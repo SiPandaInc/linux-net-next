@@ -2,7 +2,7 @@
 #include <linux/jhash.h>
 #include <linux/netfilter.h>
 #include <linux/rcupdate.h>
-#include <linux/rhashtable.h>
+#include <linux/rhashtable.h> // use them in kparser
 #include <linux/vmalloc.h>
 #include <net/genetlink.h>
 #include <net/ila.h>
@@ -19,7 +19,7 @@ struct ila_map {
 	struct ila_xlat_params xp;
 	struct rhash_head node;
 	struct ila_map __rcu *next;
-	struct rcu_head rcu;
+	struct rcu_head rcu; // read more on this
 };
 
 #define MAX_LOCKS 1024
@@ -93,6 +93,9 @@ static const struct rhashtable_params rht_params = {
 	.obj_cmpfn = ila_cmpfn,
 };
 
+// where config input is being parsed
+// similar to tlvs
+// ila_xlat_params contains all the config from tc
 static int parse_nl_config(struct genl_info *info,
 			   struct ila_xlat_params *xp)
 {
@@ -201,6 +204,8 @@ static const struct nf_hook_ops ila_nf_hook_ops[] = {
 	},
 };
 
+// kaprser_add_node
+// kparser_add_metadata etc.
 static int ila_add_mapping(struct net *net, struct ila_xlat_params *xp)
 {
 	struct ila_net *ilan = net_generic(net, ila_net_id);
