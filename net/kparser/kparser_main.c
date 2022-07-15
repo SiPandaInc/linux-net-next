@@ -39,112 +39,73 @@
 #include <net/netlink.h>
 #include <net/pkt_cls.h>
 
-static s32 kparser_cmd_handler(struct sk_buff *skb, struct genl_info *info);
+static int kparser_cli_cmd_handler(struct sk_buff *skb,
+		struct genl_info *info);
+
+//		.len = sizeof(struct struc_name),
+
+#define NS_DEFINE_POLICY_ATTR_ENTRY(id, struc_name, rsp_struc_name)\
+	[KPARSER_ATTR_CREATE_##id] = {				\
+		.type = NLA_BINARY,				\
+                .validation_type = NLA_VALIDATE_MIN,		\
+                .min = sizeof(struct struc_name)		\
+	},							\
+	[KPARSER_ATTR_UPDATE_##id] = {				\
+		.type = NLA_BINARY,				\
+		.len = sizeof(struct struc_name),		\
+                .validation_type = NLA_VALIDATE_MIN,		\
+                .min = sizeof(struct struc_name)		\
+	},							\
+	[KPARSER_ATTR_READ_##id] = {				\
+		.type = NLA_BINARY,				\
+		.len = sizeof(struct struc_name),		\
+                .validation_type = NLA_VALIDATE_MIN,		\
+                .min = sizeof(struct struc_name)		\
+	},							\
+	[KPARSER_ATTR_DELETE_##id] = {				\
+		.type = NLA_BINARY,				\
+		.len = sizeof(struct struc_name),		\
+                .validation_type = NLA_VALIDATE_MIN,		\
+                .min = sizeof(struct struc_name)		\
+	},							\
+	[KPARSER_ATTR_RSP_##id] = {				\
+		.type = NLA_BINARY,				\
+		.len = sizeof(struct rsp_struc_name),		\
+                .validation_type = NLA_VALIDATE_MIN,		\
+                .min = sizeof(struct rsp_struc_name)		\
+	}							\
 
 static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX + 1] = {
-	[KPARSER_ATTR_CREATE_MD] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_arg_md),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_arg_md)
-	},
-	[KPARSER_ATTR_CREATE_MD_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
-	[KPARSER_ATTR_CREATE_MDL] = {
-		.type = NLA_BINARY,
-//		.len = sizeof(struct kparser_arg_mdl),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_arg_mdl)
-	},
-	[KPARSER_ATTR_CREATE_MDL_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
-	[KPARSER_ATTR_CREATE_NODE] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_arg_node),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_arg_node)
-	},
-	[KPARSER_ATTR_CREATE_NODE_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
-	[KPARSER_ATTR_CREATE_TBL] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_arg_proto_tbl),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_arg_proto_tbl)
-	},
-	[KPARSER_ATTR_CREATE_TBL_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
-	[KPARSER_ATTR_CREATE_TBL_ENT] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_arg_proto_tbl),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_arg_proto_tbl)
-	},
-	[KPARSER_ATTR_CREATE_TBL_ENT_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
-	[KPARSER_ATTR_CREATE_PARSER] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_arg_parser),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_arg_parser)
-	},
-	[KPARSER_ATTR_CREATE_PARSER_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
-	[KPARSER_ATTR_DELL_ALL] = {
-		.type = NLA_BINARY,
-		.len = 0,
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = 0
-	},
-	[KPARSER_ATTR_DELL_ALL_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
-	[KPARSER_ATTR_LIST_PARSER] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_hkey),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_hkey)
-	},
-	[KPARSER_ATTR_LIST_PARSER_RSP] = {
-		.type = NLA_BINARY,
-		.len = sizeof(struct kparser_cmd_rsp_hdr),
-                .validation_type = NLA_VALIDATE_MIN,
-                .min = sizeof(struct kparser_cmd_rsp_hdr)
-	},
+	NS_DEFINE_POLICY_ATTR_ENTRY(METADATA, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(METALIST, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(NODE_PROTO, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(NODE_PARSE, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(PROTO_TABLE, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(TLV_NODE_PROTO, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(TLV_NODE_PARSE, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(TLVS_NODE_PROTO, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(TLVS_NODE_PARSE, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(TLV_PROTO_TABLE, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(PARSER, kparser_conf_cmd,
+			kparser_cmd_rsp_hdr),
 };
 
 static const struct genl_ops kparser_nl_ops[] = {
 	{
-		.cmd = KPARSER_CMD_ADD,
-		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
-		.doit = kparser_cmd_handler,
+		.cmd = KPARSER_CMD_CONFIGURE,
+		.validate = GENL_DONT_VALIDATE_STRICT |
+			GENL_DONT_VALIDATE_DUMP,
+		.doit = kparser_cli_cmd_handler,
 		.flags = GENL_ADMIN_PERM,
 	},
 };
@@ -162,81 +123,55 @@ struct genl_family kparser_nl_family __ro_after_init = {
 	.n_ops		= ARRAY_SIZE(kparser_nl_ops),
 };
 
-static s32 kparser_send_cmd_rsp(s32 cmd, s32 attrtype,
-		const struct kparser_cmd_rsp_hdr *rsp, struct genl_info *info)
+static int kparser_send_cmd_rsp(int cmd, int attrtype,
+		const struct kparser_cmd_rsp_hdr *rsp,
+		ssize_t rsp_len, struct genl_info *info)
 {
 	struct sk_buff *msg;
+	ssize_t msgsz = NLMSG_DEFAULT_SIZE;
 	void *hdr;
-	s32 ret;
+	int ret;
 
-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (rsp_len > msgsz)
+		msgsz = rsp_len;
+
+	msg = nlmsg_new(msgsz, GFP_KERNEL);
 	if (!msg)
-		return -ENOMEM;
+		return ENOMEM;
 
 	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq, &kparser_nl_family,
 			0, cmd);
 	if (!hdr) {
 		nlmsg_free(msg);
-		return -ENOBUFS;
+		return ENOBUFS;
 	}
 
-	if (nla_put(msg, attrtype, sizeof(*rsp), rsp)) {
+	if (nla_put(msg, attrtype, (int) rsp_len, rsp)) {
 		genlmsg_cancel(msg, hdr);
 		nlmsg_free(msg);
-		return -EMSGSIZE;
+		return EMSGSIZE;
 	}
 
 	genlmsg_end(msg, hdr);
 	ret = genlmsg_reply(msg, info);
 
 	// pr_debug("genlmsg_reply() ret:%d\n", ret);
-
 	return ret;
 }
 
-typedef s32 kparser_ops(const struct nlattr *, struct kparser_cmd_rsp_hdr *);
+typedef int kparser_ops(const void *, ssize_t,
+		struct kparser_cmd_rsp_hdr **, ssize_t *);
 
-#define DEFINE_FUNCTION(suffix, arg_suffix, attr)			\
-static s32 kparser_create_##suffix(const struct nlattr *nl_curr_attr,	\
-		struct kparser_cmd_rsp_hdr *rsp)			\
-{									\
-	struct kparser_arg_##arg_suffix *cmd_arg = nla_data(nl_curr_attr);\
-									\
-	rsp->op_ret_code = 0;						\
-	rsp->err_str_buf[0] = '\0';					\
-	if (nla_len(nl_curr_attr) < sizeof(*cmd_arg) ) {		\
-		(void) snprintf(rsp->err_str_buf,			\
-				sizeof(rsp->err_str_buf),		\
-				"%s: attr size %d is less than min cmd "\
-				"arg size %lu", __FUNCTION__, 		\
-				nla_len(nl_curr_attr),			\
-				sizeof(*cmd_arg));			\
-		rsp->op_ret_code = -EINVAL;				\
-	} else {							\
-		kparser_add_##suffix(cmd_arg, rsp);			\
-	}								\
-	return attr;							\
-}									\
-
-DEFINE_FUNCTION(md, md, KPARSER_ATTR_CREATE_MD_RSP);
-DEFINE_FUNCTION(mdl, mdl, KPARSER_ATTR_CREATE_MDL_RSP);
-DEFINE_FUNCTION(node, node, KPARSER_ATTR_CREATE_NODE_RSP);
-DEFINE_FUNCTION(proto_tbl, proto_tbl, KPARSER_ATTR_CREATE_TBL_RSP);
-DEFINE_FUNCTION(proto_tbl_ent, proto_tbl, KPARSER_ATTR_CREATE_TBL_ENT_RSP);
-DEFINE_FUNCTION(parser, parser, KPARSER_ATTR_CREATE_PARSER_RSP);
-
-static s32 kparser_dell_all(const struct nlattr *nl_curr_attr,
-		struct kparser_cmd_rsp_hdr *rsp)
+#if 0
+static int kparser_dell_all(const struct nlattr *nl_curr_attr,
+		struct kparser_cmd_rsp_hdr **rsp, ssize_t *rsp_len)
 {
-	rsp->op_ret_code = 0;
-	rsp->err_str_buf[0] = '\0';
+	kparser_del_all(NULL, rsp, rsp_len);
 
-	kparser_del_all(NULL, rsp);
-
-	return KPARSER_ATTR_DELL_ALL_RSP;
+	return 0; // KPARSER_ATTR_DELL_ALL_RSP;
 }
 
-static s32 kparser_list_all(const struct nlattr *nl_curr_attr,
+static int kparser_list_all(const struct nlattr *nl_curr_attr,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
 	struct kparser_hkey *cmd_arg = nla_data(nl_curr_attr);
@@ -256,79 +191,135 @@ static s32 kparser_list_all(const struct nlattr *nl_curr_attr,
 		kparser_ls_all(cmd_arg, rsp);
 	}
 
-	return KPARSER_ATTR_LIST_PARSER_RSP;
+	return 0; // KPARSER_ATTR_LIST_PARSER_RSP;
 }
+#endif
 
-static kparser_ops *kparser_op_handler[KPARSER_ATTR_MAX+1] = {
+#define KPARSER_NS_DEFINE_OP_HANDLERS(NS_ID) 				\
+	[KPARSER_ATTR_CREATE_##NS_ID] = kparser_config_handler_add,	\
+	[KPARSER_ATTR_UPDATE_##NS_ID] = kparser_config_handler_update,	\
+	[KPARSER_ATTR_READ_##NS_ID] = kparser_config_handler_read,	\
+	[KPARSER_ATTR_DELETE_##NS_ID] = kparser_config_handler_delete,	\
+	[KPARSER_ATTR_RSP_##NS_ID] = NULL 				\
+
+static kparser_ops *kparser_ns_op_handler[KPARSER_ATTR_MAX + 1] = {
 	NULL,
-	kparser_create_md,
-	NULL,
-	kparser_create_mdl,
-	NULL,
-	kparser_create_node,
-	NULL,
-	kparser_create_proto_tbl,
-	NULL,
-	kparser_create_proto_tbl_ent,
-	NULL,
-	kparser_create_parser,
-	NULL,
-	kparser_dell_all,
-	NULL,
-	kparser_list_all,
-	NULL,
+	KPARSER_NS_DEFINE_OP_HANDLERS(METADATA),
+	KPARSER_NS_DEFINE_OP_HANDLERS(METALIST),
+	KPARSER_NS_DEFINE_OP_HANDLERS(NODE_PROTO),
+	KPARSER_NS_DEFINE_OP_HANDLERS(NODE_PARSE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(PROTO_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(TLV_NODE_PROTO),
+	KPARSER_NS_DEFINE_OP_HANDLERS(TLV_NODE_PARSE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(TLVS_NODE_PROTO),
+	KPARSER_NS_DEFINE_OP_HANDLERS(TLVS_NODE_PARSE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(TLV_PROTO_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(PARSER),
+	// kparser_dell_all,
+	// kparser_list_all,
 };
 
-static s32 kparser_cmd_handler(struct sk_buff *skb, struct genl_info *info)
+static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 {
-	struct kparser_cmd_rsp_hdr rsp_buf;
-	s32 ret_attr_id;
-	s32 attr_idx;
-	s32 rc;
+	struct kparser_cmd_rsp_hdr *rsp = NULL;
+	ssize_t rsp_len = 0;
+	int ret_attr_id;
+	int attr_idx;
+	int rc;
 
-	for (attr_idx = KPARSER_ATTR_UNSPEC+1; attr_idx < KPARSER_ATTR_MAX;
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	for (attr_idx = KPARSER_ATTR_UNSPEC + 1; attr_idx <= KPARSER_ATTR_MAX;
 			attr_idx++) {
-		if (info->attrs[attr_idx] && kparser_op_handler[attr_idx]) {
-			ret_attr_id = kparser_op_handler[attr_idx](
-					info->attrs[attr_idx], &rsp_buf);
-			rc = kparser_send_cmd_rsp(KPARSER_CMD_ADD, ret_attr_id,
-					&rsp_buf, info);
-			if (rc) {
-				printk("kparser_send_cmd_rsp() failed,"
-						"attr:%d, rc:%d\n",
-						attr_idx, rc);
-			}
+
+		if (!info->attrs[attr_idx] || !kparser_ns_op_handler[attr_idx])
+			continue;
+
+		ret_attr_id = kparser_ns_op_handler[attr_idx](
+				nla_data(info->attrs[attr_idx]),
+				nla_len(info->attrs[attr_idx]), &rsp,
+				&rsp_len);
+
+		if (ret_attr_id <= KPARSER_ATTR_UNSPEC ||
+				ret_attr_id > KPARSER_ATTR_MAX) {
+			pr_debug("%s: attr %d handler failed\n",
+					__FUNCTION__, attr_idx);
+			rc = EIO;
+			goto out;
 		}
+
+		rc = kparser_send_cmd_rsp(KPARSER_CMD_CONFIGURE,
+				ret_attr_id, rsp, rsp_len, info);
+		if (rc) {
+			printk("kparser_send_cmd_rsp() failed,"
+					"attr:%d, rc:%d\n",
+					attr_idx, rc);
+			rc = EIO;
+			goto out;
+		}
+
+		kfree(rsp);
+		rsp = NULL;
+		rsp_len = 0;
 	}
+
+out:
+	if (rsp)
+		kfree(rsp);
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
 	return rc;
 }
 
 static int __init init_kparser(void)
 {
-	int ret;
-	pr_debug("kparser init is started.\n");
-	ret = genl_register_family(&kparser_nl_family);
-	if (ret) {
+	int rc;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	rc = genl_register_family(&kparser_nl_family);
+	if (rc) {
 		printk("genl_register_family failed\n");
-		genl_unregister_family(&kparser_nl_family);
+		pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+		return rc;
 	}
-	ret = kparser_init();
-	if (ret != 0)
-		printk("kparser_init() err:%d\n", ret);
-	pr_debug("kparser init is done.\n");
-	return 0;
+	
+	rc = kparser_init();
+	if (rc) {
+		printk("kparser_init() err:%d\n", rc);
+		goto out;
+	}
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	return rc;
+
+out:
+	rc = genl_unregister_family(&kparser_nl_family);
+	if (rc != 0)
+		printk("kparser_deinit() err:%d\n", rc);
+
+	pr_debug("ERR OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	return rc;
 }
 
 static void __exit exit_kparser(void)
 {
-	s32 rc;
-	pr_debug("kparser exit is started.\n");
-	genl_unregister_family(&kparser_nl_family);
+	int rc;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	rc = genl_unregister_family(&kparser_nl_family);
+	if (rc != 0)
+		printk("genl_unregister_family() err:%d\n", rc);
+
 	rc = kparser_deinit();
 	if (rc != 0)
 		printk("kparser_deinit() err:%d\n", rc);
-	pr_debug("kparser exit is done.\n");
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 }
 
 module_init(init_kparser);
@@ -336,4 +327,4 @@ module_exit(exit_kparser);
 MODULE_AUTHOR("Pratyush Khan <pratyush@sipanda.io>");
 MODULE_AUTHOR("SiPanda Inc");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Configurable PANDA Parser in Kernel (KPARSER)");
+MODULE_DESCRIPTION("Configurable Parameterized Parser in Kernel (KPARSER)");
