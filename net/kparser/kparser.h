@@ -334,6 +334,9 @@ void kparser_ls_all(const struct kparser_hkey *cmdarg,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
 #endif
 
+int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
+		size_t parse_len, void *_metadata, size_t _metadata_len);
+
 int kparser_do_parse(const struct kparser_hkey *kparser_key, void *_hdr,
 		ssize_t parse_len,  void *_metadata, ssize_t _metadata_len);
 

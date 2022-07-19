@@ -103,7 +103,11 @@ enum kparser_global_namespace_ids {
 	KPARSER_NS_FIELD,
 	KPARSER_NS_FIELDS,
 	KPARSER_NS_PARSER,
+
 	KPARSER_NS_CONDEXPRS,
+	KPARSER_NS_CONDEXPRS_TABLE,
+	KPARSER_NS_CONDEXPRS_TABLES,
+
 	KPARSER_NS_MAX
 };
 
@@ -122,7 +126,10 @@ enum kparser_global_namespace_ids {
 
 #define KPARSER_NAMESPACE_NAME_FIELDS "flags_fields"
 #define KPARSER_NAMESPACE_NAME_PARSER "parser"
-#define KPARSER_NAMESPACE_NAME_COND_EXPRS "condexprs"
+
+#define KPARSER_NAMESPACE_NAME_CONDEXPRS "condexprs"
+#define KPARSER_NAMESPACE_NAME_CONDEXPRS_TABLE "condexprs_table"
+#define KPARSER_NAMESPACE_NAME_CONDEXPRS_TABLES "condexprs_tables"
 
 struct kparser_global_namespaces {
 	enum kparser_global_namespace_ids name_space_id;
@@ -141,25 +148,30 @@ struct kparser_global_namespaces {
 	KPARSER_ATTR_UPDATE_##id_suffix,	/* NLA_BINARY */\
 	KPARSER_ATTR_READ_##id_suffix,		/* NLA_BINARY */\
 	KPARSER_ATTR_DELETE_##id_suffix,	/* NLA_BINARY */\
-	KPARSER_ATTR_RSP_##id_suffix,				\
+	KPARSER_ATTR_RSP_##id_suffix				\
 
 enum {
 	KPARSER_ATTR_UNSPEC,
 
-	KPARSER_DEFINE_ATTR_IDS(METADATA)
-	KPARSER_DEFINE_ATTR_IDS(METALIST)
+	KPARSER_DEFINE_ATTR_IDS(METADATA),
+	KPARSER_DEFINE_ATTR_IDS(METALIST),
 
-	KPARSER_DEFINE_ATTR_IDS(NODE_PROTO)
-	KPARSER_DEFINE_ATTR_IDS(NODE_PARSE)
-	KPARSER_DEFINE_ATTR_IDS(PROTO_TABLE)
+	KPARSER_DEFINE_ATTR_IDS(NODE_PROTO),
+	KPARSER_DEFINE_ATTR_IDS(NODE_PARSE),
+	KPARSER_DEFINE_ATTR_IDS(PROTO_TABLE),
 
-	KPARSER_DEFINE_ATTR_IDS(TLV_NODE_PROTO)
-	KPARSER_DEFINE_ATTR_IDS(TLV_NODE_PARSE)
-	KPARSER_DEFINE_ATTR_IDS(TLVS_NODE_PROTO)
-	KPARSER_DEFINE_ATTR_IDS(TLVS_NODE_PARSE)
-	KPARSER_DEFINE_ATTR_IDS(TLV_PROTO_TABLE)
+	KPARSER_DEFINE_ATTR_IDS(TLV_NODE_PROTO),
+	KPARSER_DEFINE_ATTR_IDS(TLV_NODE_PARSE),
+	KPARSER_DEFINE_ATTR_IDS(TLVS_NODE_PROTO),
+	KPARSER_DEFINE_ATTR_IDS(TLVS_NODE_PARSE),
+	KPARSER_DEFINE_ATTR_IDS(TLV_PROTO_TABLE),
 
-	KPARSER_DEFINE_ATTR_IDS(PARSER)
+	KPARSER_DEFINE_ATTR_IDS(PARSER),
+
+
+	KPARSER_DEFINE_ATTR_IDS(CONDEXPRS),
+	KPARSER_DEFINE_ATTR_IDS(CONDEXPRS_TABLE),
+	KPARSER_DEFINE_ATTR_IDS(CONDEXPRS_TABLES),
 
 	KPARSER_ATTR_DELETE_ALL,
 	KPARSER_ATTR_LIST_ALL,
@@ -242,8 +254,12 @@ struct kparser_parameterized_next_proto {
 };
 
 struct kparser_conf_parse_ops {
+	bool flag_fields_length;
+	bool len_parameterized;
         struct kparser_parameterized_len pflen;
+	bool next_proto_parameterized;
         struct kparser_parameterized_next_proto pfnext_proto;
+	bool cond_exprs_parameterized;
 	struct kparser_hkey cond_exprs_table;
 };
 
@@ -381,6 +397,11 @@ struct kparser_conf_tlv_proto_table {
 	struct kparser_hkey parse_tlv_node_key;
 };
 
+/* Make the parser */
+#define KPARSER_MAX_NODES        1
+#define KPARSER_MAX_ENCAPS       0
+#define KPARSER_MAX_FRAMES       0
+
 /* Configuration for a KPARSER parser
  *
  * flags: Flags KPARSER_F_* in parser.h
@@ -409,6 +430,49 @@ struct kparser_conf_parser {
 	struct kparser_hkey fail_node_key;
 };
 
+/* Defines for parser conditional expressions */
+enum kparser_condexpr_types {
+	KPARSER_CONDEXPR_TYPE_OR,
+	KPARSER_CONDEXPR_TYPE_AND,
+};
+
+enum kparser_expr_types {
+	KPARSER_CONDEXPR_TYPE_EQUAL,
+	KPARSER_CONDEXPR_TYPE_NOTEQUAL,
+	KPARSER_CONDEXPR_TYPE_LT,
+	KPARSER_CONDEXPR_TYPE_LTE,
+	KPARSER_CONDEXPR_TYPE_GT,
+	KPARSER_CONDEXPR_TYPE_GTE,
+};
+
+/* One boolean condition expressions */
+struct kparser_condexpr_expr {
+	enum kparser_expr_types type;
+	__u16 src_off;
+	__u8 length;
+	__u32 mask;
+	__u32 value;
+};
+
+struct kparser_conf_condexpr {
+	struct kparser_hkey key;
+	struct kparser_condexpr_expr config;
+};
+
+struct kparser_conf_condexpr_table {
+	struct kparser_hkey key;
+	int idx;
+	int default_fail;
+	enum kparser_condexpr_types type;
+	struct kparser_hkey condexpr_expr_key;
+};
+
+struct kparser_conf_condexpr_tables {
+	struct kparser_hkey key;
+	int idx;
+	struct kparser_hkey condexpr_expr_table_key;
+};
+
 struct kparser_conf_cmd {
 	enum kparser_global_namespace_ids namespace_id;
 	union {
@@ -423,6 +487,9 @@ struct kparser_conf_cmd {
 		struct kparser_conf_tlvs_node_proto tlvs_node_proto_conf;
 		struct kparser_conf_tlvs_node_parse tlvs_node_parse_conf;
 		struct kparser_conf_tlv_proto_table tlv_proto_table_conf;
+		struct kparser_conf_condexpr cond_conf;
+		struct kparser_conf_condexpr_table cond_table_conf;
+		struct kparser_conf_condexpr_tables cond_tables_conf;
 		struct kparser_conf_parser parser_conf;
 	};
 };
@@ -436,6 +503,91 @@ struct kparser_cmd_rsp_hdr {
 	// variable list of objects
 	struct kparser_conf_cmd objects[0];
 };
+
+enum {
+	KPARSER_OKAY = 0,			/* Okay and continue */
+	KPARSER_RET_OKAY = -1,		/* Encoding of OKAY in ret code */
+
+	KPARSER_OKAY_USE_WILD = -2,	/* cam instruction */
+	KPARSER_OKAY_USE_ALT_WILD = -3,	/* cam instruction */
+
+	KPARSER_STOP_OKAY = -4,		/* Okay and stop parsing */
+	KPARSER_STOP_NODE_OKAY = -5,	/* Stop parsing current node */
+	KPARSER_STOP_SUB_NODE_OKAY = -6,	/* Stop parsing currnet sub-node */
+
+	/* Parser failure */
+	KPARSER_STOP_FAIL = -12,
+	KPARSER_STOP_LENGTH = -13,
+	KPARSER_STOP_UNKNOWN_PROTO = -14,
+	KPARSER_STOP_ENCAP_DEPTH = -15,
+	KPARSER_STOP_UNKNOWN_TLV = -16,
+	KPARSER_STOP_TLV_LENGTH = -17,
+	KPARSER_STOP_BAD_FLAG = -18,
+	KPARSER_STOP_FAIL_CMP = -19,
+	KPARSER_STOP_LOOP_CNT = -20,
+	KPARSER_STOP_TLV_PADDING = -21,
+	KPARSER_STOP_OPTION_LIMIT = -22,
+	KPARSER_STOP_MAX_NODES = -23,
+	KPARSER_STOP_COMPARE = -24,
+	KPARSER_STOP_CNTR1 = -25,
+	KPARSER_STOP_CNTR2 = -26,
+	KPARSER_STOP_CNTR3 = -27,
+	KPARSER_STOP_CNTR4 = -28,
+	KPARSER_STOP_CNTR5 = -29,
+
+	KPARSER_STOP_THREADS_FAIL = -31,
+};
+
+static inline const char *kparser_code_to_text(int code)
+{
+	switch (code) {
+	case KPARSER_OKAY:
+		return "okay";
+	case KPARSER_RET_OKAY:
+		return "okay-ret";
+	case KPARSER_OKAY_USE_WILD:
+		return "okay-use-wild";
+	case KPARSER_OKAY_USE_ALT_WILD:
+		return "okay-use-alt-wild";
+	case KPARSER_STOP_OKAY:
+		return "stop-okay";
+	case KPARSER_STOP_NODE_OKAY:
+		return "stop-node-okay";
+	case KPARSER_STOP_SUB_NODE_OKAY:
+		return "stop-sub-node-okay";
+	case KPARSER_STOP_FAIL:
+		return "stop-fail";
+	case KPARSER_STOP_LENGTH:
+		return "stop-length";
+	case KPARSER_STOP_UNKNOWN_PROTO:
+		return "stop-unknown-proto";
+	case KPARSER_STOP_ENCAP_DEPTH:
+		return "stop-encap-depth";
+	case KPARSER_STOP_UNKNOWN_TLV:
+		return "stop-unknown-tlv";
+	case KPARSER_STOP_TLV_LENGTH:
+		return "stop-tlv-length";
+	case KPARSER_STOP_BAD_FLAG:
+		return "stop-bad-flag";
+	case KPARSER_STOP_FAIL_CMP:
+		return "stop-fail-cmp";
+	case KPARSER_STOP_LOOP_CNT:
+		return "stop-loop-cnt";
+	case KPARSER_STOP_TLV_PADDING:
+		return "stop-tlv-padding";
+	case KPARSER_STOP_OPTION_LIMIT:
+		return "stop-option-limit";
+	case KPARSER_STOP_MAX_NODES:
+		return "stop-max-nodes";
+	case KPARSER_STOP_COMPARE:
+		return "stop-compare";
+	case KPARSER_STOP_THREADS_FAIL:
+		return "stop-thread-fail";
+	default:
+		return "unknown-code";
+	}
+}
+
 
 static inline bool kparser_hkey_id_empty(const struct kparser_hkey *key)
 {

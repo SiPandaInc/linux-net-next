@@ -34,6 +34,7 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/rcupdate.h>
 #include <linux/rhashtable-types.h>
 #include <linux/skbuff.h>
 #include <linux/xxhash.h>
@@ -60,90 +61,6 @@
 	(KPARSER_IS_RET_CODE(X) &&					\
 	 KPARSER_EXTRACT_CODE(X) >	KPARSER_STOP_FAIL)
 
-enum {
-	KPARSER_OKAY = 0,			/* Okay and continue */
-	KPARSER_RET_OKAY = -1,		/* Encoding of OKAY in ret code */
-
-	KPARSER_OKAY_USE_WILD = -2,	/* cam instruction */
-	KPARSER_OKAY_USE_ALT_WILD = -3,	/* cam instruction */
-
-	KPARSER_STOP_OKAY = -4,		/* Okay and stop parsing */
-	KPARSER_STOP_NODE_OKAY = -5,	/* Stop parsing current node */
-	KPARSER_STOP_SUB_NODE_OKAY = -6,	/* Stop parsing currnet sub-node */
-
-	/* Parser failure */
-	KPARSER_STOP_FAIL = -12,
-	KPARSER_STOP_LENGTH = -13,
-	KPARSER_STOP_UNKNOWN_PROTO = -14,
-	KPARSER_STOP_ENCAP_DEPTH = -15,
-	KPARSER_STOP_UNKNOWN_TLV = -16,
-	KPARSER_STOP_TLV_LENGTH = -17,
-	KPARSER_STOP_BAD_FLAG = -18,
-	KPARSER_STOP_FAIL_CMP = -19,
-	KPARSER_STOP_LOOP_CNT = -20,
-	KPARSER_STOP_TLV_PADDING = -21,
-	KPARSER_STOP_OPTION_LIMIT = -22,
-	KPARSER_STOP_MAX_NODES = -23,
-	KPARSER_STOP_COMPARE = -24,
-	KPARSER_STOP_CNTR1 = -25,
-	KPARSER_STOP_CNTR2 = -26,
-	KPARSER_STOP_CNTR3 = -27,
-	KPARSER_STOP_CNTR4 = -28,
-	KPARSER_STOP_CNTR5 = -29,
-
-	KPARSER_STOP_THREADS_FAIL = -31,
-};
-
-static inline const char *kparser_code_to_text(int code)
-{
-	switch (code) {
-	case KPARSER_OKAY:
-		return "okay";
-	case KPARSER_RET_OKAY:
-		return "okay-ret";
-	case KPARSER_OKAY_USE_WILD:
-		return "okay-use-wild";
-	case KPARSER_OKAY_USE_ALT_WILD:
-		return "okay-use-alt-wild";
-	case KPARSER_STOP_OKAY:
-		return "stop-okay";
-	case KPARSER_STOP_NODE_OKAY:
-		return "stop-node-okay";
-	case KPARSER_STOP_SUB_NODE_OKAY:
-		return "stop-sub-node-okay";
-	case KPARSER_STOP_FAIL:
-		return "stop-fail";
-	case KPARSER_STOP_LENGTH:
-		return "stop-length";
-	case KPARSER_STOP_UNKNOWN_PROTO:
-		return "stop-unknown-proto";
-	case KPARSER_STOP_ENCAP_DEPTH:
-		return "stop-encap-depth";
-	case KPARSER_STOP_UNKNOWN_TLV:
-		return "stop-unknown-tlv";
-	case KPARSER_STOP_TLV_LENGTH:
-		return "stop-tlv-length";
-	case KPARSER_STOP_BAD_FLAG:
-		return "stop-bad-flag";
-	case KPARSER_STOP_FAIL_CMP:
-		return "stop-fail-cmp";
-	case KPARSER_STOP_LOOP_CNT:
-		return "stop-loop-cnt";
-	case KPARSER_STOP_TLV_PADDING:
-		return "stop-tlv-padding";
-	case KPARSER_STOP_OPTION_LIMIT:
-		return "stop-option-limit";
-	case KPARSER_STOP_MAX_NODES:
-		return "stop-max-nodes";
-	case KPARSER_STOP_COMPARE:
-		return "stop-compare";
-	case KPARSER_STOP_THREADS_FAIL:
-		return "stop-thread-fail";
-	default:
-		return "unknown-code";
-	}
-}
-
 /* Two bit code that describes the action to take when a loop node
  * exceeds a limit
  */
@@ -168,31 +85,6 @@ static inline __u64 kparser_ins32_disp_to_code(unsigned int disp)
 		return KPARSER_STOP_FAIL;
 	}
 }
-
-/* Defines for parser conditional expressions */
-
-enum kparser_condexpr_types {
-	KPARSER_CONDEXPR_TYPE_OR,
-	KPARSER_CONDEXPR_TYPE_AND,
-};
-
-enum kparser_expr_types {
-	KPARSER_CONDEXPR_TYPE_EQUAL,
-	KPARSER_CONDEXPR_TYPE_NOTEQUAL,
-	KPARSER_CONDEXPR_TYPE_LT,
-	KPARSER_CONDEXPR_TYPE_LTE,
-	KPARSER_CONDEXPR_TYPE_GT,
-	KPARSER_CONDEXPR_TYPE_GTE,
-};
-
-/* One boolean condition expressions */
-struct kparser_condexpr_expr {
-	enum kparser_expr_types type;
-	__u16 src_off;
-	__u8 length;
-	__u32 mask;
-	__u32 value;
-};
 
 /* A table of conditional expressions, type indicates that the expressions
  * are or'ed of and'ed
@@ -234,9 +126,13 @@ struct kparser_condexpr_tables {
  */
 
 struct kparser_parse_ops {
-	const struct kparser_parameterized_len pflen;
-	const struct kparser_parameterized_next_proto pfnext_proto;
-	const struct kparser_condexpr_tables cond_exprs;
+	bool flag_fields_length;
+	bool len_parameterized;
+	struct kparser_parameterized_len pflen;
+	bool next_proto_parameterized;
+	struct kparser_parameterized_next_proto pfnext_proto;
+	bool cond_exprs_parameterized;
+	struct kparser_condexpr_tables cond_exprs;
 };
 
 /* Protocol node
@@ -257,9 +153,9 @@ struct kparser_proto_node {
 	enum kparser_node_type node_type;
 	__u8 encap;
 	__u8 overlay;
-	const char name[KPARSER_MAX_NAME];
+	char name[KPARSER_MAX_NAME];
 	size_t min_len;
-	const struct kparser_parse_ops ops;
+	struct kparser_parse_ops ops;
 };
 
 /* Control data describing various values produced while parsing. This is
@@ -343,7 +239,7 @@ struct kparser_parse_node {
  * config: Parser conifguration
  */
 struct kparser_parser {
-	const char name[KPARSER_MAX_NAME];
+	char name[KPARSER_MAX_NAME];
 	const struct kparser_parse_node __rcu *root_node;
 	const struct kparser_parse_node __rcu *okay_node;
 	const struct kparser_parse_node __rcu *fail_node;
@@ -354,6 +250,17 @@ static inline bool kparser_proto_node_convert(
 		const struct kparser_conf_node_proto *conf,
 		struct kparser_proto_node *node)
 {
+	node->node_type = KPARSER_NODE_TYPE_PLAIN;
+	node->encap = conf->encap;
+	node->overlay = conf->overlay;
+	strcpy(node->name, conf->key.name);
+	node->min_len = conf->min_len;
+	node->ops.flag_fields_length = conf->ops.flag_fields_length;
+	node->ops.next_proto_parameterized = conf->ops.next_proto_parameterized;
+	node->ops.cond_exprs_parameterized = conf->ops.cond_exprs_parameterized;
+	node->ops.pflen = conf->ops.pflen;
+	node->ops.pfnext_proto = conf->ops.pfnext_proto;
+
 	return true;
 }
 
@@ -365,6 +272,11 @@ static inline bool kparser_parse_node_convert(
 		const struct kparser_parse_node *wildcard_node,
 		const struct kparser_metadata_table *metadata_table)
 {
+	node->node_type = KPARSER_NODE_TYPE_PLAIN;
+	rcu_assign_pointer(node->proto_node, proto_node);
+	rcu_assign_pointer(node->proto_table, proto_table);
+	rcu_assign_pointer(node->wildcard_node, wildcard_node);
+	rcu_assign_pointer(node->metadata_table, metadata_table);
 	return true;
 }
 
@@ -375,6 +287,11 @@ static inline bool kparser_parser_convert(
 		const struct kparser_parse_node *ok_node,
 		const struct kparser_parse_node *fail_node)
 {
+	strcpy(parser->name, conf->key.name);
+	rcu_assign_pointer(parser->root_node, root_node);
+	rcu_assign_pointer(parser->okay_node, ok_node);
+	rcu_assign_pointer(parser->fail_node, fail_node);
+	parser->config = conf->config;
 	return true;
 }
 

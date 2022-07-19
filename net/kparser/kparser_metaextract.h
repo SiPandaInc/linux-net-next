@@ -137,6 +137,9 @@ struct kparser_metadata_extract {
 		} control;
 		__u32 val;
 	};
+	int ktype;
+	__u16 ksoff;
+	__u16 kdoff;
 };
 
 /* Helper macros to make various pseudo instructions */
@@ -802,6 +805,10 @@ static inline bool kparser_md_convert(const struct kparser_conf_metadata *conf,
 
 	*mde = __kparser_metadata_set_control(conf->frame,
 		encoding_type, conf->doff);
+
+	mde->ktype = conf->type;
+	mde->ksoff = conf->soff;
+	mde->kdoff = conf->doff;
 
 	return true;
 }
