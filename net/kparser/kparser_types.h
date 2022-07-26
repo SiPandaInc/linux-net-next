@@ -39,52 +39,12 @@
 #include <linux/skbuff.h>
 #include <linux/xxhash.h>
 
-/* Panda parser return codes
- *
- * There are two variants of the KPARSER return codes. The normal variant is
- * a number between -15 and 0 inclusive where the name for the code is
- * prefixed by KPARSER_. There is also a special 16-bit encoding which is
- * 0xfff0 + -val where val is the negative number for the code so that
- * corresponds to values 0xfff0 to 0xffff. Names for the 16-bit encoding
- * are prefixed by KPARSER_16BIT_
- */
-
 /* Sign extend an returned signed value */
 #define KPARSER_EXTRACT_CODE(X) ((__s64)(short)(X))
-
 #define KPARSER_IS_RET_CODE(X) (KPARSER_EXTRACT_CODE(X) < 0)
-
-#define KPARSER_IS_NOT_OK_CODE(X)					\
-	(KPARSER_EXTRACT_CODE(X) <= KPARSER_STOP_FAIL)
-
-#define KPARSER_IS_OK_CODE(X)					\
-	(KPARSER_IS_RET_CODE(X) &&					\
-	 KPARSER_EXTRACT_CODE(X) >	KPARSER_STOP_FAIL)
-
-/* Two bit code that describes the action to take when a loop node
- * exceeds a limit
- */
-enum {
-	KPARSER_LOOP_DISP_STOP_OKAY = 0,
-	KPARSER_LOOP_DISP_STOP_NODE_OKAY = 1,
-	KPARSER_LOOP_DISP_STOP_SUB_NODE_OKAY = 2,
-	KPARSER_LOOP_DISP_STOP_FAIL = 3,
-};
-
-static inline __u64 kparser_ins32_disp_to_code(unsigned int disp)
-{
-	switch (disp) {
-	case KPARSER_LOOP_DISP_STOP_OKAY:
-		return KPARSER_STOP_OKAY;
-	case KPARSER_LOOP_DISP_STOP_NODE_OKAY:
-		return KPARSER_STOP_NODE_OKAY;
-	case KPARSER_LOOP_DISP_STOP_SUB_NODE_OKAY:
-		return KPARSER_STOP_SUB_NODE_OKAY;
-	case KPARSER_LOOP_DISP_STOP_FAIL:
-	default:
-		return KPARSER_STOP_FAIL;
-	}
-}
+#define KPARSER_IS_NOT_OK_CODE(X) (KPARSER_EXTRACT_CODE(X) <= KPARSER_STOP_FAIL)
+#define KPARSER_IS_OK_CODE(X)						\
+	(KPARSER_IS_RET_CODE(X) && KPARSER_EXTRACT_CODE(X) > KPARSER_STOP_FAIL)
 
 /* A table of conditional expressions, type indicates that the expressions
  * are or'ed of and'ed
@@ -103,6 +63,21 @@ struct kparser_condexpr_tables {
 	unsigned int num_ents;
 	const struct kparser_condexpr_table __rcu **entries;
 };
+
+/* Control data describing various values produced while parsing. This is
+ * used an argument to metadata extraction and handler functions
+ */
+struct kparser_ctrl_data {
+	int ret;
+	size_t pkt_len;
+	__u16 pkt_csum;
+	__u16 hdr_csum;
+	void *hdr_base;
+	unsigned int node_cnt;
+	unsigned int encap_levels;
+};
+
+/*****************************************************************************/
 
 /* Protocol parsing operations:
  *
@@ -150,25 +125,10 @@ struct kparser_parse_ops {
  * ops: Operations to parse protocol header
  */
 struct kparser_proto_node {
-	enum kparser_node_type node_type;
 	__u8 encap;
 	__u8 overlay;
-	char name[KPARSER_MAX_NAME];
 	size_t min_len;
 	struct kparser_parse_ops ops;
-};
-
-/* Control data describing various values produced while parsing. This is
- * used an argument to metadata extraction and handler functions
- */
-struct kparser_ctrl_data {
-	int ret;
-	size_t pkt_len;
-	__u16 pkt_csum;
-	__u16 hdr_csum;
-	void *hdr_base;
-	unsigned int node_cnt;
-	unsigned int encap_levels;
 };
 
 /* Protocol node and parse node operations ordering. When processing a
@@ -179,9 +139,6 @@ struct kparser_ctrl_data {
  * parseop.handle_proto
  * protoop.next_proto
  */
-
-struct kparser_parse_node;
-
 /* One entry in a protocol table:
  *	value: protocol number
  *	node: associated parse node for the protocol number
@@ -201,7 +158,138 @@ struct kparser_proto_table {
 	struct kparser_proto_table_entry __rcu *entries;
 };
 
-struct kparser_metadata_table;
+/*****************************************************************************/
+
+struct kparser_cntrs_conf {
+	struct kparser_cntr_conf cntrs[KPARSER_CNTR_NUM_CNTRS];
+};
+
+struct kparser_counters {
+	unsigned int cntr[KPARSER_CNTR_NUM_CNTRS];
+};
+
+/*****************************************************************************/
+
+/* Definitions for parsing TLVs
+ *
+ * Operations can be specified either as a function or a parameterization
+ * of a parameterized function
+ *
+ * TLVs are a common protocol header structure consisting of Type, Length,
+ * Value tuple (e.g. for handling TCP or IPv6 HBH options TLVs)
+ */
+
+#if 0
+/* Descriptor for parsing operations of one type of TLV. Fields are:
+ *
+ * start_offset: Returns the offset of TLVs in a header
+ * len: Return length of a TLV. Must be set. If the return value < 0 (a
+ *	KPARSER_STOP_* return code value) this indicates an error and parsing
+ *	is stopped. A the return value greater than or equal to zero then
+ *	gives the protocol length. If the returned length is less than the
+ *	minimum TLV option length, indicated by min_len by the TLV protocol
+ *	node, then this considered and error.
+ * type: Return the type of the TLV. If the return value is less than zero
+ *	(KPARSER_STOP_* value) then this indicates and error and parsing stops
+ */
+struct kparser_proto_tlvs_opts {
+	struct kparser_parameterized_len pfstart_offset;
+	bool len_parameterized;
+	struct kparser_parameterized_len pflen;
+	bool type_parameterized;
+	struct kparser_parameterized_next_proto pftype;
+};
+#endif
+
+/* A protocol node for parsing proto with TLVs
+ *
+ * proto_node: proto node
+ * ops: Operations for parsing TLVs
+ * start_offset: When there TLVs start relative the enapsulating protocol
+ *	(e.g. would be twenty for TCP)
+ * pad1_val: Type value indicating one byte of TLV padding (e.g. would be
+ *	for IPv6 HBH TLVs)
+ * pad1_enable: Pad1 value is used to detect single byte padding
+ * eol_val: Type value that indicates end of TLV list
+ * eol_enable: End of list value in eol_val is used
+ * fixed_start_offset: Take start offset from start_offset
+ * min_len: Minimal length of a TLV option
+ */
+struct kparser_proto_tlvs_node {
+	struct kparser_proto_node proto_node;
+	struct kparser_proto_tlvs_opts ops;
+	size_t start_offset;
+	__u8 pad1_val;
+	__u8 padn_val;
+	__u8 eol_val;
+	bool pad1_enable;
+	bool padn_enable;
+	bool eol_enable;
+	bool fixed_start_offset;
+	size_t min_len;
+};
+
+/*****************************************************************************/
+
+/* Definitions and functions for processing and parsing flag-fields */
+/* Definitions for parsing flag-fields
+ *
+ * Flag-fields is a common networking protocol construct that encodes optional
+ * data in a set of flags and data fields. The flags indicate whether or not a
+ * corresponding data field is present. The data fields are fixed length per
+ * each flag-field definition and ordered by the ordering of the flags
+ * indicating the presence of the fields (e.g. GRE and GUE employ flag-fields)
+ */
+
+/* Flag-fields descriptors and tables
+ *
+ * A set of flag-fields is defined in a table of type struct kparser_flag_fields.
+ * Each entry in the table is a descriptor for one flag-field in a protocol and
+ * includes a flag value, mask (for the case of a multi-bit flag), and size of
+ * the cooresponding field. A flag is matched if "(flags & mask) == flag"
+ */
+
+/* Descriptor for a protocol field with flag fields
+ *
+ * Defines the flags and their data fields for one instance a flag field in
+ * in a protocol header (e.g. GRE v0 flags):
+ *
+ * num_idx: Number of flag_field structures
+ * fields: List of defined flag fields
+ */
+struct kparser_flag_fields {
+	size_t num_idx;
+	const struct kparser_flag_field __rcu *fields;
+};
+
+#if 0
+/* Structure or parsing operations for flag-fields
+ *
+ * Operations can be specified either as a function or a parameterization
+ * of a parameterized function
+ *
+ * flags_offset: Offset of flags in the protocol header
+ * start_fields_offset: Return the offset in the header of the start of the
+ *	flag fields data
+ */
+struct kparser_proto_flag_fields_ops {
+	bool get_flags_parameterized;
+	struct kparser_parameterized_get_value pfget_flags;
+	bool start_fields_offset_parameterized;
+	struct kparser_parameterized_len pfstart_fields_offset;
+};
+#endif
+
+/* A flag-fields protocol node. Note this is a super structure for aKPARSER 
+ * protocol node and type is KPARSER_NODE_TYPE_FLAG_FIELDS
+ */
+struct kparser_proto_flag_fields_node {
+	struct kparser_proto_node proto_node;
+	struct kparser_proto_flag_fields_ops ops;
+	const struct kparser_flag_fields __rcu *flag_fields;
+};
+
+/*****************************************************************************/
 
 /* Parse node definition. Defines parsing and processing for one node in
  * the parse graph of a parser. Contains:
@@ -219,12 +307,290 @@ struct kparser_metadata_table;
  */
 struct kparser_parse_node {
 	enum kparser_node_type node_type;
+	char name[KPARSER_MAX_NAME];
 	int unknown_ret;
-	const struct kparser_proto_node __rcu *proto_node;
 	const struct kparser_proto_table __rcu *proto_table;
 	const struct kparser_parse_node __rcu *wildcard_node;
 	const struct kparser_metadata_table __rcu *metadata_table;
+	union {
+		struct kparser_proto_node proto_node;
+		struct kparser_proto_tlvs_node tlvs_proto_node;
+		struct kparser_proto_flag_fields_node flag_fields_proto_node;
+	};
 };
+
+/*****************************************************************************/
+
+/* TLV parse node operations
+ *
+ * Operations to process a single TLV
+ *
+ * Operations can be specified either as a function or a parameterization
+ * of a parameterized function
+ *
+ * extract_metadata: Extract metadata for the node. Input is the meta
+ *	data frame which points to a parser defined metadata structure.
+ *	If the value is NULL then no metadata is extracted
+ * handle_tlv: Per TLV type handler which allows arbitrary processing
+ *	of a TLV. Input is the TLV data and a parser defined metadata
+ *	structure for the current frame. Return value is a parser
+ *	return code: KPARSER_OKAY indicates no errors, KPARSER_STOP* return
+ *	values indicate to stop parsing
+ * check_tlv: Function to validate a TLV
+ * cond_exprs: Parameterization of a set of conditionals to check before
+ *	proceeding. In the case of functions being used, these
+ *      conditionals would be in the check_tlv function
+ */
+
+/* One entry in a TLV table:
+ *	type: TLV type
+ *	node: associated TLV parse structure for the type
+ */
+struct kparser_parse_tlv_node;
+struct kparser_proto_tlvs_table_entry {
+	int type;
+	const struct kparser_parse_tlv_node __rcu *node;
+};
+
+/* TLV table
+ *
+ * Contains a table that maps a TLV type to a TLV parse node
+ */
+struct kparser_proto_tlvs_table {
+	int num_ents;
+	struct kparser_proto_tlvs_table_entry __rcu *entries;
+};
+
+/* Parse node for parsing a protocol header that contains TLVs to be
+ * parser:
+ *
+ * parse_node: Node for main protocol header (e.g. IPv6 node in case of HBH
+ *	options) Note that node_type is set in parse_node to
+ *	KPARSER_NODE_TYPE_TLVS and that the parse node can then be cast to a
+ *	parse_tlv_node
+ * tlv_proto_table: Lookup table for TLV type
+ * unknown_tlv_type_ret: Code to return on a TLV type lookup miss and
+ *	tlv_wildcard_node is NULL
+ * tlv_wildcard_node: Node to use on a TLV type lookup miss
+ * config: Loop configuration
+ */
+struct kparser_parse_tlvs_node {
+	struct kparser_parse_node parse_node;
+	const struct kparser_proto_tlvs_table __rcu *tlv_proto_table;
+	int unknown_tlv_type_ret;
+	const struct kparser_parse_tlv_node __rcu *tlv_wildcard_node;
+	struct kparser_loop_node_config config;
+};
+
+struct kparser_proto_tlv_node_ops {
+	bool overlay_type_parameterized;
+	struct kparser_parameterized_next_proto pfoverlay_type;
+	bool cond_exprs_parameterized;
+	struct kparser_condexpr_tables cond_exprs;
+};
+
+/* A protocol node for parsing proto with TLVs
+ *
+ * min_len: Minimal length of TLV
+ * max_len: Maximum size of a TLV option
+ * is_padding: Indicates padding TLV
+ */
+struct kparser_proto_tlv_node {
+	size_t min_len;
+	size_t max_len;
+	bool is_padding;
+	struct kparser_proto_tlv_node_ops ops;
+};
+
+/* Parse node for a single TLV. Use common parse node operations
+ * (extract_metadata and handle_proto)
+ *
+ * proto_tlv_node: TLV protocol node
+ * tlv_ops: Operations on a TLV
+ * overlay_table: Lookup table for an overlay TLV
+ * overlay_wildcard_node: Wildcard node to an overlay lookup miss
+ * unknown_overlay_ret: Code to return on an overlay lookup miss and
+ *	overlay_wildcard_node is NULL
+ * name: Name for debugging
+ * metadata_table: Table of parameterized metadata operations
+ * thread_funcs: Thread functions
+ */
+struct kparser_parse_tlv_node {
+	struct kparser_proto_tlv_node proto_tlv_node;
+	struct kparser_proto_tlvs_table __rcu *overlay_table;
+	const struct kparser_parse_tlv_node __rcu *overlay_wildcard_node;
+	int unknown_overlay_ret;
+	char name[KPARSER_MAX_NAME];
+	struct kparser_metadata_table __rcu *metadata_table;
+};
+
+/*****************************************************************************/
+
+/* Flag-field parse node operations
+ *
+ * Operations to process a single flag-field
+ *
+ * extract_metadata: Extract metadata for the node. Input is the meta
+ *	data frame which points to a parser defined metadata structure.
+ *	If the value is NULL then no metadata is extracted
+ * handle_flag_field: Per flag-field handler which allows arbitrary processing
+ *	of a flag-field. Input is the flag-field data and a parser defined
+ *	metadata structure for the current frame. Return value is a parser
+ *	return code: KPARSER_OKAY indicates no errors, KPARSER_STOP* return
+ *	values indicate to stop parsing
+ * check_flag_field: Function to validate a flag-field
+ * cond_exprs: Parameterization of a set of conditionals to check before
+ *      proceeding. In the case of functions being used, these
+ *      conditionals would be in the check_flag_field function
+ */
+struct kparser_parse_flag_field_node_ops {
+	struct kparser_condexpr_tables cond_exprs;
+};
+
+/* A parse node for a single flag field
+ *
+ * name: Text name for debugging
+ * metadata_table: Table of parameterized metadata operations
+ * ops: Operations
+ * thread_funcs: Thread functions
+ */
+struct kparser_parse_flag_field_node {
+	char name[KPARSER_MAX_NAME];
+	struct kparser_metadata_table __rcu *metadata_table;
+	struct kparser_parse_flag_field_node_ops ops;
+};
+
+/* One entry in a flag-fields protocol table:
+ *	index: flag-field index (index in a flag-fields table)
+ *	node: associated TLV parse structure for the type
+ */
+struct kparser_proto_flag_fields_table_entry {
+	int index;
+	const struct kparser_parse_flag_field_node __rcu *node;
+};
+
+/* Flag-fields table
+ *
+ * Contains a table that maps a flag-field index to a flag-field parse node.
+ * Note that the index correlates to an entry in a flag-fields table that
+ * describes the flag-fields of a protocol
+ */
+struct kparser_proto_flag_fields_table {
+	int num_ents;
+	struct kparser_proto_flag_fields_table_entry __rcu *entries;
+};
+
+/* A flag-fields parse node. Note this is a super structure for a KPARSER parse
+ * node and type is KPARSER_NODE_TYPE_FLAG_FIELDS
+ */
+struct kparser_parse_flag_fields_node {
+	struct kparser_parse_node parse_node;
+	const struct kparser_proto_flag_fields_table __rcu
+		*flag_fields_proto_table;
+};
+
+static inline ssize_t __kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
+		const struct kparser_flag_fields
+		*flag_fields)
+{
+	size_t offset = 0;
+	__u32 mask;
+	int i;
+
+	for (i = 0; i < targ_idx; i++) {
+		mask = flag_fields->fields[i].mask ? :
+			flag_fields->fields[i].flag;
+
+		if ((flags & mask) == flag_fields->fields[i].flag)
+			offset += flag_fields->fields[i].size;
+	}
+
+	return offset;
+}
+
+/* Determine offset of a field given a set of flags */
+static inline ssize_t kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
+		const struct kparser_flag_fields
+		*flag_fields)
+{
+	__u32 mask;
+
+	mask = flag_fields->fields[targ_idx].mask ? :
+		flag_fields->fields[targ_idx].flag;
+	if ((flags & mask) != flag_fields->fields[targ_idx].flag) {
+		/* Flag not set */
+		return -1;
+	}
+
+	return __kparser_flag_fields_offset(targ_idx, flags, flag_fields);
+}
+
+/* Check flags are legal */
+static inline bool kparser_flag_fields_check_invalid(__u32 flags, __u32 mask)
+{
+	return !!(flags & ~mask);
+}
+
+/* Retrieve a byte value from a flag field */
+static inline __u8 kparser_flag_fields_get8(const __u8 *fields, __u32 targ_idx,
+		__u32 flags,
+		const struct kparser_flag_fields
+		*flag_fields)
+{
+	ssize_t offset = kparser_flag_fields_offset(targ_idx, flags,
+			flag_fields);
+
+	if (offset < 0)
+		return 0;
+
+	return *(__u8 *)&fields[offset];
+}
+
+/* Retrieve a short value from a flag field */
+static inline __u16 kparser_flag_fields_get16(const __u8 *fields,
+		__u32 targ_idx,
+		__u32 flags,
+		const struct kparser_flag_fields
+		*flag_fields)
+{
+	ssize_t offset = kparser_flag_fields_offset(targ_idx, flags, flag_fields);
+
+	if (offset < 0)
+		return 0;
+
+	return *(__u16 *)&fields[offset];
+}
+
+/* Retrieve a 32 bit value from a flag field */
+static inline __u32 kparser_get_flag_field32(const __u8 *fields, __u32 targ_idx,
+		__u32 flags,
+		const struct kparser_flag_fields
+		*flag_fields)
+{
+	ssize_t offset = kparser_flag_fields_offset(targ_idx, flags, flag_fields);
+
+	if (offset < 0)
+		return 0;
+
+	return *(__u32 *)&fields[offset];
+}
+
+/* Retrieve a 64 bit value from a flag field */
+static inline __u64 kparser_get_flag_field64(const __u8 *fields, __u32 targ_idx,
+		__u32 flags,
+		const struct kparser_flag_fields
+		*flag_fields)
+{
+	ssize_t offset = kparser_flag_fields_offset(targ_idx, flags,
+			flag_fields);
+
+	if (offset < 0)
+		return 0;
+
+	return *(__u64 *)&fields[offset];
+}
+
+/*****************************************************************************/
 
 /* Definition of a KPARSER parser. Fields are:
  *
@@ -243,56 +609,11 @@ struct kparser_parser {
 	const struct kparser_parse_node __rcu *root_node;
 	const struct kparser_parse_node __rcu *okay_node;
 	const struct kparser_parse_node __rcu *fail_node;
+	const struct kparser_parse_node __rcu *atencap_node;
+	size_t cntrs_len;
+	struct kparser_counters __rcu *cntrs;
 	struct kparser_config config;
+	struct kparser_cntrs_conf cntrs_conf;
 };
-
-static inline bool kparser_proto_node_convert(
-		const struct kparser_conf_node_proto *conf,
-		struct kparser_proto_node *node)
-{
-	node->node_type = KPARSER_NODE_TYPE_PLAIN;
-	node->encap = conf->encap;
-	node->overlay = conf->overlay;
-	strcpy(node->name, conf->key.name);
-	node->min_len = conf->min_len;
-	node->ops.flag_fields_length = conf->ops.flag_fields_length;
-	node->ops.next_proto_parameterized = conf->ops.next_proto_parameterized;
-	node->ops.cond_exprs_parameterized = conf->ops.cond_exprs_parameterized;
-	node->ops.pflen = conf->ops.pflen;
-	node->ops.pfnext_proto = conf->ops.pfnext_proto;
-
-	return true;
-}
-
-static inline bool kparser_parse_node_convert(
-		const struct kparser_conf_node_parse *conf,
-		struct kparser_parse_node *node,
-		const struct kparser_proto_node *proto_node,
-		const struct kparser_proto_table *proto_table,
-		const struct kparser_parse_node *wildcard_node,
-		const struct kparser_metadata_table *metadata_table)
-{
-	node->node_type = KPARSER_NODE_TYPE_PLAIN;
-	rcu_assign_pointer(node->proto_node, proto_node);
-	rcu_assign_pointer(node->proto_table, proto_table);
-	rcu_assign_pointer(node->wildcard_node, wildcard_node);
-	rcu_assign_pointer(node->metadata_table, metadata_table);
-	return true;
-}
-
-static inline bool kparser_parser_convert(
-		const struct kparser_conf_parser *conf,
-		struct kparser_parser *parser,
-		const struct kparser_parse_node *root_node,
-		const struct kparser_parse_node *ok_node,
-		const struct kparser_parse_node *fail_node)
-{
-	strcpy(parser->name, conf->key.name);
-	rcu_assign_pointer(parser->root_node, root_node);
-	rcu_assign_pointer(parser->okay_node, ok_node);
-	rcu_assign_pointer(parser->fail_node, fail_node);
-	parser->config = conf->config;
-	return true;
-}
 
 #endif /* __KPARSER_TYPES_H */

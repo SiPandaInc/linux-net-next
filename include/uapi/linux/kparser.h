@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-/* kparser.h - KPARSER Interface */
+/* kparser.h - kParser Interface */
 
 #ifndef _LINUX_KPARSER_H
 #define _LINUX_KPARSER_H
@@ -11,19 +11,20 @@
 #define BITS_IN_BYTE	8
 #define BITS_IN_U32	(sizeof(__u32) * BITS_IN_BYTE)
 
+/* TODO: find these from linux header file, maybe bitmasks.h */
 #define setbit(A,k)	(A[(k)/BITS_IN_U32] |= (1 << ((k) % BITS_IN_U32)))
 #define clearbit(A,k)	(A[(k)/BITS_IN_U32] &= ~(1 << ((k) % BITS_IN_U32)))
 #define testbit(A,k)    (1 & (A[(k)/BITS_IN_U32] >> ((k) % BITS_IN_U32)))
 
 /* NETLINK_GENERIC related info */
-#define KPARSER_GENL_NAME	"kparser"
-#define KPARSER_GENL_VERSION	0x1
+#define KPARSER_GENL_NAME		"kParser"
+#define KPARSER_GENL_VERSION		0x1
 
-#define KPARSER_ERR_STR_MAX_LEN 256
-#define KPARSER_MAX_STR_LEN_U8 6
-#define KPARSER_MAX_STR_LEN_U16 8
-#define KPARSER_MAX_STR_LEN_U32 12
-#define KPARSER_MAX_STR_LEN_U64 16
+#define KPARSER_ERR_STR_MAX_LEN		256
+#define KPARSER_MAX_STR_LEN_U8		6
+#define KPARSER_MAX_STR_LEN_U16 	8
+#define KPARSER_MAX_STR_LEN_U32 	12
+#define KPARSER_MAX_STR_LEN_U64 	16
 
 enum kparser_arg_val_type {
 	KPARSER_ARG_VAL_STR,
@@ -55,16 +56,16 @@ struct kparser_arg_key_val_token {
 	bool semi_optional;
 	int other_mandatory_idx;
 	bool immutable;
-	ssize_t str_arg_len_max;
-	ssize_t w_offset;
-	ssize_t w_len;
+	size_t str_arg_len_max;
+	size_t w_offset;
+	size_t w_len;
 	union {
 		struct {
-			ssize_t default_val_size;
+			size_t default_val_size;
 			const void *default_val;
 		};
 		struct {
-			ssize_t value_set_len;
+			size_t value_set_len;
 			const struct kparser_arg_set *value_set;
 			__u64 def_value_enum;
 		};
@@ -76,9 +77,9 @@ struct kparser_arg_key_val_token {
 	};
 	struct {
 		enum kparser_arg_val_type elem_type;
-		ssize_t elem_counter;
-		ssize_t elem_size;
-		ssize_t offset_adjust;
+		size_t elem_counter;
+		size_t elem_size;
+		size_t offset_adjust;
 	};
 	const char *help_msg;
 	const struct kparser_arg_key_val_token *default_template_token;
@@ -90,51 +91,34 @@ enum kparser_global_namespace_ids {
 	KPARSER_NS_METADATA,
 	KPARSER_NS_METALIST,
 
-	KPARSER_NS_NODE_PROTO,
 	KPARSER_NS_NODE_PARSE,
 	KPARSER_NS_PROTO_TABLE,
 
-	KPARSER_NS_TLV_NODE_PROTO,
 	KPARSER_NS_TLV_NODE_PARSE,
-	KPARSER_NS_TLVS_NODE_PROTO,
-	KPARSER_NS_TLVS_NODE_PARSE,
 	KPARSER_NS_TLV_PROTO_TABLE,
 
-	KPARSER_NS_FIELD,
-	KPARSER_NS_FIELDS,
+	KPARSER_NS_FLAG_FIELD,
+	KPARSER_NS_FLAG_FIELD_NODE_PARSE,
+	KPARSER_NS_FLAG_FIELD_TABLE,
+	KPARSER_NS_FLAG_FIELD_PROTO_TABLE,
+
 	KPARSER_NS_PARSER,
 
 	KPARSER_NS_CONDEXPRS,
 	KPARSER_NS_CONDEXPRS_TABLE,
 	KPARSER_NS_CONDEXPRS_TABLES,
 
+	KPARSER_NS_COUNTER,
+	KPARSER_NS_COUNTER_TABLE,
+
 	KPARSER_NS_MAX
 };
-
-#define KPARSER_NAMESPACE_NAME_METADATA "metadata"
-#define KPARSER_NAMESPACE_NAME_METALIST "metalist"
-
-#define KPARSER_NAMESPACE_NAME_NODE_PROTO "node_proto"
-#define KPARSER_NAMESPACE_NAME_NODE_PARSE "node_parse"
-#define KPARSER_NAMESPACE_NAME_PROTO_TABLE "proto_table"
-
-#define KPARSER_NAMESPACE_NAME_TLV_NODE_PROTO "tlv_node_proto"
-#define KPARSER_NAMESPACE_NAME_TLV_NODE_PARSE "tlv_node_parse"
-#define KPARSER_NAMESPACE_NAME_TLVS_NODE_PROTO "tlvs_node_proto"
-#define KPARSER_NAMESPACE_NAME_TLVS_NODE_PARSE "tlvs_node_parse"
-#define KPARSER_NAMESPACE_NAME_TLV_PROTO_TABLE "tlv_proto_table"
-
-#define KPARSER_NAMESPACE_NAME_FIELDS "flags_fields"
-#define KPARSER_NAMESPACE_NAME_PARSER "parser"
-
-#define KPARSER_NAMESPACE_NAME_CONDEXPRS "condexprs"
-#define KPARSER_NAMESPACE_NAME_CONDEXPRS_TABLE "condexprs_table"
-#define KPARSER_NAMESPACE_NAME_CONDEXPRS_TABLES "condexprs_tables"
 
 struct kparser_global_namespaces {
 	enum kparser_global_namespace_ids name_space_id;
 	const char *name;
-	ssize_t arg_tokens_count;
+	const char *alias;
+	size_t arg_tokens_count;
 	const struct kparser_arg_key_val_token *arg_tokens; 
 	int create_attr_id;
 	int update_attr_id;
@@ -143,35 +127,40 @@ struct kparser_global_namespaces {
 	int rsp_attr_id;
 };
 
-#define KPARSER_DEFINE_ATTR_IDS(id_suffix)			\
-	KPARSER_ATTR_CREATE_##id_suffix,	/* NLA_BINARY */\
-	KPARSER_ATTR_UPDATE_##id_suffix,	/* NLA_BINARY */\
-	KPARSER_ATTR_READ_##id_suffix,		/* NLA_BINARY */\
-	KPARSER_ATTR_DELETE_##id_suffix,	/* NLA_BINARY */\
-	KPARSER_ATTR_RSP_##id_suffix				\
+#define KPARSER_ATTR_RSP(id)		KPARSER_ATTR_RSP_##id
+
+#define KPARSER_DEFINE_ATTR_IDS(id)			\
+	KPARSER_ATTR_CREATE_##id,	/* NLA_BINARY */\
+	KPARSER_ATTR_UPDATE_##id,	/* NLA_BINARY */\
+	KPARSER_ATTR_READ_##id,		/* NLA_BINARY */\
+	KPARSER_ATTR_DELETE_##id,	/* NLA_BINARY */\
+	KPARSER_ATTR_RSP(id)
 
 enum {
 	KPARSER_ATTR_UNSPEC,
 
-	KPARSER_DEFINE_ATTR_IDS(METADATA),
-	KPARSER_DEFINE_ATTR_IDS(METALIST),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_METADATA),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_METALIST),
 
-	KPARSER_DEFINE_ATTR_IDS(NODE_PROTO),
-	KPARSER_DEFINE_ATTR_IDS(NODE_PARSE),
-	KPARSER_DEFINE_ATTR_IDS(PROTO_TABLE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_NODE_PARSE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_PROTO_TABLE),
 
-	KPARSER_DEFINE_ATTR_IDS(TLV_NODE_PROTO),
-	KPARSER_DEFINE_ATTR_IDS(TLV_NODE_PARSE),
-	KPARSER_DEFINE_ATTR_IDS(TLVS_NODE_PROTO),
-	KPARSER_DEFINE_ATTR_IDS(TLVS_NODE_PARSE),
-	KPARSER_DEFINE_ATTR_IDS(TLV_PROTO_TABLE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_TLV_NODE_PARSE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_TLV_PROTO_TABLE),
 
-	KPARSER_DEFINE_ATTR_IDS(PARSER),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_FLAG_FIELD),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_FLAG_FIELD_TABLE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_FLAG_FIELD_NODE_PARSE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_FLAG_FIELD_PROTO_TABLE),
 
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_PARSER),
 
-	KPARSER_DEFINE_ATTR_IDS(CONDEXPRS),
-	KPARSER_DEFINE_ATTR_IDS(CONDEXPRS_TABLE),
-	KPARSER_DEFINE_ATTR_IDS(CONDEXPRS_TABLES),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS_TABLE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS_TABLES),
+
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_COUNTER),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_COUNTER_TABLE),
 
 	KPARSER_ATTR_DELETE_ALL,
 	KPARSER_ATTR_LIST_ALL,
@@ -189,49 +178,69 @@ enum {
 
 #define KPARSER_CMD_MAX	(__KPARSER_CMD_MAX - 1)
 
-#define KPARSER_INVALID_ID 0xffff
+#define KPARSER_INVALID_ID		0xffff
 
-#define KPARSER_USER_ID_MIN 0
-#define KPARSER_USER_ID_MAX 0x8000
-#define KPARSER_KMOD_ID_MIN 0x8001
-#define KPARSER_KMOD_ID_MAX 0xfffe
+#define KPARSER_USER_ID_MIN		0
+#define KPARSER_USER_ID_MAX		0x8000
+#define KPARSER_KMOD_ID_MIN		0x8001
+#define KPARSER_KMOD_ID_MAX		0xfffe
 
-#define KPARSER_MAX_NAME 128
-#define KPARSER_MAX_DIGIT_STR_LEN 16
-#define KPARSER_DEF_NAME_PREFIX "kparser_default_name"
+#define KPARSER_MAX_NAME		128
+#define KPARSER_MAX_DIGIT_STR_LEN	16
+#define KPARSER_DEF_NAME_PREFIX		"kparser_default_name"
+#define KPARSER_USER_ID_MIN		0
+#define KPARSER_USER_ID_MAX		0x8000
+#define KPARSER_KMOD_ID_MIN		0x8001
+#define KPARSER_KMOD_ID_MAX		0xfffe
 
 struct kparser_hkey {
 	__u16 id;
 	char name[KPARSER_MAX_NAME];
 };
 
-enum kparser_md_type {
-	KPARSER_MD_INVALID,
-	KPARSER_MD_HDRDATA,
-	KPARSER_MD_HDRLEN,
-	KPARSER_MD_OFFSET,
-	KPARSER_MD_NUMENCAPS,
-	KPARSER_MD_NUMNODES,
-	KPARSER_MD_TIMESTAMP,
-	KPARSER_MD_MAX
+enum kparser_metadata_type {
+	KPARSER_METADATA_INVALID,
+	KPARSER_METADATA_HDRDATA,
+	KPARSER_METADATA_HDRLEN,
+	KPARSER_METADATA_CONSTANT_BYTE,
+	KPARSER_METADATA_CONSTANT_HALFWORD,
+	KPARSER_METADATA_OFFSET,
+	KPARSER_METADATA_NUMENCAPS,
+	KPARSER_METADATA_NUMNODES,
+	KPARSER_METADATA_TIMESTAMP,
+	KPARSER_METADATA_RETURN_CODE,
+	KPARSER_METADATA_COUNTER,
+	KPARSER_METADATA_NOOP,
+	KPARSER_METADATA_MAX
 };
 
+enum kparser_metadata_counter_op_type {
+	KPARSER_METADATA_COUNTEROP_NOOP,
+	KPARSER_METADATA_COUNTEROP_INCR,
+	KPARSER_METADATA_COUNTEROP_RST
+};
+
+/* TODO: align and pack all struct members
+ */
 struct kparser_conf_metadata {
 	struct kparser_hkey key;
-	__u16 soff;
-	__u16 doff;
-	ssize_t len;
+	enum kparser_metadata_type type;
+	enum kparser_metadata_counter_op_type cntr_op; // 3 bit
 	bool frame;
 	bool e_bit;
-	enum kparser_md_type type;
-	struct kparser_hkey array_hkey;
-	__u16 array_doff;
-	struct kparser_hkey array_counter_id;
+	bool bit_offset;
+	__u8 cntr; // 3 bit
+	__u8 cntr_data; // 3 bit
+	__u8 constant_value;
+	size_t soff;
+	size_t doff;
+	size_t len;
+	size_t add_off;
 };
 
 struct kparser_conf_metadata_table {
 	struct kparser_hkey key;
-	ssize_t metadata_keys_count;
+	size_t metadata_keys_count;
 	struct kparser_hkey metadata_keys[0];
 };
 
@@ -253,25 +262,8 @@ struct kparser_parameterized_next_proto {
         __u8 right_shift;
 };
 
-struct kparser_conf_parse_ops {
-	bool flag_fields_length;
-	bool len_parameterized;
-        struct kparser_parameterized_len pflen;
-	bool next_proto_parameterized;
-        struct kparser_parameterized_next_proto pfnext_proto;
-	bool cond_exprs_parameterized;
-	struct kparser_hkey cond_exprs_table;
-};
-
-struct kparser_conf_node_proto {
-	struct kparser_hkey key;
-	bool encap;
-	bool overlay;
-	ssize_t min_len;
-	struct kparser_conf_parse_ops ops;
-};
-
-/* Kparse protocol node types */
+/* TODO: Use kParser in comments */
+/* kParser protocol node types */
 enum kparser_node_type {
 	/* Plain node, no super structure */
 	KPARSER_NODE_TYPE_PLAIN,
@@ -283,69 +275,44 @@ enum kparser_node_type {
 	KPARSER_NODE_TYPE_MAX,
 };
 
-struct kparser_conf_node_parse {
-	struct kparser_hkey key;
-	enum kparser_node_type type;
-	int unknown_ret;
-	struct kparser_hkey proto_node;
-	struct kparser_hkey proto_table;
-	struct kparser_hkey wildcard_parse_node;
-	struct kparser_hkey metadata_table;
-};
-
-struct kparser_conf_proto_table {
-	struct kparser_hkey key;
-	__u16 idx;
-	int value;
-	struct kparser_hkey parse_node_key;
-};
-
-struct kparser_conf_proto_tlv_node_ops {
-        struct kparser_parameterized_next_proto pfoverlay_type;
+struct kparser_conf_parse_ops {
+	bool flag_fields_length;
+	bool len_parameterized;
+        struct kparser_parameterized_len pflen;
+	bool next_proto_parameterized;
+        struct kparser_parameterized_next_proto pfnext_proto;
+	bool cond_exprs_parameterized;
 	struct kparser_hkey cond_exprs_table;
 };
 
-struct kparser_conf_tlv_node_proto {
-	struct kparser_hkey key;
-	ssize_t min_len;
-	ssize_t max_len;
-	bool is_padding;
-	struct kparser_conf_proto_tlv_node_ops ops;
+/* base nodes */
+struct kparser_conf_node_proto {
+	bool encap;
+	bool overlay;
+	size_t min_len;
+	struct kparser_conf_parse_ops ops;
 };
 
-struct kparser_conf_tlv_node_parse {
-	struct kparser_hkey key;
-	struct kparser_hkey proto_tlv_node_key;
-	struct kparser_hkey overlay_proto_tlvs_table_key;
-	struct kparser_hkey overlay_wildcard_parse_node;
+struct kparser_conf_node_parse {
 	int unknown_ret;
-	struct kparser_hkey metadata_table;
-};
-
-/* Descriptor for parsing operations of one type of TLV. Fields are:
- *
- * start_offset: Returns the offset of TLVs in a header
- * len: Return length of a TLV. Must be set. If the return value < 0 (a
- *	KPARSER_STOP_* return code value) this indicates an error and parsing
- *	is stopped. A the return value greater than or equal to zero then
- *	gives the protocol length. If the returned length is less than the
- *	minimum TLV option length, indicated by min_len by the TLV protocol
- *	node, then this considered and error.
- * type: Return the type of the TLV. If the return value is less than zero
- *	(KPARSER_STOP_* value) then this indicates and error and parsing stops
- */
-struct kparser_proto_tlvs_opts {
-        const struct kparser_parameterized_len pfstart_offset;
-        bool len_parameterized;
-        const struct kparser_parameterized_len pflen;
-        bool type_parameterized;
-        const struct kparser_parameterized_next_proto pftype;
-};
-
-struct kparser_conf_tlvs_node_proto {
+	struct kparser_hkey proto_table_key;
+	struct kparser_hkey wildcard_parse_node_key;
+	struct kparser_hkey metadata_table_key;
 	struct kparser_conf_node_proto proto_node;
+};
+
+/* TLVS */
+struct kparser_proto_tlvs_opts {
+        struct kparser_parameterized_len pfstart_offset;
+        bool len_parameterized;
+        struct kparser_parameterized_len pflen;
+        bool type_parameterized;
+        struct kparser_parameterized_next_proto pftype;
+};
+
+struct kparser_conf_proto_tlvs_node {
 	struct kparser_proto_tlvs_opts ops;
-	ssize_t start_offset;
+	size_t start_offset;
 	__u8 pad1_val;
 	__u8 padn_val;
 	__u8 eol_val;
@@ -353,7 +320,7 @@ struct kparser_conf_tlvs_node_proto {
 	bool padn_enable;
 	bool eol_enable;
 	bool fixed_start_offset;
-	ssize_t min_len;
+	size_t min_len;
 };
 
 #define KPARSER_DEFAULT_TLV_MAX_LOOP			255
@@ -361,7 +328,17 @@ struct kparser_conf_tlvs_node_proto {
 #define KPARSER_DEFAULT_TLV_MAX_CONSEC_PAD_BYTES	255
 #define KPARSER_DEFAULT_TLV_MAX_CONSEC_PAD_OPTS		255
 #define KPARSER_DEFAULT_TLV_DISP_LIMIT_EXCEED		0
-#define KPARSER_DEFAULT_TLV_EXCEED_LOOP_CNT_ERR		0
+#define KPARSER_DEFAULT_TLV_EXCEED_LOOP_CNT_ERR		false
+
+/* Two bit code that describes the action to take when a loop node
+ * exceeds a limit
+ */
+enum {
+	KPARSER_LOOP_DISP_STOP_OKAY = 0,
+	KPARSER_LOOP_DISP_STOP_NODE_OKAY = 1,
+	KPARSER_LOOP_DISP_STOP_SUB_NODE_OKAY = 2,
+	KPARSER_LOOP_DISP_STOP_FAIL = 3,
+};
 
 /* Configuration for a TLV node (generally loop nodes)
  *
@@ -382,25 +359,125 @@ struct kparser_loop_node_config {
         bool exceed_loop_cnt_is_err;
 };
 
-struct kparser_conf_tlvs_node_parse {
-	struct kparser_conf_node_parse parse_node;
+/* TODO:
+ * disp_limit_exceed: 2;
+ * exceed_loop_cnt_is_err: 1;
+ */
+struct kparser_conf_parse_tlvs {
+	struct kparser_conf_proto_tlvs_node proto_node;
 	struct kparser_hkey tlv_proto_table_key;
-	int unknown_ret;
-	struct kparser_hkey tlv_wildcard_parse_node;
+	int unknown_tlv_type_ret;
+	struct kparser_hkey tlv_wildcard_node_key;
 	struct kparser_loop_node_config config;
 };
 
-struct kparser_conf_tlv_proto_table {
-	struct kparser_hkey key;
-	__u16 idx;
-	int type;
-	struct kparser_hkey parse_tlv_node_key;
+struct kparser_conf_proto_tlv_node_ops {
+	bool overlay_type_parameterized;
+        struct kparser_parameterized_next_proto pfoverlay_type;
+	bool cond_exprs_parameterized;
+	struct kparser_hkey cond_exprs_table;
 };
 
-/* Make the parser */
-#define KPARSER_MAX_NODES        1
-#define KPARSER_MAX_ENCAPS       0
-#define KPARSER_MAX_FRAMES       0
+struct kparser_conf_node_proto_tlv {
+	size_t min_len;
+	size_t max_len;
+	bool is_padding;
+	struct kparser_conf_proto_tlv_node_ops ops;
+};
+
+struct kparser_conf_node_parse_tlv {
+	struct kparser_hkey key;
+	struct kparser_conf_node_proto_tlv node_proto;
+	struct kparser_hkey overlay_proto_tlvs_table_key;
+	struct kparser_hkey overlay_wildcard_parse_node_key;
+	int unknown_ret;
+	struct kparser_hkey metadata_table_key;
+};
+
+/* flag fields */
+struct kparser_parameterized_get_value {
+	__u16 src_off;
+	__u32 mask;
+	__u8 size;
+};
+
+struct kparser_proto_flag_fields_ops {
+	bool get_flags_parameterized;
+	struct kparser_parameterized_get_value pfget_flags;
+	bool start_fields_offset_parameterized;
+	struct kparser_parameterized_len pfstart_fields_offset;
+	bool flag_feilds_len;
+	__u16 hdr_length;
+};
+
+struct kparser_conf_node_proto_flag_fields {
+	struct kparser_proto_flag_fields_ops ops;
+	struct kparser_hkey flag_fields_table_hkey;
+};
+
+struct kparser_conf_parse_flag_fields {
+	struct kparser_conf_node_proto_flag_fields proto_node;
+	struct kparser_hkey flag_fields_proto_table_key;
+};
+
+
+/* One descriptor for a flag
+ *
+ * flag: protocol value
+ * mask: mask to apply to field
+ * size: size for associated field data
+ */
+struct kparser_flag_field {
+	__u32 flag;
+	__u32 mask;
+	size_t size;
+};
+
+struct kparser_conf_flag_field {
+	struct kparser_hkey key;
+	struct kparser_flag_field conf;
+};
+
+struct kparser_parse_flag_field_node_ops_conf {
+	struct kparser_hkey cond_exprs_table_key;
+};
+
+struct kparser_conf_node_parse_flag_field {
+	struct kparser_hkey key;
+	struct kparser_hkey metadata_table_key;
+	struct kparser_parse_flag_field_node_ops_conf ops;
+};
+
+/* generic tables */
+struct kparser_conf_table {
+	struct kparser_hkey key;
+	__u16 idx;
+	int optional_value1;
+	int optional_value2;
+	struct kparser_hkey elem_key;
+};
+
+/* counter */
+#define KPARSER_CNTR_NUM_CNTRS		7
+
+struct kparser_cntr_conf {
+	__u32 max_value;
+	__u32 array_limit;
+        size_t el_size;
+        bool reset_on_encap;
+        bool overwrite_last;
+        bool error_on_exceeded;
+};
+
+struct kparser_conf_cntr {
+	struct kparser_hkey key;
+	struct kparser_cntr_conf conf;
+};
+
+/* parser */
+#define KPARSER_MAX_NODES	1
+#define KPARSER_MAX_ENCAPS	4
+#define KPARSER_MAX_FRAMES	255 
 
 /* Configuration for a KPARSER parser
  *
@@ -418,8 +495,8 @@ struct kparser_config {
         __u16 max_nodes;
         __u16 max_encaps;
         __u16 max_frames;
-        ssize_t metameta_size;
-        ssize_t frame_size;
+        size_t metameta_size;
+        size_t frame_size;
 };
 
 struct kparser_conf_parser {
@@ -428,8 +505,11 @@ struct kparser_conf_parser {
 	struct kparser_hkey root_node_key;
 	struct kparser_hkey ok_node_key;
 	struct kparser_hkey fail_node_key;
+	struct kparser_hkey atencap_node_key;
+	struct kparser_hkey cntrs_table_key;
 };
 
+/* conditional expressions */
 /* Defines for parser conditional expressions */
 enum kparser_condexpr_types {
 	KPARSER_CONDEXPR_TYPE_OR,
@@ -473,23 +553,47 @@ struct kparser_conf_condexpr_tables {
 	struct kparser_hkey condexpr_expr_table_key;
 };
 
+struct kparser_conf_node {
+	struct kparser_hkey key;
+	enum kparser_node_type type;
+	struct kparser_conf_node_parse plain_parse_node;
+	struct kparser_conf_parse_tlvs tlvs_parse_node;
+	struct kparser_conf_parse_flag_fields flag_fields_parse_node;
+};
+
+/* cli interface cmd structures */
 struct kparser_conf_cmd {
 	enum kparser_global_namespace_ids namespace_id;
 	union {
+		/* for read/delete commands */
 		struct kparser_hkey obj_key;
+		/* KPARSER_NS_METADATA */
 		struct kparser_conf_metadata md_conf;
+		/* KPARSER_NS_METALIST */
 		struct kparser_conf_metadata_table mdl_conf;
-		struct kparser_conf_node_proto node_proto_conf;
-		struct kparser_conf_node_parse node_parse_conf;
-		struct kparser_conf_proto_table proto_table_conf;
-		struct kparser_conf_tlv_node_proto tlv_node_proto_conf;
-		struct kparser_conf_tlv_node_parse tlv_node_parse_conf;
-		struct kparser_conf_tlvs_node_proto tlvs_node_proto_conf;
-		struct kparser_conf_tlvs_node_parse tlvs_node_parse_conf;
-		struct kparser_conf_tlv_proto_table tlv_proto_table_conf;
+		/* KPARSER_NS_NODE_PARSE */
+		struct kparser_conf_node node_conf;
+		/* KPARSER_NS_TLV_NODE_PARSE */
+		struct kparser_conf_node_parse_tlv tlv_node_conf;
+		/* KPARSER_NS_FLAG_FIELD */
+		struct kparser_conf_flag_field flag_field_conf;
+		/* KPARSER_NS_FLAG_FIELD_NODE_PARSE */
+		struct kparser_conf_node_parse_flag_field flag_field_node_conf;
+		/* KPARSER_NS_PROTO_TABLE */
+		/* KPARSER_NS_TLV_PROTO_TABLE */
+		/* KPARSER_NS_FLAG_FIELD_TABLE */
+		/* KPARSER_NS_FLAG_FIELD_PROTO_TABLE */
+		/* KPARSER_NS_CONDEXPRS_TABLE */
+		/* KPARSER_NS_CONDEXPRS_TABLES */
+		/* KPARSER_NS_COUNTER_TABLE */
+		struct kparser_conf_table table_conf;
+		/* KPARSER_NS_CONDEXPRS */
 		struct kparser_conf_condexpr cond_conf;
 		struct kparser_conf_condexpr_table cond_table_conf;
 		struct kparser_conf_condexpr_tables cond_tables_conf;
+		/* KPARSER_NS_COUNTER */
+		struct kparser_conf_cntr cntr_conf;
+
 		struct kparser_conf_parser parser_conf;
 	};
 };
@@ -498,14 +602,24 @@ struct kparser_cmd_rsp_hdr {
 	int op_ret_code;
 	__u8 err_str_buf[KPARSER_ERR_STR_MAX_LEN];
 	struct kparser_hkey key;
-	ssize_t objects_len;
 	struct kparser_conf_cmd object;
-	// variable list of objects
+	size_t objects_len;
+	/* variable list of objects */
 	struct kparser_conf_cmd objects[0];
 };
 
+/* Panda parser return codes
+ *
+ * There are two variants of the KPARSER return codes. The normal variant is
+ * a number between -15 and 0 inclusive where the name for the code is
+ * prefixed by KPARSER_. There is also a special 16-bit encoding which is
+ * 0xfff0 + -val where val is the negative number for the code so that
+ * corresponds to values 0xfff0 to 0xffff. Names for the 16-bit encoding
+ * are prefixed by KPARSER_16BIT_
+ */
+/* different kparser error code */
 enum {
-	KPARSER_OKAY = 0,			/* Okay and continue */
+	KPARSER_OKAY = 0,		/* Okay and continue */
 	KPARSER_RET_OKAY = -1,		/* Encoding of OKAY in ret code */
 
 	KPARSER_OKAY_USE_WILD = -2,	/* cam instruction */
@@ -513,7 +627,7 @@ enum {
 
 	KPARSER_STOP_OKAY = -4,		/* Okay and stop parsing */
 	KPARSER_STOP_NODE_OKAY = -5,	/* Stop parsing current node */
-	KPARSER_STOP_SUB_NODE_OKAY = -6,	/* Stop parsing currnet sub-node */
+	KPARSER_STOP_SUB_NODE_OKAY = -6,/* Stop parsing currnet sub-node */
 
 	/* Parser failure */
 	KPARSER_STOP_FAIL = -12,
@@ -529,13 +643,15 @@ enum {
 	KPARSER_STOP_OPTION_LIMIT = -22,
 	KPARSER_STOP_MAX_NODES = -23,
 	KPARSER_STOP_COMPARE = -24,
-	KPARSER_STOP_CNTR1 = -25,
-	KPARSER_STOP_CNTR2 = -26,
-	KPARSER_STOP_CNTR3 = -27,
-	KPARSER_STOP_CNTR4 = -28,
-	KPARSER_STOP_CNTR5 = -29,
-
-	KPARSER_STOP_THREADS_FAIL = -31,
+        KPARSER_STOP_BAD_EXTRACT = -25,
+        KPARSER_STOP_BAD_CNTR = -26,
+	KPARSER_STOP_CNTR1 = -27,
+	KPARSER_STOP_CNTR2 = -28,
+	KPARSER_STOP_CNTR3 = -29,
+	KPARSER_STOP_CNTR4 = -30,
+	KPARSER_STOP_CNTR5 = -31,
+	KPARSER_STOP_CNTR6 = -32,
+	KPARSER_STOP_CNTR7 = -33,
 };
 
 static inline const char *kparser_code_to_text(int code)
@@ -581,13 +697,14 @@ static inline const char *kparser_code_to_text(int code)
 		return "stop-max-nodes";
 	case KPARSER_STOP_COMPARE:
 		return "stop-compare";
-	case KPARSER_STOP_THREADS_FAIL:
-		return "stop-thread-fail";
+	case KPARSER_STOP_BAD_EXTRACT:
+		return "stop-bad-extract";
+	case KPARSER_STOP_BAD_CNTR:
+		return "stop-bad-counter";
 	default:
 		return "unknown-code";
 	}
 }
-
 
 static inline bool kparser_hkey_id_empty(const struct kparser_hkey *key)
 {
@@ -608,11 +725,6 @@ static inline bool kparser_hkey_empty(const struct kparser_hkey *key)
 {
 	return (kparser_hkey_id_empty(key) && kparser_hkey_name_empty(key));
 }
-
-#define KPARSER_USER_ID_MIN 0
-#define KPARSER_USER_ID_MAX 0x8000
-#define KPARSER_KMOD_ID_MIN 0x8001
-#define KPARSER_KMOD_ID_MAX 0xfffe
 
 static inline bool kparser_hkey_user_id_invalid(const struct kparser_hkey *key)
 {

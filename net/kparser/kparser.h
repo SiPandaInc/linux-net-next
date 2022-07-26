@@ -70,13 +70,7 @@ tc parser create parser name big_parser id 0x1000 root_node_name ether root_node
 #endif
 
 /* Flags for parser configuration */
-#define KPARSER_F_DEBUG                           (1 << 0)
-#define KPARSER_F_METADATA_THREAD                 (1 << 1)
-#define KPARSER_F_HANDLER_THREAD                  (1 << 2)
-#define KPARSER_F_TLV_METADATA_THREAD             (1 << 3)
-#define KPARSER_F_TLV_HANDLER_THREAD              (1 << 4)
-#define KPARSER_F_FLAG_FIELDS_METADATA_THREAD     (1 << 5)
-#define KPARSER_F_FLAG_FIELDS_HANDLER_THREAD      (1 << 6)
+#define KPARSER_F_DEBUG				(1 << 0)
 
 // TODO: add comments on every member of DSs
 
@@ -125,26 +119,28 @@ struct kparser_glue_node {
 	struct list_head ptblent_rev_ref_list;
 };
 
-struct k_proto_node {
-	struct kparser_glue_node glue;
-	struct kparser_proto_node node; 
-};
-
 struct k_parse_node {
 	struct kparser_glue_node glue;
-	struct kparser_parse_node node; 
+	union {
+		struct kparser_parse_node node;
+		struct kparser_parse_flag_fields_node flags_parse_node;
+		struct kparser_parse_tlvs_node tlvs_parse_node;
+	} parse_node;
 };
-
-#if 0
-struct k_proto_table_entry {
-	struct kparser_glue glue;
-	struct kparser_proto_table_entry proto_tbl_entry;
-};
-#endif
 
 struct k_protocol_table {
 	struct kparser_glue glue;
 	struct kparser_proto_table proto_table;
+};
+
+struct k_parse_tlv_node {
+	struct kparser_glue_node glue;
+	struct kparser_parse_tlv_node tlv_parse_node;
+};
+
+struct k_proto_tlvs_table {
+	struct kparser_glue glue;
+	struct kparser_proto_tlvs_table tlvs_proto_table;
 };
 
 struct k_flag_field {
@@ -162,54 +158,19 @@ struct k_flag_field_node {
 	struct kparser_parse_flag_field_node node_flag_field;
 };
 
-struct k_proto_flag_fields_table_entry {
-	struct kparser_glue glue;
-	struct kparser_proto_flag_fields_table_entry flags_proto_tbl_entry;
-};
-
 struct k_proto_flag_fields_table {
 	struct kparser_glue glue;
 	struct kparser_proto_flag_fields_table flags_proto_table;
 };
 
-struct k_parse_flag_fields_node {
-	struct kparser_glue_node glue;
-	struct kparser_parse_flag_fields_node flags_parse_node;;
-};
-
-struct k_proto_flag_fields_node {
-	struct kparser_glue_node glue;
-	struct kparser_proto_flag_fields_node flags_proto_node;;
-};
-
-struct k_parse_tlv_node {
-	struct kparser_glue_node glue;
-	struct kparser_parse_tlv_node tlv_parse_node;
-};
-
-struct k_proto_tlvs_table_entry {
+struct k_counter {
 	struct kparser_glue glue;
-	struct kparser_proto_tlvs_table_entry tlvs_proto_table_entry;
+	struct kparser_cntr_conf counter_cnf;
 };
 
-struct k_proto_tlvs_table {
+struct k_counter_table {
 	struct kparser_glue glue;
-	struct kparser_proto_tlvs_table tlvs_proto_table;
-};
-
-struct k_parse_tlvs_node {
-	struct kparser_glue_node glue;
-	struct kparser_parse_tlvs_node tlvs_parse_node;
-};
-
-struct k_proto_tlvs_node {
-	struct kparser_glue_node glue;
-	struct kparser_proto_tlvs_node tlvs_proto_node;
-};
-
-struct k_proto_tlv_node {
-	struct kparser_glue_node glue;
-	struct kparser_proto_tlv_node tlv_proto_node;
+	struct k_counter k_cntrs[KPARSER_CNTR_NUM_CNTRS];
 };
 
 struct k_parser {
@@ -224,7 +185,7 @@ struct k_metadata_extract {
 
 struct k_metadata_table {
 	struct kparser_glue glue;
-	ssize_t md_configs_len;
+	size_t md_configs_len;
 	struct kparser_conf_cmd *md_configs;
 	struct kparser_metadata_table metadata_table;
 };
@@ -315,17 +276,17 @@ int kparser_init(void);
 
 int kparser_deinit(void);
 
-int kparser_config_handler_add(const void *cmdarg, ssize_t cmdarglen,
-		struct kparser_cmd_rsp_hdr **rsp, ssize_t *rsp_len);
+int kparser_config_handler_add(const void *cmdarg, size_t cmdarglen,
+		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
 
-int kparser_config_handler_update(const void *cmdarg, ssize_t cmdarglen,
-		struct kparser_cmd_rsp_hdr **rsp, ssize_t *rsp_len);
+int kparser_config_handler_update(const void *cmdarg, size_t cmdarglen,
+		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
 
-int kparser_config_handler_read(const void *cmdarg, ssize_t cmdarglen,
-		struct kparser_cmd_rsp_hdr **rsp, ssize_t *rsp_len);
+int kparser_config_handler_read(const void *cmdarg, size_t cmdarglen,
+		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
 
-int kparser_config_handler_delete(const void *cmdarg, ssize_t cmdarglen,
-		struct kparser_cmd_rsp_hdr **rsp, ssize_t *rsp_len);
+int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
+		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
 
 #if 0
 void kparser_del_all(const void *cmdarg,
@@ -338,7 +299,7 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 		size_t parse_len, void *_metadata, size_t _metadata_len);
 
 int kparser_do_parse(const struct kparser_hkey *kparser_key, void *_hdr,
-		ssize_t parse_len,  void *_metadata, ssize_t _metadata_len);
+		size_t parse_len,  void *_metadata, size_t _metadata_len);
 
 void * kparser_namespace_lookup(enum kparser_global_namespace_ids ns_id,
 		const struct kparser_hkey *key);

@@ -73,31 +73,57 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb,
 		.len = sizeof(struct rsp_struc_name),		\
                 .validation_type = NLA_VALIDATE_MIN,		\
                 .min = sizeof(struct rsp_struc_name)		\
-	}							\
+	}
 
 static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX + 1] = {
-	NS_DEFINE_POLICY_ATTR_ENTRY(METADATA, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(METALIST, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(NODE_PROTO, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(NODE_PARSE, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(PROTO_TABLE, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(TLV_NODE_PROTO, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(TLV_NODE_PARSE, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(TLVS_NODE_PROTO, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(TLVS_NODE_PARSE, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(TLV_PROTO_TABLE, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(PARSER, kparser_conf_cmd,
-			kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_METADATA,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_METALIST,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_NODE_PARSE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_PROTO_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_TLV_NODE_PARSE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_TLV_PROTO_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_NODE_PARSE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_PROTO_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_PARSER,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS_TABLES,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_COUNTER,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_COUNTER_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
 };
 
 static const struct genl_ops kparser_nl_ops[] = {
@@ -125,10 +151,10 @@ struct genl_family kparser_nl_family __ro_after_init = {
 
 static int kparser_send_cmd_rsp(int cmd, int attrtype,
 		const struct kparser_cmd_rsp_hdr *rsp,
-		ssize_t rsp_len, struct genl_info *info)
+		size_t rsp_len, struct genl_info *info)
 {
 	struct sk_buff *msg;
-	ssize_t msgsz = NLMSG_DEFAULT_SIZE;
+	size_t msgsz = NLMSG_DEFAULT_SIZE;
 	void *hdr;
 	int ret;
 
@@ -159,12 +185,12 @@ static int kparser_send_cmd_rsp(int cmd, int attrtype,
 	return ret;
 }
 
-typedef int kparser_ops(const void *, ssize_t,
-		struct kparser_cmd_rsp_hdr **, ssize_t *);
+typedef int kparser_ops(const void *, size_t,
+		struct kparser_cmd_rsp_hdr **, size_t *);
 
 #if 0
 static int kparser_dell_all(const struct nlattr *nl_curr_attr,
-		struct kparser_cmd_rsp_hdr **rsp, ssize_t *rsp_len)
+		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
 	kparser_del_all(NULL, rsp, rsp_len);
 
@@ -200,21 +226,27 @@ static int kparser_list_all(const struct nlattr *nl_curr_attr,
 	[KPARSER_ATTR_UPDATE_##NS_ID] = kparser_config_handler_update,	\
 	[KPARSER_ATTR_READ_##NS_ID] = kparser_config_handler_read,	\
 	[KPARSER_ATTR_DELETE_##NS_ID] = kparser_config_handler_delete,	\
-	[KPARSER_ATTR_RSP_##NS_ID] = NULL 				\
+	[KPARSER_ATTR_RSP_##NS_ID] = NULL
 
 static kparser_ops *kparser_ns_op_handler[KPARSER_ATTR_MAX + 1] = {
 	NULL,
-	KPARSER_NS_DEFINE_OP_HANDLERS(METADATA),
-	KPARSER_NS_DEFINE_OP_HANDLERS(METALIST),
-	KPARSER_NS_DEFINE_OP_HANDLERS(NODE_PROTO),
-	KPARSER_NS_DEFINE_OP_HANDLERS(NODE_PARSE),
-	KPARSER_NS_DEFINE_OP_HANDLERS(PROTO_TABLE),
-	KPARSER_NS_DEFINE_OP_HANDLERS(TLV_NODE_PROTO),
-	KPARSER_NS_DEFINE_OP_HANDLERS(TLV_NODE_PARSE),
-	KPARSER_NS_DEFINE_OP_HANDLERS(TLVS_NODE_PROTO),
-	KPARSER_NS_DEFINE_OP_HANDLERS(TLVS_NODE_PARSE),
-	KPARSER_NS_DEFINE_OP_HANDLERS(TLV_PROTO_TABLE),
-	KPARSER_NS_DEFINE_OP_HANDLERS(PARSER),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_METADATA),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_METALIST),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_NODE_PARSE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_PROTO_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_TLV_NODE_PARSE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_TLV_PROTO_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD_NODE_PARSE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD_PROTO_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_PARSER),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS_TABLES),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_COUNTER),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_COUNTER_TABLE),
+
 	// kparser_dell_all,
 	// kparser_list_all,
 };
@@ -222,7 +254,7 @@ static kparser_ops *kparser_ns_op_handler[KPARSER_ATTR_MAX + 1] = {
 static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 {
 	struct kparser_cmd_rsp_hdr *rsp = NULL;
-	ssize_t rsp_len = 0;
+	size_t rsp_len = 0;
 	int ret_attr_id;
 	int attr_idx;
 	int rc;

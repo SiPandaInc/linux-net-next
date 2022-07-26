@@ -39,7 +39,7 @@ static inline bool kparser_expr_evaluate(
 {
 	__u64 val;
 
-	__kparser_metadata_byte_extract(hdr + expr->src_off, (__u8 *)&val,
+	__kparser_metadata_bytes_extract(hdr + expr->src_off, (__u8 *)&val,
 					expr->length, 0);
 
 	val &= expr->mask;
