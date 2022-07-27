@@ -14,8 +14,6 @@
 
 #include "kparser_types.h"
 #include "kparser_condexpr.h"
-#include "kparser_tlvs.h"
-#include "kparser_flag_fields.h"
 #include "kparser_metaextract.h"
 #include "kparser_types.h"
 
@@ -288,19 +286,17 @@ int kparser_config_handler_read(const void *cmdarg, size_t cmdarglen,
 int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
 
-#if 0
-void kparser_del_all(const void *cmdarg,
-		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
-void kparser_ls_all(const struct kparser_hkey *cmdarg,
-		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
-#endif
-
 int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
-		size_t parse_len, void *_metadata, size_t _metadata_len);
+		size_t parse_len, void *_metadata, size_t metadata_len);
 
 int kparser_do_parse(const struct kparser_hkey *kparser_key, void *_hdr,
-		size_t parse_len,  void *_metadata, size_t _metadata_len);
+		size_t parse_len,  void *_metadata, size_t metadata_len);
 
 void * kparser_namespace_lookup(enum kparser_global_namespace_ids ns_id,
 		const struct kparser_hkey *key);
+
+const struct kparser_parser * kparser_get_parser(
+		const struct kparser_hkey *kparser_key);
+
+bool kparser_put_parser(const struct kparser_hkey *kparser_key);
 #endif /* __KPARSER_H */

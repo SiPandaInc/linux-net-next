@@ -1620,7 +1620,8 @@ static inline int kparser_metadata_extract(
 	return ret;
 }
 
-static inline bool kparser_md_convert(const struct kparser_conf_metadata *conf,
+static inline bool kparser_metadata_convert(
+		const struct kparser_conf_metadata *conf,
 		struct kparser_metadata_extract *mde)
 {
 	__u32 encoding_type;

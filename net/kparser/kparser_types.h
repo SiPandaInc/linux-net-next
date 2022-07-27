@@ -53,7 +53,7 @@ struct kparser_condexpr_table {
 	int default_fail;
 	enum kparser_condexpr_types type;
 	unsigned int num_ents;
-	const struct kparser_condexpr_expr __rcu *entries;
+	struct kparser_condexpr_expr __rcu *entries;
 };
 
 /* A table of tables of conditional expressions. This is used to create more
@@ -70,8 +70,6 @@ struct kparser_condexpr_tables {
 struct kparser_ctrl_data {
 	int ret;
 	size_t pkt_len;
-	__u16 pkt_csum;
-	__u16 hdr_csum;
 	void *hdr_base;
 	unsigned int node_cnt;
 	unsigned int encap_levels;
@@ -259,7 +257,7 @@ struct kparser_proto_tlvs_node {
  */
 struct kparser_flag_fields {
 	size_t num_idx;
-	const struct kparser_flag_field __rcu *fields;
+	struct kparser_flag_field __rcu *fields;
 };
 
 #if 0

@@ -16,10 +16,12 @@
 #define clearbit(A,k)	(A[(k)/BITS_IN_U32] &= ~(1 << ((k) % BITS_IN_U32)))
 #define testbit(A,k)    (1 & (A[(k)/BITS_IN_U32] >> ((k) % BITS_IN_U32)))
 
-/* NETLINK_GENERIC related info */
+/* *********************** NETLINK_GENERIC *********************** */
 #define KPARSER_GENL_NAME		"kParser"
 #define KPARSER_GENL_VERSION		0x1
 
+
+/* *********************** NETLINK CLI *********************** */
 #define KPARSER_ERR_STR_MAX_LEN		256
 #define KPARSER_MAX_STR_LEN_U8		6
 #define KPARSER_MAX_STR_LEN_U16 	8
@@ -85,8 +87,16 @@ struct kparser_arg_key_val_token {
 	const struct kparser_arg_key_val_token *default_template_token;
 };
 
+/* *********************** Namespaces/objects *********************** */
 enum kparser_global_namespace_ids {
 	KPARSER_NS_INVALID,
+
+	KPARSER_NS_CONDEXPRS,
+	KPARSER_NS_CONDEXPRS_TABLE,
+	KPARSER_NS_CONDEXPRS_TABLES,
+
+	KPARSER_NS_COUNTER,
+	KPARSER_NS_COUNTER_TABLE,
 
 	KPARSER_NS_METADATA,
 	KPARSER_NS_METALIST,
@@ -98,18 +108,13 @@ enum kparser_global_namespace_ids {
 	KPARSER_NS_TLV_PROTO_TABLE,
 
 	KPARSER_NS_FLAG_FIELD,
-	KPARSER_NS_FLAG_FIELD_NODE_PARSE,
 	KPARSER_NS_FLAG_FIELD_TABLE,
+	KPARSER_NS_FLAG_FIELD_NODE_PARSE,
 	KPARSER_NS_FLAG_FIELD_PROTO_TABLE,
 
 	KPARSER_NS_PARSER,
 
-	KPARSER_NS_CONDEXPRS,
-	KPARSER_NS_CONDEXPRS_TABLE,
-	KPARSER_NS_CONDEXPRS_TABLES,
-
-	KPARSER_NS_COUNTER,
-	KPARSER_NS_COUNTER_TABLE,
+	KPARSER_NS_OP_PARSER_LOCK_UNLOCK,
 
 	KPARSER_NS_MAX
 };
@@ -137,7 +142,14 @@ struct kparser_global_namespaces {
 	KPARSER_ATTR_RSP(id)
 
 enum {
-	KPARSER_ATTR_UNSPEC,
+	KPARSER_ATTR_UNSPEC,	/* Add more entries after this */
+
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_COUNTER),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_COUNTER_TABLE),
+
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS_TABLE),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS_TABLES),
 
 	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_METADATA),
 	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_METALIST),
@@ -155,29 +167,18 @@ enum {
 
 	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_PARSER),
 
-	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS),
-	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS_TABLE),
-	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_CONDEXPRS_TABLES),
+	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_OP_PARSER_LOCK_UNLOCK),
 
-	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_COUNTER),
-	KPARSER_DEFINE_ATTR_IDS(KPARSER_NS_COUNTER_TABLE),
-
-	KPARSER_ATTR_DELETE_ALL,
-	KPARSER_ATTR_LIST_ALL,
-
-	__KPARSER_ATTR_MAX,
+	KPARSER_ATTR_MAX	/* Add more entries before this */
 };
-
-#define KPARSER_ATTR_MAX		(__KPARSER_ATTR_MAX - 1)
 
 enum {
 	KPARSER_CMD_UNSPEC,
 	KPARSER_CMD_CONFIGURE,
-	__KPARSER_CMD_MAX,
+	KPARSER_CMD_MAX
 };
 
-#define KPARSER_CMD_MAX	(__KPARSER_CMD_MAX - 1)
-
+/* *********************** kparser hash key (hkey) *********************** */
 #define KPARSER_INVALID_ID		0xffff
 
 #define KPARSER_USER_ID_MIN		0
@@ -198,6 +199,67 @@ struct kparser_hkey {
 	char name[KPARSER_MAX_NAME];
 };
 
+/* *********************** conditional expressions *********************** */
+enum kparser_condexpr_types {
+	KPARSER_CONDEXPR_TYPE_OR,
+	KPARSER_CONDEXPR_TYPE_AND,
+};
+
+enum kparser_expr_types {
+	KPARSER_CONDEXPR_TYPE_EQUAL,
+	KPARSER_CONDEXPR_TYPE_NOTEQUAL,
+	KPARSER_CONDEXPR_TYPE_LT,
+	KPARSER_CONDEXPR_TYPE_LTE,
+	KPARSER_CONDEXPR_TYPE_GT,
+	KPARSER_CONDEXPR_TYPE_GTE,
+};
+
+/* One boolean condition expressions */
+struct kparser_condexpr_expr {
+	enum kparser_expr_types type;
+	__u16 src_off;
+	__u8 length;
+	__u32 mask;
+	__u32 value;
+};
+
+struct kparser_conf_condexpr {
+	struct kparser_hkey key;
+	struct kparser_condexpr_expr config;
+};
+
+struct kparser_conf_condexpr_table {
+	struct kparser_hkey key;
+	int idx;
+	int default_fail;
+	enum kparser_condexpr_types type;
+	struct kparser_hkey condexpr_expr_key;
+};
+
+struct kparser_conf_condexpr_tables {
+	struct kparser_hkey key;
+	int idx;
+	struct kparser_hkey condexpr_expr_table_key;
+};
+
+/* *********************** counter *********************** */
+#define KPARSER_CNTR_NUM_CNTRS		7
+
+struct kparser_cntr_conf {
+	__u32 max_value;
+	__u32 array_limit;
+        size_t el_size;
+        bool reset_on_encap;
+        bool overwrite_last;
+        bool error_on_exceeded;
+};
+
+struct kparser_conf_cntr {
+	struct kparser_hkey key;
+	struct kparser_cntr_conf conf;
+};
+
+/* *********************** metadata *********************** */
 enum kparser_metadata_type {
 	KPARSER_METADATA_INVALID,
 	KPARSER_METADATA_HDRDATA,
@@ -238,10 +300,24 @@ struct kparser_conf_metadata {
 	size_t add_off;
 };
 
+/* *********************** metadata list/table *********************** */
 struct kparser_conf_metadata_table {
 	struct kparser_hkey key;
 	size_t metadata_keys_count;
 	struct kparser_hkey metadata_keys[0];
+};
+
+/* *********************** parse nodes *********************** */
+/* kParser protocol node types */
+enum kparser_node_type {
+	/* Plain node, no super structure */
+	KPARSER_NODE_TYPE_PLAIN,
+	/* TLVs node with super structure for TLVs */
+	KPARSER_NODE_TYPE_TLVS,
+	/* Flag-fields with super structure for flag-fields */
+	KPARSER_NODE_TYPE_FLAG_FIELDS,
+	/* It represents the limit value */
+	KPARSER_NODE_TYPE_MAX,
 };
 
 /* Types for parameterized functions */
@@ -260,19 +336,6 @@ struct kparser_parameterized_next_proto {
         __u16 mask;
         __u8 size;
         __u8 right_shift;
-};
-
-/* TODO: Use kParser in comments */
-/* kParser protocol node types */
-enum kparser_node_type {
-	/* Plain node, no super structure */
-	KPARSER_NODE_TYPE_PLAIN,
-	/* TLVs node with super structure for TLVs */
-	KPARSER_NODE_TYPE_TLVS,
-	/* Flag-fields with super structure for flag-fields */
-	KPARSER_NODE_TYPE_FLAG_FIELDS,
-	/* It represents the limit value */
-	KPARSER_NODE_TYPE_MAX,
 };
 
 struct kparser_conf_parse_ops {
@@ -371,29 +434,6 @@ struct kparser_conf_parse_tlvs {
 	struct kparser_loop_node_config config;
 };
 
-struct kparser_conf_proto_tlv_node_ops {
-	bool overlay_type_parameterized;
-        struct kparser_parameterized_next_proto pfoverlay_type;
-	bool cond_exprs_parameterized;
-	struct kparser_hkey cond_exprs_table;
-};
-
-struct kparser_conf_node_proto_tlv {
-	size_t min_len;
-	size_t max_len;
-	bool is_padding;
-	struct kparser_conf_proto_tlv_node_ops ops;
-};
-
-struct kparser_conf_node_parse_tlv {
-	struct kparser_hkey key;
-	struct kparser_conf_node_proto_tlv node_proto;
-	struct kparser_hkey overlay_proto_tlvs_table_key;
-	struct kparser_hkey overlay_wildcard_parse_node_key;
-	int unknown_ret;
-	struct kparser_hkey metadata_table_key;
-};
-
 /* flag fields */
 struct kparser_parameterized_get_value {
 	__u16 src_off;
@@ -420,7 +460,39 @@ struct kparser_conf_parse_flag_fields {
 	struct kparser_hkey flag_fields_proto_table_key;
 };
 
+struct kparser_conf_node {
+	struct kparser_hkey key;
+	enum kparser_node_type type;
+	struct kparser_conf_node_parse plain_parse_node;
+	struct kparser_conf_parse_tlvs tlvs_parse_node;
+	struct kparser_conf_parse_flag_fields flag_fields_parse_node;
+};
 
+/* *********************** tlv parse node *********************** */
+struct kparser_conf_proto_tlv_node_ops {
+	bool overlay_type_parameterized;
+        struct kparser_parameterized_next_proto pfoverlay_type;
+	bool cond_exprs_parameterized;
+	struct kparser_hkey cond_exprs_table;
+};
+
+struct kparser_conf_node_proto_tlv {
+	size_t min_len;
+	size_t max_len;
+	bool is_padding;
+	struct kparser_conf_proto_tlv_node_ops ops;
+};
+
+struct kparser_conf_node_parse_tlv {
+	struct kparser_hkey key;
+	struct kparser_conf_node_proto_tlv node_proto;
+	struct kparser_hkey overlay_proto_tlvs_table_key;
+	struct kparser_hkey overlay_wildcard_parse_node_key;
+	int unknown_ret;
+	struct kparser_hkey metadata_table_key;
+};
+
+/* *********************** flag field *********************** */
 /* One descriptor for a flag
  *
  * flag: protocol value
@@ -438,6 +510,7 @@ struct kparser_conf_flag_field {
 	struct kparser_flag_field conf;
 };
 
+/* *********************** flag field parse node *********************** */
 struct kparser_parse_flag_field_node_ops_conf {
 	struct kparser_hkey cond_exprs_table_key;
 };
@@ -448,7 +521,7 @@ struct kparser_conf_node_parse_flag_field {
 	struct kparser_parse_flag_field_node_ops_conf ops;
 };
 
-/* generic tables */
+/* *********************** generic tables *********************** */
 struct kparser_conf_table {
 	struct kparser_hkey key;
 	__u16 idx;
@@ -457,24 +530,7 @@ struct kparser_conf_table {
 	struct kparser_hkey elem_key;
 };
 
-/* counter */
-#define KPARSER_CNTR_NUM_CNTRS		7
-
-struct kparser_cntr_conf {
-	__u32 max_value;
-	__u32 array_limit;
-        size_t el_size;
-        bool reset_on_encap;
-        bool overwrite_last;
-        bool error_on_exceeded;
-};
-
-struct kparser_conf_cntr {
-	struct kparser_hkey key;
-	struct kparser_cntr_conf conf;
-};
-
-/* parser */
+/* *********************** parser *********************** */
 #define KPARSER_MAX_NODES	1
 #define KPARSER_MAX_ENCAPS	4
 #define KPARSER_MAX_FRAMES	255 
@@ -509,76 +565,40 @@ struct kparser_conf_parser {
 	struct kparser_hkey cntrs_table_key;
 };
 
-/* conditional expressions */
-/* Defines for parser conditional expressions */
-enum kparser_condexpr_types {
-	KPARSER_CONDEXPR_TYPE_OR,
-	KPARSER_CONDEXPR_TYPE_AND,
-};
-
-enum kparser_expr_types {
-	KPARSER_CONDEXPR_TYPE_EQUAL,
-	KPARSER_CONDEXPR_TYPE_NOTEQUAL,
-	KPARSER_CONDEXPR_TYPE_LT,
-	KPARSER_CONDEXPR_TYPE_LTE,
-	KPARSER_CONDEXPR_TYPE_GT,
-	KPARSER_CONDEXPR_TYPE_GTE,
-};
-
-/* One boolean condition expressions */
-struct kparser_condexpr_expr {
-	enum kparser_expr_types type;
-	__u16 src_off;
-	__u8 length;
-	__u32 mask;
-	__u32 value;
-};
-
-struct kparser_conf_condexpr {
-	struct kparser_hkey key;
-	struct kparser_condexpr_expr config;
-};
-
-struct kparser_conf_condexpr_table {
-	struct kparser_hkey key;
-	int idx;
-	int default_fail;
-	enum kparser_condexpr_types type;
-	struct kparser_hkey condexpr_expr_key;
-};
-
-struct kparser_conf_condexpr_tables {
-	struct kparser_hkey key;
-	int idx;
-	struct kparser_hkey condexpr_expr_table_key;
-};
-
-struct kparser_conf_node {
-	struct kparser_hkey key;
-	enum kparser_node_type type;
-	struct kparser_conf_node_parse plain_parse_node;
-	struct kparser_conf_parse_tlvs tlvs_parse_node;
-	struct kparser_conf_parse_flag_fields flag_fields_parse_node;
-};
-
-/* cli interface cmd structures */
+/* *********************** CLI config interface *********************** */
 struct kparser_conf_cmd {
 	enum kparser_global_namespace_ids namespace_id;
 	union {
 		/* for read/delete commands */
+		/* KPARSER_NS_OP_PARSER_LOCK_UNLOCK */
 		struct kparser_hkey obj_key;
+
+		/* KPARSER_NS_CONDEXPRS */
+		struct kparser_conf_condexpr cond_conf;
+		struct kparser_conf_condexpr_table cond_table_conf;
+		struct kparser_conf_condexpr_tables cond_tables_conf;
+
+		/* KPARSER_NS_COUNTER */
+		struct kparser_conf_cntr cntr_conf;
+
 		/* KPARSER_NS_METADATA */
 		struct kparser_conf_metadata md_conf;
+
 		/* KPARSER_NS_METALIST */
 		struct kparser_conf_metadata_table mdl_conf;
+
 		/* KPARSER_NS_NODE_PARSE */
 		struct kparser_conf_node node_conf;
+
 		/* KPARSER_NS_TLV_NODE_PARSE */
 		struct kparser_conf_node_parse_tlv tlv_node_conf;
+
 		/* KPARSER_NS_FLAG_FIELD */
 		struct kparser_conf_flag_field flag_field_conf;
+
 		/* KPARSER_NS_FLAG_FIELD_NODE_PARSE */
 		struct kparser_conf_node_parse_flag_field flag_field_node_conf;
+
 		/* KPARSER_NS_PROTO_TABLE */
 		/* KPARSER_NS_TLV_PROTO_TABLE */
 		/* KPARSER_NS_FLAG_FIELD_TABLE */
@@ -587,13 +607,8 @@ struct kparser_conf_cmd {
 		/* KPARSER_NS_CONDEXPRS_TABLES */
 		/* KPARSER_NS_COUNTER_TABLE */
 		struct kparser_conf_table table_conf;
-		/* KPARSER_NS_CONDEXPRS */
-		struct kparser_conf_condexpr cond_conf;
-		struct kparser_conf_condexpr_table cond_table_conf;
-		struct kparser_conf_condexpr_tables cond_tables_conf;
-		/* KPARSER_NS_COUNTER */
-		struct kparser_conf_cntr cntr_conf;
 
+		/* KPARSER_NS_PARSER */
 		struct kparser_conf_parser parser_conf;
 	};
 };
@@ -608,8 +623,8 @@ struct kparser_cmd_rsp_hdr {
 	struct kparser_conf_cmd objects[0];
 };
 
-/* Panda parser return codes
- *
+/* ***********************  kParser error code *********************** */
+/*
  * There are two variants of the KPARSER return codes. The normal variant is
  * a number between -15 and 0 inclusive where the name for the code is
  * prefixed by KPARSER_. There is also a special 16-bit encoding which is
@@ -617,7 +632,6 @@ struct kparser_cmd_rsp_hdr {
  * corresponds to values 0xfff0 to 0xffff. Names for the 16-bit encoding
  * are prefixed by KPARSER_16BIT_
  */
-/* different kparser error code */
 enum {
 	KPARSER_OKAY = 0,		/* Okay and continue */
 	KPARSER_RET_OKAY = -1,		/* Encoding of OKAY in ret code */
@@ -706,6 +720,7 @@ static inline const char *kparser_code_to_text(int code)
 	}
 }
 
+/* *********************** HKey utility APIs *********************** */
 static inline bool kparser_hkey_id_empty(const struct kparser_hkey *key)
 {
 	if (!key)
@@ -733,5 +748,4 @@ static inline bool kparser_hkey_user_id_invalid(const struct kparser_hkey *key)
 	return ((key->id == KPARSER_INVALID_ID) ||
 			(key->id > KPARSER_USER_ID_MAX));
 }
-
 #endif /* _LINUX_KPARSER_H */

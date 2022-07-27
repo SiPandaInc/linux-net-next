@@ -26,12 +26,10 @@
 
 /* kparser main parsing logic - data path */
 #include "kparser.h"
-#include "kparser_types.h"
-#include "kparser_metaextract.h"
-#include "kparser_tlvs.h"
-#include "kparser_flag_fields.h"
-#include "kparser_metaextract.h"
 #include "kparser_condexpr.h"
+#include "kparser_metaextract.h"
+#include "kparser_types.h"
+
 #include <linux/rhashtable.h>
 #include <linux/skbuff.h>
 

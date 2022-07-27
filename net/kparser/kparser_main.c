@@ -42,40 +42,53 @@
 static int kparser_cli_cmd_handler(struct sk_buff *skb,
 		struct genl_info *info);
 
-//		.len = sizeof(struct struc_name),
-
-#define NS_DEFINE_POLICY_ATTR_ENTRY(id, struc_name, rsp_struc_name)\
-	[KPARSER_ATTR_CREATE_##id] = {				\
-		.type = NLA_BINARY,				\
-                .validation_type = NLA_VALIDATE_MIN,		\
-                .min = sizeof(struct struc_name)		\
-	},							\
-	[KPARSER_ATTR_UPDATE_##id] = {				\
-		.type = NLA_BINARY,				\
-		.len = sizeof(struct struc_name),		\
-                .validation_type = NLA_VALIDATE_MIN,		\
-                .min = sizeof(struct struc_name)		\
-	},							\
-	[KPARSER_ATTR_READ_##id] = {				\
-		.type = NLA_BINARY,				\
-		.len = sizeof(struct struc_name),		\
-                .validation_type = NLA_VALIDATE_MIN,		\
-                .min = sizeof(struct struc_name)		\
-	},							\
-	[KPARSER_ATTR_DELETE_##id] = {				\
-		.type = NLA_BINARY,				\
-		.len = sizeof(struct struc_name),		\
-                .validation_type = NLA_VALIDATE_MIN,		\
-                .min = sizeof(struct struc_name)		\
-	},							\
-	[KPARSER_ATTR_RSP_##id] = {				\
-		.type = NLA_BINARY,				\
-		.len = sizeof(struct rsp_struc_name),		\
-                .validation_type = NLA_VALIDATE_MIN,		\
-                .min = sizeof(struct rsp_struc_name)		\
+#define NS_DEFINE_POLICY_ATTR_ENTRY(id, struc_name, rsp_struc_name)	\
+	[KPARSER_ATTR_CREATE_##id] = {					\
+		.type = NLA_BINARY,					\
+                .validation_type = NLA_VALIDATE_MIN,			\
+                .min = sizeof(struct struc_name)			\
+	},								\
+	[KPARSER_ATTR_UPDATE_##id] = {					\
+		.type = NLA_BINARY,					\
+		.len = sizeof(struct struc_name),			\
+                .validation_type = NLA_VALIDATE_MIN,			\
+                .min = sizeof(struct struc_name)			\
+	},								\
+	[KPARSER_ATTR_READ_##id] = {					\
+		.type = NLA_BINARY,					\
+		.len = sizeof(struct struc_name),			\
+                .validation_type = NLA_VALIDATE_MIN,			\
+                .min = sizeof(struct struc_name)			\
+	},								\
+	[KPARSER_ATTR_DELETE_##id] = {					\
+		.type = NLA_BINARY,					\
+		.len = sizeof(struct struc_name),			\
+                .validation_type = NLA_VALIDATE_MIN,			\
+                .min = sizeof(struct struc_name)			\
+	},								\
+	[KPARSER_ATTR_RSP_##id] = {					\
+		.type = NLA_BINARY,					\
+		.len = sizeof(struct rsp_struc_name),			\
+                .validation_type = NLA_VALIDATE_MIN,			\
+                .min = sizeof(struct rsp_struc_name)			\
 	}
 
-static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX + 1] = {
+static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX] = {
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS_TABLES,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_COUNTER,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_COUNTER_TABLE,
+				    kparser_conf_cmd,
+				    kparser_cmd_rsp_hdr),
 	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_METADATA,
 				    kparser_conf_cmd,
 				    kparser_cmd_rsp_hdr),
@@ -97,10 +110,10 @@ static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX + 1] = {
 	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD,
 				    kparser_conf_cmd,
 				    kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_NODE_PARSE,
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_TABLE,
 				    kparser_conf_cmd,
 				    kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_TABLE,
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_NODE_PARSE,
 				    kparser_conf_cmd,
 				    kparser_cmd_rsp_hdr),
 	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_FLAG_FIELD_PROTO_TABLE,
@@ -109,19 +122,7 @@ static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX + 1] = {
 	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_PARSER,
 				    kparser_conf_cmd,
 				    kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS,
-				    kparser_conf_cmd,
-				    kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS_TABLE,
-				    kparser_conf_cmd,
-				    kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_CONDEXPRS_TABLES,
-				    kparser_conf_cmd,
-				    kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_COUNTER,
-				    kparser_conf_cmd,
-				    kparser_cmd_rsp_hdr),
-	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_COUNTER_TABLE,
+	NS_DEFINE_POLICY_ATTR_ENTRY(KPARSER_NS_OP_PARSER_LOCK_UNLOCK,
 				    kparser_conf_cmd,
 				    kparser_cmd_rsp_hdr),
 };
@@ -140,7 +141,7 @@ struct genl_family kparser_nl_family __ro_after_init = {
 	.hdrsize	= 0,
 	.name		= KPARSER_GENL_NAME,
 	.version	= KPARSER_GENL_VERSION,
-	.maxattr	= KPARSER_ATTR_MAX,
+	.maxattr	= KPARSER_ATTR_MAX - 1,
 	.policy		= kparser_nl_policy,
 	.netnsok	= true,
 	.parallel_ops	= true,
@@ -165,8 +166,8 @@ static int kparser_send_cmd_rsp(int cmd, int attrtype,
 	if (!msg)
 		return ENOMEM;
 
-	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq, &kparser_nl_family,
-			0, cmd);
+	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq,
+			  &kparser_nl_family, 0, cmd);
 	if (!hdr) {
 		nlmsg_free(msg);
 		return ENOBUFS;
@@ -228,8 +229,13 @@ static int kparser_list_all(const struct nlattr *nl_curr_attr,
 	[KPARSER_ATTR_DELETE_##NS_ID] = kparser_config_handler_delete,	\
 	[KPARSER_ATTR_RSP_##NS_ID] = NULL
 
-static kparser_ops *kparser_ns_op_handler[KPARSER_ATTR_MAX + 1] = {
+static kparser_ops *kparser_ns_op_handler[KPARSER_ATTR_MAX] = {
 	NULL,
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS_TABLES),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_COUNTER),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_COUNTER_TABLE),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_METADATA),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_METALIST),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_NODE_PARSE),
@@ -237,18 +243,11 @@ static kparser_ops *kparser_ns_op_handler[KPARSER_ATTR_MAX + 1] = {
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_TLV_NODE_PARSE),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_TLV_PROTO_TABLE),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD),
-	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD_NODE_PARSE),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD_TABLE),
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD_NODE_PARSE),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_FLAG_FIELD_PROTO_TABLE),
 	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_PARSER),
-	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS),
-	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS_TABLE),
-	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_CONDEXPRS_TABLES),
-	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_COUNTER),
-	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_COUNTER_TABLE),
-
-	// kparser_dell_all,
-	// kparser_list_all,
+	KPARSER_NS_DEFINE_OP_HANDLERS(KPARSER_NS_OP_PARSER_LOCK_UNLOCK),
 };
 
 static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
