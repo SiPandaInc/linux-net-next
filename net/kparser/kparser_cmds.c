@@ -177,7 +177,7 @@ static struct kparser_mod_namespaces g_ns_obj = {			     \
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_condexprs,
 			     KPARSER_NS_CONDEXPRS,
-			     k_condexpr_expr,
+			     kparser_glue_condexpr_expr,
 			     glue,
 			     kparser_create_cond_exprs,
 			     kparser_read_cond_exprs,
@@ -187,7 +187,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_condexprs,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_condexprs_table,
 			     KPARSER_NS_CONDEXPRS_TABLE,
-			     k_condexpr_table,
+			     kparser_glue_condexpr_table,
 			     glue,
 			     kparser_create_cond_table,
 			     kparser_read_cond_table,
@@ -197,7 +197,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_condexprs_table,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_condexprs_tables,
 			     KPARSER_NS_CONDEXPRS_TABLES,
-			     k_condexpr_tables,
+			     kparser_glue_condexpr_tables,
 			     glue,
 			     kparser_create_cond_tables,
 			     kparser_read_cond_tables,
@@ -207,7 +207,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_condexprs_tables,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_counter,
 			     KPARSER_NS_COUNTER,
-			     k_counter,
+			     kparser_glue_counter,
 			     glue,
 			     kparser_create_counter,
 			     kparser_read_counter,
@@ -217,7 +217,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_counter,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_counter_table,
 			     KPARSER_NS_COUNTER_TABLE,
-			     k_counter_table,
+			     kparser_glue_counter_table,
 			     glue,
 			     kparser_create_counter_table,
 			     kparser_read_counter_table,
@@ -227,7 +227,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_counter_table,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_metadata,
 			     KPARSER_NS_METADATA,
-			     k_metadata_extract,
+			     kparser_glue_metadata_extract,
 			     glue,
 			     kparser_create_metadata,
 			     kparser_read_metadata,
@@ -237,7 +237,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_metadata,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_metalist,
 			     KPARSER_NS_METALIST,
-			     k_metadata_table,
+			     kparser_glue_metadata_table,
 			     glue,
 			     kparser_create_metalist,
 			     kparser_read_metalist,
@@ -247,7 +247,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_metalist,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_node_parse,
 			     KPARSER_NS_NODE_PARSE,
-			     k_parse_node,
+			     kparser_glue_glue_parse_node,
 			     glue.glue,
 			     kparser_create_parse_node,
 			     kparser_read_parse_node,
@@ -257,7 +257,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_node_parse,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_proto_table,
 			     KPARSER_NS_PROTO_TABLE,
-			     k_protocol_table,
+			     kparser_glue_protocol_table,
 			     glue,
 			     kparser_create_proto_table,
 			     kparser_read_proto_table,
@@ -267,7 +267,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_proto_table,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_tlv_node_parse,
 			     KPARSER_NS_TLV_NODE_PARSE,
-			     k_parse_tlv_node,
+			     kparser_glue_parse_tlv_node,
 			     glue.glue,
 			     kparser_create_parse_tlv_node,
 			     kparser_read_parse_tlv_node,
@@ -277,7 +277,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_tlv_node_parse,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_tlv_proto_table,
 			     KPARSER_NS_TLV_PROTO_TABLE,
-			     k_proto_tlvs_table,
+			     kparser_glue_proto_tlvs_table,
 			     glue,
 			     kparser_create_tlv_proto_table,
 			     kparser_read_tlv_proto_table,
@@ -287,7 +287,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_tlv_proto_table,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field,
 			     KPARSER_NS_FLAG_FIELD,
-			     k_flag_field,
+			     kparser_glue_flag_field,
 			     glue,
 			     kparser_create_flag_field,
 			     kparser_read_flag_field,
@@ -297,7 +297,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field_table,
 			     KPARSER_NS_FLAG_FIELD_TABLE,
-			     k_flag_fields,
+			     kparser_glue_flag_fields,
 			     glue,
 			     kparser_create_flag_field_table,
 			     kparser_read_flag_field_table,
@@ -307,7 +307,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field_table,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field_parse_node,
 			     KPARSER_NS_FLAG_FIELD_NODE_PARSE,
-			     k_flag_field_node,
+			     kparser_glue_flag_field_node,
 			     glue.glue,
 			     kparser_create_parse_flag_field_node,
 			     kparser_read_parse_flag_field_node,
@@ -317,7 +317,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field_parse_node,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field_proto_table,
 			     KPARSER_NS_FLAG_FIELD_PROTO_TABLE,
-			     k_proto_flag_fields_table,
+			     kparser_glue_proto_flag_fields_table,
 			     glue,
 			     kparser_create_flag_field_proto_table,
 			     kparser_read_flag_field_proto_table,
@@ -327,7 +327,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_flag_field_proto_table,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_parser,
 			     KPARSER_NS_PARSER,
-			     k_parser,
+			     kparser_glue_parser,
 			     glue,
 			     kparser_create_parser,
 			     kparser_read_parser,
@@ -337,7 +337,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_parser,
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_parser_lock_unlock,
 			     KPARSER_NS_OP_PARSER_LOCK_UNLOCK,
-			     k_parser,
+			     kparser_glue_parser,
 			     glue,
 			     kparser_parser_lock,
 			     NULL,
@@ -618,13 +618,413 @@ int kparser_deinit(void)
 	return 0;
 }
 
+
+static void kparser_dump_node(const struct kparser_parse_node *obj);
+static void kparser_dump_proto_table(const struct kparser_proto_table *obj);
+
+static void kparser_dump_param_len(
+		const struct kparser_parameterized_len *pflen)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!pflen) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("pflen.src_off:%u \n", pflen->src_off);
+	pr_debug("pflen.size:%u \n", pflen->size);
+	pr_debug("pflen.endian:%d \n", pflen->endian);
+	pr_debug("pflen.mask:%u \n", pflen->mask);
+	pr_debug("pflen.right_shift:%u \n", pflen->right_shift);
+	pr_debug("pflen.multiplier:%u \n", pflen->multiplier);
+	pr_debug("pflen.add_value:%u \n", pflen->add_value);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_param_next_proto(
+		const struct kparser_parameterized_next_proto *pfnext_proto)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!pfnext_proto) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("pfnext_proto.src_off:%u \n", pfnext_proto->src_off);
+	pr_debug("pfnext_proto.mask:%u \n", pfnext_proto->mask);
+	pr_debug("pfnext_proto.size:%u \n", pfnext_proto->size);
+	pr_debug("pfnext_proto.right_shift:%u \n", pfnext_proto->right_shift);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_cond_expr(const struct kparser_condexpr_expr *obj)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("type:%u, src_off:%u, len:%u, mask:%04x value:%04x \n",
+			obj->type, obj->src_off,
+			obj->length, obj->mask, obj->value);
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_cond_table(const struct kparser_condexpr_table *obj)
+{
+	int i;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("default_fail:%d, type:%u\n", obj->default_fail, obj->type);
+	pr_debug("num_ents:%u, entries:%p\n", obj->num_ents, obj->entries);
+
+	if (!obj->entries)
+		goto done;
+
+	for (i = 0; i < obj->num_ents; i++)
+		kparser_dump_cond_expr(&obj->entries[i]);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_cond_tables(const struct kparser_condexpr_tables *obj)
+{
+	int i;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("num_ents:%u, entries:%p\n", obj->num_ents, obj->entries);
+	if (!obj->entries)
+		goto done;
+
+	for (i = 0; i < obj->num_ents; i++)
+		kparser_dump_cond_table(obj->entries[i]);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_proto_node(const struct kparser_proto_node *obj)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("encap:%u \n", obj->encap);
+	pr_debug("overlay:%u \n", obj->overlay);
+	pr_debug("min_len:%lu \n", obj->min_len);
+
+	pr_debug("ops.flag_fields_length:%d \n", obj->ops.flag_fields_length);
+
+	pr_debug("ops.len_parameterized:%d \n",
+			obj->ops.len_parameterized);
+	kparser_dump_param_len(&obj->ops.pflen);
+
+	pr_debug("ops.next_proto_parameterized:%d \n",
+			obj->ops.next_proto_parameterized);
+	kparser_dump_param_next_proto(&obj->ops.pfnext_proto);
+
+	pr_debug("ops.cond_exprs_parameterized:%d \n",
+			obj->ops.cond_exprs_parameterized);
+	kparser_dump_cond_tables(&obj->ops.cond_exprs);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_tlvs_parse_node(
+		const struct kparser_parse_tlvs_node *obj)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("unknown_tlv_type_ret:%d \n", obj->unknown_tlv_type_ret);
+	pr_debug("config:%d \n", obj->config.max_loop);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_tlvs_proto_node(
+		const struct kparser_proto_tlvs_node *obj)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	kparser_dump_proto_node(&obj->proto_node);
+
+	kparser_dump_param_len(&obj->ops.pfstart_offset);
+	pr_debug("ops.len_parameterized:%d \n",
+			obj->ops.len_parameterized);
+	kparser_dump_param_len(&obj->ops.pflen);
+	pr_debug("ops.type_parameterized:%d \n",
+			obj->ops.type_parameterized);
+	kparser_dump_param_next_proto(&obj->ops.pftype);
+
+	pr_debug("start_offset:%lu \n", obj->start_offset);
+	pr_debug("pad1_val:%u \n", obj->pad1_val);
+	pr_debug("padn_val:%u \n", obj->padn_val);
+	pr_debug("eol_val:%u \n", obj->eol_val);
+	pr_debug("pad1_enable:%u \n", obj->pad1_enable);
+	pr_debug("padn_enable:%u \n", obj->padn_enable);
+	pr_debug("eol_enable:%u \n", obj->eol_enable);
+	pr_debug("fixed_start_offset:%u \n", obj->fixed_start_offset);
+	pr_debug("min_len:%lu \n", obj->min_len);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_flag_field(
+		const struct kparser_flag_field *obj)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("flag:%04x, mask:%04x size:%lu\n",
+			obj->flag, obj->mask, obj->size);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_flag_fields(
+		const struct kparser_flag_fields *obj)
+{
+	int i;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("num_idx:%lu, fields:%p\n", obj->num_idx, obj->fields);
+
+	if (!obj->fields)
+		goto done;
+
+	for (i = 0; i < obj->num_idx; i++)
+		kparser_dump_flag_field(&obj->fields[i]);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_flags_proto_node(
+		const struct kparser_proto_flag_fields_node *obj)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	kparser_dump_proto_node(&obj->proto_node);
+
+	pr_debug("ops.get_flags_parameterized:%d \n",
+			obj->ops.get_flags_parameterized);
+	pr_debug("ops.pfget_flags: src_off:%u mask:%04x size:%u \n",
+			obj->ops.pfget_flags.src_off,
+			obj->ops.pfget_flags.mask,
+			obj->ops.pfget_flags.size);
+
+	pr_debug("ops.start_fields_offset_parameterized:%d \n",
+			obj->ops.start_fields_offset_parameterized);
+	kparser_dump_param_len(&obj->ops.pfstart_fields_offset);
+
+	pr_debug("ops.flag_feilds_len:%u ops.hdr_length:%u\n",
+		obj->ops.flag_feilds_len, obj->ops.hdr_length);
+
+	kparser_dump_flag_fields(obj->flag_fields);
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_metadatatable(
+		const struct kparser_metadata_table *obj)
+{
+	int i;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("num_ents:%u, entries:%p\n", obj->num_ents, obj->entries);
+	if (!obj->entries)
+		goto done;
+
+	for (i = 0; i < obj->num_ents; i++)
+		pr_debug("mde[%d]:%04x\n", i, obj->entries[i].val);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_proto_table(
+		const struct kparser_proto_table *obj)
+{
+	int i;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("num_ents:%u, entries:%p\n", obj->num_ents, obj->entries);
+	if (!obj->entries)
+		goto done;
+
+	for (i = 0; i < obj->num_ents; i++) {
+		pr_debug("[%d]: val: %d\n", i, obj->entries[i].value);
+		kparser_dump_node(obj->entries[i].node);
+	}
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_node(const struct kparser_parse_node *obj)
+{
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("name: %s: type: %d\n", obj->name, obj->node_type);
+	pr_debug("unknown_ret:%d \n", obj->unknown_ret);
+
+	switch(obj->node_type) {
+	case KPARSER_NODE_TYPE_PLAIN:
+		kparser_dump_proto_node(&obj->proto_node);
+		break;
+
+	case KPARSER_NODE_TYPE_TLVS:
+		kparser_dump_tlvs_proto_node(&obj->tlvs_proto_node);
+		kparser_dump_tlvs_parse_node(
+				(const struct kparser_parse_tlvs_node *) obj);
+		break;
+
+	case KPARSER_NODE_TYPE_FLAG_FIELDS:
+		kparser_dump_flags_proto_node(&obj->flag_fields_proto_node);
+		break;
+
+	default:
+		pr_debug("unknown node type:%d\n", obj->node_type);
+		break;
+	}
+
+	kparser_dump_proto_table(obj->proto_table);
+
+	kparser_dump_node(obj->wildcard_node);
+
+	kparser_dump_metadatatable(obj->metadata_table);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
+static void kparser_dump_parser(const struct kparser_parser *obj)
+{
+	int i;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	if (!obj) {
+		pr_debug("obj NULL");
+		goto done;
+	}
+
+	pr_debug("name: %s\n", obj->name);
+
+	pr_debug("config: flags:%02x \n", obj->config.flags);
+	pr_debug("config: max_nodes:%u \n", obj->config.max_nodes);
+	pr_debug("config: max_encaps:%u \n", obj->config.max_encaps);
+	pr_debug("config: max_frames:%u \n", obj->config.max_frames);
+	pr_debug("config: metameta_size:%lu \n", obj->config.metameta_size);
+	pr_debug("config: frame_size:%lu \n", obj->config.frame_size);
+
+	pr_debug("cntrs_len: %lu\n", obj->cntrs_len);
+	for (i = 0; i < (sizeof(obj->cntrs_conf.cntrs) /
+				sizeof (obj->cntrs_conf.cntrs[0])); i++) {
+		pr_debug("cntrs:%d: max_value:%u\n", i,
+				obj->cntrs_conf.cntrs[i].max_value);
+		pr_debug("cntrs:%d: array_limit:%u\n", i,
+				obj->cntrs_conf.cntrs[i].array_limit);
+		pr_debug("cntrs:%d: el_size:%lu\n", i,
+				obj->cntrs_conf.cntrs[i].el_size);
+		pr_debug("cntrs:%d: reset_on_encap:%d\n", i,
+				obj->cntrs_conf.cntrs[i].reset_on_encap);
+		pr_debug("cntrs:%d: overwrite_last:%d\n", i,
+				obj->cntrs_conf.cntrs[i].overwrite_last);
+		pr_debug("cntrs:%d: error_on_exceeded:%d\n", i,
+				obj->cntrs_conf.cntrs[i].error_on_exceeded);
+		if (obj->cntrs) {
+			pr_debug("cntr[%d]:%d", i, obj->cntrs->cntr[i]);
+		}
+	}
+
+	kparser_dump_node(obj->root_node);
+	kparser_dump_node(obj->okay_node);
+	kparser_dump_node(obj->fail_node);
+	kparser_dump_node(obj->atencap_node);
+
+done:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+}
+
 int kparser_create_cond_exprs(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
 	const struct kparser_conf_condexpr *arg;
-	struct k_condexpr_expr *kobj = NULL;
+	struct kparser_glue_condexpr_expr *kobj = NULL;
 	struct kparser_hkey key;
 	int rc;
 
@@ -719,7 +1119,7 @@ int kparser_read_cond_exprs(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	struct k_condexpr_expr *kobj;
+	struct kparser_glue_condexpr_expr *kobj;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -766,10 +1166,10 @@ done:
 
 static bool kparser_create_cond_table_ent(
 		const struct kparser_conf_table *arg,
-		struct k_condexpr_table **proto_table,
+		struct kparser_glue_condexpr_table **proto_table,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
-	const struct k_condexpr_expr *kcondent;
+	const struct kparser_glue_condexpr_expr *kcondent;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -829,7 +1229,7 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_condexpr_table *proto_table = NULL;
+	struct kparser_glue_condexpr_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -937,8 +1337,8 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_condexpr_table *proto_table;
-	const struct k_condexpr_expr *kcondent;
+	const struct kparser_glue_condexpr_table *proto_table;
+	const struct kparser_glue_condexpr_expr *kcondent;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -1004,7 +1404,7 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 			continue;
 		kcondent = container_of(
 				&proto_table->table.entries[i],
-				struct k_condexpr_expr, expr);
+				struct kparser_glue_condexpr_expr, expr);
 		(*rsp)->objects[i].table_conf.elem_key=
 			kcondent->glue.key;
 	}
@@ -1020,10 +1420,10 @@ done:
 
 static bool kparser_create_cond_tables_ent(
 		const struct kparser_conf_table *arg,
-		struct k_condexpr_tables **proto_table,
+		struct kparser_glue_condexpr_tables **proto_table,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
-	const struct k_condexpr_table *kcondent;
+	const struct kparser_glue_condexpr_table *kcondent;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -1083,7 +1483,7 @@ int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_condexpr_tables *proto_table = NULL;
+	struct kparser_glue_condexpr_tables *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -1189,8 +1589,8 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_condexpr_tables *proto_table;
-	const struct k_condexpr_table *kcondent;
+	const struct kparser_glue_condexpr_tables *proto_table;
+	const struct kparser_glue_condexpr_table *kcondent;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -1250,7 +1650,7 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 		if (!proto_table->table.entries)
 			continue;
 		kcondent = container_of(proto_table->table.entries[i],
-				struct k_condexpr_table, table);
+				struct kparser_glue_condexpr_table, table);
 		(*rsp)->objects[i].table_conf.elem_key=
 			kcondent->glue.key;
 	}
@@ -1270,7 +1670,7 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 		      size_t *rsp_len)
 {
 	const struct kparser_conf_cntr *arg;
-	struct k_counter *kcntr = NULL;
+	struct kparser_glue_counter *kcntr = NULL;
 	struct kparser_hkey key;
 	int rc;
 
@@ -1365,7 +1765,7 @@ int kparser_read_counter(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	struct k_counter *kcntr;
+	struct kparser_glue_counter *kcntr;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -1415,9 +1815,9 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_counter_table *table = NULL;
+	struct kparser_glue_counter_table *table = NULL;
 	const struct kparser_conf_table *arg;
-	struct k_counter *kcntr;
+	struct kparser_glue_counter *kcntr;
 	struct kparser_hkey key;
 	int rc;
 
@@ -1542,7 +1942,7 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_counter_table *table;
+	const struct kparser_glue_counter_table *table;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -1614,7 +2014,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		      size_t *rsp_len)
 {
 	const struct kparser_conf_metadata *arg;
-	struct k_metadata_extract *kmde = NULL;
+	struct kparser_glue_metadata_extract *kmde = NULL;
 	struct kparser_hkey key;
 	int rc;
 
@@ -1716,7 +2116,7 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_metadata_extract *kmde;
+	const struct kparser_glue_metadata_extract *kmde;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -1767,8 +2167,8 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		      size_t *rsp_len)
 {
 	const struct kparser_conf_metadata_table *arg;
-	const struct k_metadata_extract *kmde = NULL;
-	struct k_metadata_table *kmdl = NULL;
+	const struct kparser_glue_metadata_extract *kmde = NULL;
+	struct kparser_glue_metadata_table *kmdl = NULL;
 	struct kparser_hkey key;
 	int rc, i;
 
@@ -1904,7 +2304,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 			(*rsp)->op_ret_code = ENOMEM;
 			(void) snprintf((*rsp)->err_str_buf,
 					sizeof((*rsp)->err_str_buf),
-					"%s: krealloc() err, ents:%lu, size:%lu",
+					"%s: krealloc() err,ents:%lu, size:%lu",
 					__FUNCTION__,
 					kmdl->md_configs_len,
 					sizeof(struct kparser_conf_cmd));
@@ -1957,7 +2357,7 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_metadata_table *kmdl;
+	const struct kparser_glue_metadata_table *kmdl;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -2026,16 +2426,16 @@ static inline bool kparser_conf_node_convert(
 		void *node, size_t node_len)
 {
 	struct kparser_parse_flag_fields_node *flag_fields_parse_node;
-	struct k_proto_flag_fields_table *kflag_fields_proto_table;
+	struct kparser_glue_proto_flag_fields_table *kflag_fields_proto_table;
 	struct kparser_parse_tlvs_node *tlvs_parse_node;
-	struct k_parse_tlv_node *kparsetlvwildcardnode;
+	struct kparser_glue_parse_tlv_node *kparsetlvwildcardnode;
 	struct kparser_parse_node *plain_parse_node;
-	struct k_parse_node *kparsewildcardnode;
-	struct k_condexpr_tables *kcond_tables;
-	struct k_flag_fields *kflag_fields;
-	struct k_protocol_table *kprototbl;
-	struct k_proto_tlvs_table *kprototlvstbl;
-	struct k_metadata_table *kmdl;
+	struct kparser_glue_glue_parse_node *kparsewildcardnode;
+	struct kparser_glue_condexpr_tables *kcond_tables;
+	struct kparser_glue_flag_fields *kflag_fields;
+	struct kparser_glue_protocol_table *kprototbl;
+	struct kparser_glue_proto_tlvs_table *kprototlvstbl;
+	struct kparser_glue_metadata_table *kmdl;
 
 	if (!conf || !node || (node_len < sizeof(*plain_parse_node)))
 		return false;
@@ -2064,8 +2464,10 @@ static inline bool kparser_conf_node_convert(
 	plain_parse_node->proto_node.ops.cond_exprs_parameterized =
 		conf->plain_parse_node.proto_node.ops.cond_exprs_parameterized;
 
-	kcond_tables = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLES,
-			&conf->plain_parse_node.proto_node.ops.cond_exprs_table);
+	kcond_tables = kparser_namespace_lookup(
+			KPARSER_NS_CONDEXPRS_TABLES,
+			&conf->plain_parse_node.proto_node.
+			ops.cond_exprs_table);
 	if (kcond_tables)
 		plain_parse_node->proto_node.ops.cond_exprs =
 			kcond_tables->table;
@@ -2182,7 +2584,7 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_parse_node *kparsenode = NULL;
+	struct kparser_glue_glue_parse_node *kparsenode = NULL;
 	const struct kparser_conf_node *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -2288,7 +2690,7 @@ int kparser_read_parse_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_parse_node *kparsenode;
+	const struct kparser_glue_glue_parse_node *kparsenode;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -2336,10 +2738,10 @@ done:
 
 static bool kparser_create_proto_table_ent(
 		const struct kparser_conf_table *arg,
-		struct k_protocol_table **proto_table,
+		struct kparser_glue_protocol_table **proto_table,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
-	const struct k_parse_node *kparsenode;
+	const struct kparser_glue_glue_parse_node *kparsenode;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -2402,7 +2804,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_protocol_table *proto_table = NULL;
+	struct kparser_glue_protocol_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -2508,8 +2910,8 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_protocol_table *proto_table;
-	const struct k_parse_node *parse_node;
+	const struct kparser_glue_protocol_table *proto_table;
+	const struct kparser_glue_glue_parse_node *parse_node;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -2569,8 +2971,10 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 			proto_table->proto_table.entries[i].value;
 		if (!proto_table->proto_table.entries[i].node)
 			continue;
-		parse_node = container_of(proto_table->proto_table.entries[i].node,
-				struct k_parse_node, parse_node.node); // TODO:
+		parse_node = container_of(
+				proto_table->proto_table.entries[i].node,
+				struct kparser_glue_glue_parse_node,
+				parse_node.node); /* TODO */
 		(*rsp)->objects[i].table_conf.elem_key=
 			parse_node->glue.glue.key;
 	}
@@ -2588,10 +2992,10 @@ static inline bool kparser_conf_tlv_node_convert(
 		const struct kparser_conf_node_parse_tlv *conf,
 		struct kparser_parse_tlv_node *node)
 {
-	struct k_parse_tlv_node *kparsewildcardnode;
-	struct k_condexpr_tables *kcond_tables;
-	struct k_proto_tlvs_table *kprototbl;
-	struct k_metadata_table *kmdl;
+	struct kparser_glue_parse_tlv_node *kparsewildcardnode;
+	struct kparser_glue_condexpr_tables *kcond_tables;
+	struct kparser_glue_proto_tlvs_table *kprototbl;
+	struct kparser_glue_metadata_table *kmdl;
 
 	if (!conf || !node)
 		return false;
@@ -2618,9 +3022,9 @@ static inline bool kparser_conf_tlv_node_convert(
 		rcu_assign_pointer(node->overlay_table,
 				   &kprototbl->tlvs_proto_table);
 
-	kparsewildcardnode = kparser_namespace_lookup(KPARSER_NS_TLV_NODE_PARSE,
-						      &conf->
-						      overlay_wildcard_parse_node_key);
+	kparsewildcardnode = kparser_namespace_lookup(
+			KPARSER_NS_TLV_NODE_PARSE,
+			&conf->overlay_wildcard_parse_node_key);
 	if (kparsewildcardnode)
 		rcu_assign_pointer(node->overlay_wildcard_node,
 				   &kparsewildcardnode->tlv_parse_node);
@@ -2644,7 +3048,7 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 		      size_t *rsp_len)
 {
 	const struct kparser_conf_node_parse_tlv *arg;
-	struct k_parse_tlv_node *node = NULL;
+	struct kparser_glue_parse_tlv_node *node = NULL;
 	struct kparser_hkey key;
 	int rc;
 
@@ -2748,7 +3152,7 @@ int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_parse_tlv_node *node;
+	const struct kparser_glue_parse_tlv_node *node;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -2796,10 +3200,10 @@ done:
 
 static bool kparser_create_tlv_proto_table_ent(
 		const struct kparser_conf_table *arg,
-		struct k_proto_tlvs_table **proto_table,
+		struct kparser_glue_proto_tlvs_table **proto_table,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
-	const struct k_parse_tlv_node *kparsenode;
+	const struct kparser_glue_parse_tlv_node *kparsenode;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -2862,7 +3266,7 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_proto_tlvs_table *proto_table = NULL;
+	struct kparser_glue_proto_tlvs_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -2968,8 +3372,8 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_proto_tlvs_table *proto_table;
-	const struct k_parse_tlv_node *parse_node;
+	const struct kparser_glue_proto_tlvs_table *proto_table;
+	const struct kparser_glue_parse_tlv_node *parse_node;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -3029,8 +3433,10 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 			proto_table->tlvs_proto_table.entries[i].type;
 		if (!proto_table->tlvs_proto_table.entries[i].node)
 			continue;
-		parse_node = container_of(proto_table->tlvs_proto_table.entries[i].node,
-				struct k_parse_tlv_node, tlv_parse_node);
+		parse_node = container_of(
+				proto_table->tlvs_proto_table.entries[i].node,
+				struct kparser_glue_parse_tlv_node,
+				tlv_parse_node);
 		(*rsp)->objects[i].table_conf.elem_key=
 			parse_node->glue.glue.key;
 	}
@@ -3050,7 +3456,7 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 		      size_t *rsp_len)
 {
 	const struct kparser_conf_flag_field *arg;
-	struct k_flag_field *kobj = NULL;
+	struct kparser_glue_flag_field *kobj = NULL;
 	struct kparser_hkey key;
 	int rc;
 
@@ -3145,7 +3551,7 @@ int kparser_read_flag_field(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	struct k_flag_field *kobj;
+	struct kparser_glue_flag_field *kobj;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -3192,10 +3598,10 @@ done:
 
 static bool kparser_create_flag_field_table_ent(
 		const struct kparser_conf_table *arg,
-		struct k_flag_fields **proto_table,
+		struct kparser_glue_flag_fields **proto_table,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
-	const struct k_flag_field *kflagent;
+	const struct kparser_glue_flag_field *kflagent;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -3255,7 +3661,7 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_flag_fields *proto_table = NULL;
+	struct kparser_glue_flag_fields *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -3361,8 +3767,8 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_flag_fields *proto_table;
-	const struct k_flag_field *kflagent;
+	const struct kparser_glue_flag_fields *proto_table;
+	const struct kparser_glue_flag_field *kflagent;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -3383,7 +3789,8 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 
 	mutex_lock(&kparser_config_lock);
 
-	proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_TABLE, key);
+	proto_table = kparser_namespace_lookup(
+			KPARSER_NS_FLAG_FIELD_TABLE, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
 		(void) snprintf((*rsp)->err_str_buf,
@@ -3422,7 +3829,7 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 			continue;
 		kflagent = container_of(
 				&proto_table->flag_fields.fields[i],
-				struct k_flag_field, flag_field);
+				struct kparser_glue_flag_field, flag_field);
 		(*rsp)->objects[i].table_conf.elem_key=
 			kflagent->glue.key;
 	}
@@ -3440,8 +3847,8 @@ static inline bool kparser_create_parse_flag_field_node_convert(
 		const struct kparser_conf_node_parse_flag_field *conf,
 		struct kparser_parse_flag_field_node *node)
 {
-	struct k_condexpr_tables *kcond_tables;
-	struct k_metadata_table *kmdl;
+	struct kparser_glue_condexpr_tables *kcond_tables;
+	struct kparser_glue_metadata_table *kmdl;
 
 	if (!conf || !node)
 		return false;
@@ -3468,7 +3875,7 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 		      size_t *rsp_len)
 {
 	const struct kparser_conf_node_parse_flag_field *arg;
-	struct k_flag_field_node *node = NULL;
+	struct kparser_glue_flag_field_node *node = NULL;
 	struct kparser_hkey key;
 	int rc;
 
@@ -3476,7 +3883,8 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 
 	if (!conf || conf_len < sizeof(*conf) || !rsp ||
 			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_FLAG_FIELD_NODE_PARSE)) {
+			(conf->namespace_id !=
+			 KPARSER_NS_FLAG_FIELD_NODE_PARSE)) {
 		printk("%s: invalid args\n", __FUNCTION__);
 		return KPARSER_ATTR_UNSPEC;
 	}
@@ -3573,7 +3981,7 @@ int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_flag_field_node *node;
+	const struct kparser_glue_flag_field_node *node;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -3621,16 +4029,17 @@ done:
 
 static bool kparser_create_flag_field_proto_table_ent(
 		const struct kparser_conf_table *arg,
-		struct k_proto_flag_fields_table **proto_table,
+		struct kparser_glue_proto_flag_fields_table **proto_table,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
-	const struct k_flag_field_node *kparsenode;
+	const struct kparser_glue_flag_field_node *kparsenode;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
-	*proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_PROTO_TABLE,
+	*proto_table = kparser_namespace_lookup(
+			KPARSER_NS_FLAG_FIELD_PROTO_TABLE,
 			&arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
@@ -3667,7 +4076,8 @@ static bool kparser_create_flag_field_proto_table_ent(
 				"%s: krealloc() err, ents:%d, size:%lu",
 				__FUNCTION__,
 				(*proto_table)->flags_proto_table.num_ents,
-				sizeof(struct kparser_proto_flag_fields_table_entry));
+				sizeof(struct
+					kparser_proto_flag_fields_table_entry));
 		return false;
 	}
 
@@ -3684,7 +4094,7 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	struct k_proto_flag_fields_table *proto_table = NULL;
+	struct kparser_glue_proto_flag_fields_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -3791,8 +4201,8 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_proto_flag_fields_table *proto_table;
-	const struct k_flag_field_node *parse_node;
+	const struct kparser_glue_proto_flag_fields_table *proto_table;
+	const struct kparser_glue_flag_field_node *parse_node;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -3853,7 +4263,8 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 			continue;
 		parse_node = container_of(
 				proto_table->flags_proto_table.entries[i].node,
-				struct k_flag_field_node, node_flag_field);
+				struct kparser_glue_flag_field_node,
+				node_flag_field);
 		(*rsp)->objects[i].table_conf.elem_key=
 			parse_node->glue.glue.key;
 	}
@@ -3871,8 +4282,8 @@ static inline bool kparser_parser_convert(
 		const struct kparser_conf_parser *conf,
 		struct kparser_parser *parser)
 {
-	struct k_counter_table *cntrs; 
-	struct k_parse_node *node;
+	struct kparser_glue_counter_table *cntrs; 
+	struct kparser_glue_glue_parse_node *node;
 	int i;
 
 	strcpy(parser->name, conf->key.name);
@@ -3882,6 +4293,8 @@ static inline bool kparser_parser_convert(
 	if (node)
 		rcu_assign_pointer(parser->root_node,
 				   &node->parse_node.node);
+	else
+		return false;
 
 	node = kparser_namespace_lookup(KPARSER_NS_NODE_PARSE,
 			&conf->ok_node_key);
@@ -3921,7 +4334,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 {
 	const struct kparser_conf_parser *arg;
 	struct kparser_counters *cntrs = NULL;
-	struct k_parser *kparsr = NULL;
+	struct kparser_glue_parser *kparsr = NULL;
 	struct kparser_hkey key;
 	int rc;
 
@@ -4048,39 +4461,45 @@ static __u8 pktbuf[] = {0x00,0x26,0x62,0x2f,0x47,0x87,0x00,
 			0x03,0x03,0x07};
 
 struct user_metadata {
-	__u16 offset;
-	__u16 ether_type;
-	__u32 ipv4_src_addr;
-	__u32 ipv4_dst_addr;
-	__u16 src_port;
-	__u16 dst_port;
+	__u16 dont_fragment_bit_offset;
+	__u16 src_ip_offset;
+	__u16 dst_ip_offset;
+	__u16 src_port_offset;
+	__u16 dst_port_offset;
 } __packed;
 
 static void run_dummy_parser(const struct kparser_parser *kparsr)
 {
-	struct user_metadata mdata = {};
-	int rc = 0;
+	// struct user_metadata mdata = {};
+	__u16 usermetadata[5] = {};
+	int rc = 0, i;
 
 	rc = __kparser_parse(kparsr, pktbuf, sizeof(pktbuf),
-			&mdata, sizeof(mdata));
+		//	&mdata, sizeof(mdata));
+			&usermetadata, sizeof(usermetadata));
 
 	pr_debug("%s:rc:%d\n", __FUNCTION__, rc);
 	if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL) {
 		printk("parser ok: %s\n", kparser_code_to_text(rc));
 	}
-	pr_debug("offset:%04x\n", mdata.offset);
-	pr_debug("ether_type:%02x\n", mdata.ether_type);
-	pr_debug("ipv4_src_addr:%04x\n", mdata.ipv4_src_addr);
-	pr_debug("ipv4_dst_addr:%04x\n", mdata.ipv4_dst_addr);
-	pr_debug("tcp_src_port:%02x\n", mdata.src_port);
-	pr_debug("tcp_dst_port:%02x\n", mdata.dst_port);
+
+	for (i = 0; i < (sizeof(usermetadata) / sizeof(usermetadata[0])); i++)
+		pr_debug("metadata offset:%d value:%04x\n",
+				i, usermetadata[i]);
+
+#if 0
+	pr_debug("metadata offset:%lu value:%04x\n",
+			offsetof(struct user_metadata,
+				dont_fragment_bit_offset),
+			mdata.dont_fragment_bit_offset);
+#endif
 }
 
 int kparser_read_parser(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
-	const struct k_parser *kparsr;
+	const struct kparser_glue_parser *kparsr;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -4110,6 +4529,7 @@ int kparser_read_parser(const struct kparser_hkey *key,
 		goto done;
 	}
 
+
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"%s: ok", __FUNCTION__);
 
@@ -4124,6 +4544,7 @@ done:
 
 	if (kparsr && strcmp(key->name, "test_parser") == 0) {
 		run_dummy_parser(&kparsr->parser);
+		kparser_dump_parser(&kparsr->parser);
 	}
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);

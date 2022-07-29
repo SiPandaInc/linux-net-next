@@ -51,6 +51,8 @@ struct kparser_arg_set {
 	__u64 set_value_enum;
 };
 
+#define KPARSER_CONFIG_MAX_KEYS 64 
+
 struct kparser_arg_key_val_token {
 	enum kparser_arg_val_type type;
 	const char *key_name;
@@ -85,6 +87,7 @@ struct kparser_arg_key_val_token {
 	};
 	const char *help_msg;
 	const struct kparser_arg_key_val_token *default_template_token;
+	const char *incompatible_keys[KPARSER_CONFIG_MAX_KEYS];
 };
 
 /* *********************** Namespaces/objects *********************** */
@@ -282,6 +285,10 @@ enum kparser_metadata_counter_op_type {
 	KPARSER_METADATA_COUNTEROP_RST
 };
 
+#define KPARSER_METADATA_OFFSET_MIN		0
+#define KPARSER_METADATA_OFFSET_MAX		0xffffff
+#define KPARSER_METADATA_OFFSET_INVALID		0xffffffff
+
 /* TODO: align and pack all struct members
  */
 struct kparser_conf_metadata {
@@ -290,7 +297,8 @@ struct kparser_conf_metadata {
 	enum kparser_metadata_counter_op_type cntr_op; // 3 bit
 	bool frame;
 	bool e_bit;
-	bool bit_offset;
+	// bool bit_offset;
+	bool set_high_bit;
 	__u8 cntr; // 3 bit
 	__u8 cntr_data; // 3 bit
 	__u8 constant_value;
@@ -298,6 +306,7 @@ struct kparser_conf_metadata {
 	size_t doff;
 	size_t len;
 	size_t add_off;
+	size_t add_bit_off;
 };
 
 /* *********************** metadata list/table *********************** */

@@ -96,17 +96,17 @@ struct kparser_glue {
 	struct kparser_conf_cmd config;
 };
 
-struct k_condexpr_expr {
+struct kparser_glue_condexpr_expr {
 	struct kparser_glue glue;
 	struct kparser_condexpr_expr expr;
 };
 
-struct k_condexpr_table {
+struct kparser_glue_condexpr_table {
 	struct kparser_glue glue;
 	struct kparser_condexpr_table table;
 };
 
-struct k_condexpr_tables {
+struct kparser_glue_condexpr_tables {
 	struct kparser_glue glue;
 	struct kparser_condexpr_tables table;
 };
@@ -117,7 +117,7 @@ struct kparser_glue_node {
 	struct list_head ptblent_rev_ref_list;
 };
 
-struct k_parse_node {
+struct kparser_glue_glue_parse_node {
 	struct kparser_glue_node glue;
 	union {
 		struct kparser_parse_node node;
@@ -126,62 +126,62 @@ struct k_parse_node {
 	} parse_node;
 };
 
-struct k_protocol_table {
+struct kparser_glue_protocol_table {
 	struct kparser_glue glue;
 	struct kparser_proto_table proto_table;
 };
 
-struct k_parse_tlv_node {
+struct kparser_glue_parse_tlv_node {
 	struct kparser_glue_node glue;
 	struct kparser_parse_tlv_node tlv_parse_node;
 };
 
-struct k_proto_tlvs_table {
+struct kparser_glue_proto_tlvs_table {
 	struct kparser_glue glue;
 	struct kparser_proto_tlvs_table tlvs_proto_table;
 };
 
-struct k_flag_field {
+struct kparser_glue_flag_field {
 	struct kparser_glue glue;
 	struct kparser_flag_field flag_field;
 };
 
-struct k_flag_fields {
+struct kparser_glue_flag_fields {
 	struct kparser_glue glue;
 	struct kparser_flag_fields flag_fields;
 };
 
-struct k_flag_field_node {
+struct kparser_glue_flag_field_node {
 	struct kparser_glue_node glue;
 	struct kparser_parse_flag_field_node node_flag_field;
 };
 
-struct k_proto_flag_fields_table {
+struct kparser_glue_proto_flag_fields_table {
 	struct kparser_glue glue;
 	struct kparser_proto_flag_fields_table flags_proto_table;
 };
 
-struct k_counter {
+struct kparser_glue_counter {
 	struct kparser_glue glue;
 	struct kparser_cntr_conf counter_cnf;
 };
 
-struct k_counter_table {
+struct kparser_glue_counter_table {
 	struct kparser_glue glue;
-	struct k_counter k_cntrs[KPARSER_CNTR_NUM_CNTRS];
+	struct kparser_glue_counter k_cntrs[KPARSER_CNTR_NUM_CNTRS];
 };
 
-struct k_parser {
+struct kparser_glue_parser {
 	struct kparser_glue glue;
 	struct kparser_parser parser;
 };
 
-struct k_metadata_extract {
+struct kparser_glue_metadata_extract {
 	struct kparser_glue glue;
 	struct kparser_metadata_extract mde; 
 };
 
-struct k_metadata_table {
+struct kparser_glue_metadata_table {
 	struct kparser_glue glue;
 	size_t md_configs_len;
 	struct kparser_conf_cmd *md_configs;

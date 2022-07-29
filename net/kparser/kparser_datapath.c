@@ -866,8 +866,11 @@ after_post_processing:
 					goto parser_out;
 				}
 
+				pr_debug("Ln:%d: %d\n", __LINE__, type);
+
 				/* Get next node */
-				next_parse_node = lookup_node(type, proto_table);
+				next_parse_node = lookup_node(type,
+						proto_table);
 
 				if (next_parse_node)
 					goto found_next;
@@ -947,7 +950,7 @@ int kparser_parse(struct sk_buff *skb,
 		void *_metadata, size_t metadata_len)
 {
 	const struct kparser_parser *parser;
-	struct k_parser *k_prsr;
+	struct kparser_glue_parser *k_prsr;
 	void *data, *ptr;
 	size_t pktlen;
 	int err;
@@ -967,7 +970,7 @@ int kparser_parse(struct sk_buff *skb,
 		return EINVAL;
 	}
 
-	k_prsr = container_of(parser, struct k_parser, parser);
+	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
 	kref_get(&k_prsr->glue.refcount);
 
 	rcu_read_lock();
@@ -995,12 +998,12 @@ const struct kparser_parser * kparser_get_parser(
 		const struct kparser_hkey *kparser_key)
 {
 	const struct kparser_parser *parser;
-	struct k_parser *k_prsr;
+	struct kparser_glue_parser *k_prsr;
 
 	parser = kparser_get_parser_ctx(kparser_key);
 	if (!parser)
 		return NULL;
-	k_prsr = container_of(parser, struct k_parser, parser);
+	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
 	kref_get(&k_prsr->glue.refcount);
 	return parser;	
 }
@@ -1008,12 +1011,12 @@ const struct kparser_parser * kparser_get_parser(
 bool kparser_put_parser(const struct kparser_hkey *kparser_key)
 {
 	const struct kparser_parser *parser;
-	struct k_parser *k_prsr;
+	struct kparser_glue_parser *k_prsr;
 
 	parser = kparser_get_parser_ctx(kparser_key);
 	if (!parser)
 		return false;
-	k_prsr = container_of(parser, struct k_parser, parser);
+	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
 	kref_put(&k_prsr->glue.refcount, NULL);
 	return true;
 }

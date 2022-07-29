@@ -344,7 +344,6 @@ struct kparser_parse_node {
  *	type: TLV type
  *	node: associated TLV parse structure for the type
  */
-struct kparser_parse_tlv_node;
 struct kparser_proto_tlvs_table_entry {
 	int type;
 	const struct kparser_parse_tlv_node __rcu *node;
