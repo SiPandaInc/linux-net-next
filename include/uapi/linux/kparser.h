@@ -51,6 +51,11 @@ struct kparser_arg_set {
 	__u64 set_value_enum;
 };
 
+enum kparser_print_id {
+	KPARSER_PRINT_INT,
+	KPARSER_PRINT_HEX,
+};
+
 #define KPARSER_CONFIG_MAX_KEYS 64 
 
 struct kparser_arg_key_val_token {
@@ -77,6 +82,7 @@ struct kparser_arg_key_val_token {
 			__u64 min_value;
 			__u64 def_value;
 			__u64 max_value;
+			enum kparser_print_id print_id;
 		};
 	};
 	struct {
@@ -329,6 +335,9 @@ enum kparser_node_type {
 	KPARSER_NODE_TYPE_MAX,
 };
 
+#define KPARSER_DEFAULT_U16_MASK 0xffff
+#define KPARSER_DEFAULT_U32_MASK 0xffffffff
+
 /* Types for parameterized functions */
 struct kparser_parameterized_len {
         __u16 src_off;
@@ -351,7 +360,6 @@ struct kparser_conf_parse_ops {
 	bool flag_fields_length;
 	bool len_parameterized;
         struct kparser_parameterized_len pflen;
-	bool next_proto_parameterized;
         struct kparser_parameterized_next_proto pfnext_proto;
 	bool cond_exprs_parameterized;
 	struct kparser_hkey cond_exprs_table;
@@ -540,6 +548,9 @@ struct kparser_conf_table {
 };
 
 /* *********************** parser *********************** */
+/* Flags for parser configuration */
+#define KPARSER_F_DEBUG		(1 << 0)
+
 #define KPARSER_MAX_NODES	1
 #define KPARSER_MAX_ENCAPS	4
 #define KPARSER_MAX_FRAMES	255 
@@ -628,7 +639,7 @@ struct kparser_cmd_rsp_hdr {
 	struct kparser_hkey key;
 	struct kparser_conf_cmd object;
 	size_t objects_len;
-	/* variable list of objects */
+	 /* array of fixed size kparser_conf_cmd objects */
 	struct kparser_conf_cmd objects[0];
 };
 

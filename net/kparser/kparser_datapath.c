@@ -38,14 +38,19 @@ static const struct kparser_parse_node *lookup_node(int type,
 		const struct kparser_proto_table *table)
 {
 	struct kparser_proto_table_entry __rcu *entries;
-	int i;
+	int i, host_type;
 
 	if (!table)
 		return NULL;
 
 	for (i = 0; i < table->num_ents; i++) {
 		entries = rcu_dereference(table->entries); 
-		if (type == entries[i].value)
+		host_type = type;
+		if (entries[i].value > 0xff) {
+			/* multi byte, need for endian swap */
+			host_type = ntohs(host_type);
+		}
+		if (host_type == entries[i].value)
 			return entries[i].node;
 	}
 
@@ -854,7 +859,7 @@ after_post_processing:
 						goto parser_out;
 				}
 
-				if (!proto_node->ops.next_proto_parameterized)
+				if (!proto_table)
 					break;
 				type = eval_parameterized_next_proto(
 						&proto_node

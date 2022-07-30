@@ -67,10 +67,7 @@ tc parser create parser name big_parser id 0x1000 root_node_name ether root_node
 
 #endif
 
-/* Flags for parser configuration */
-#define KPARSER_F_DEBUG				(1 << 0)
-
-// TODO: add comments on every member of DSs
+/* TODO: add comments on every member of DSs */
 
 struct kparser_list {
 	void *ptr;
@@ -109,6 +106,28 @@ struct kparser_glue_condexpr_table {
 struct kparser_glue_condexpr_tables {
 	struct kparser_glue glue;
 	struct kparser_condexpr_tables table;
+};
+
+struct kparser_glue_counter {
+	struct kparser_glue glue;
+	struct kparser_cntr_conf counter_cnf;
+};
+
+struct kparser_glue_counter_table {
+	struct kparser_glue glue;
+	struct kparser_glue_counter k_cntrs[KPARSER_CNTR_NUM_CNTRS];
+};
+
+struct kparser_glue_metadata_extract {
+	struct kparser_glue glue;
+	struct kparser_metadata_extract mde; 
+};
+
+struct kparser_glue_metadata_table {
+	struct kparser_glue glue;
+	size_t md_configs_len;
+	struct kparser_conf_cmd *md_configs;
+	struct kparser_metadata_table metadata_table;
 };
 
 struct kparser_glue_node {
@@ -161,31 +180,10 @@ struct kparser_glue_proto_flag_fields_table {
 	struct kparser_proto_flag_fields_table flags_proto_table;
 };
 
-struct kparser_glue_counter {
-	struct kparser_glue glue;
-	struct kparser_cntr_conf counter_cnf;
-};
-
-struct kparser_glue_counter_table {
-	struct kparser_glue glue;
-	struct kparser_glue_counter k_cntrs[KPARSER_CNTR_NUM_CNTRS];
-};
-
 struct kparser_glue_parser {
 	struct kparser_glue glue;
+	struct list_head list_node;
 	struct kparser_parser parser;
-};
-
-struct kparser_glue_metadata_extract {
-	struct kparser_glue glue;
-	struct kparser_metadata_extract mde; 
-};
-
-struct kparser_glue_metadata_table {
-	struct kparser_glue glue;
-	size_t md_configs_len;
-	struct kparser_conf_cmd *md_configs;
-	struct kparser_metadata_table metadata_table;
 };
 
 static inline int kparser_cmp_fn_name(struct rhashtable_compare_arg *arg,
@@ -193,11 +191,6 @@ static inline int kparser_cmp_fn_name(struct rhashtable_compare_arg *arg,
 {
 	const char *key2 = arg->key;
         const struct kparser_hkey *key1 = ptr;
-
-#if 0
-	pr_debug("%s:%s:%s\n",
-			__FUNCTION__, key2, key1->name);
-#endif
 
 	return strcmp(key1->name, key2);
 }
@@ -208,11 +201,6 @@ static inline int kparser_cmp_fn_id(struct rhashtable_compare_arg *arg,
 	const __u16 *key2 = arg->key;
         const __u16 *key1 = ptr;
 
-#if 0
-	pr_debug("%s:%u:%u\n",
-			__FUNCTION__, *key2, *key1);
-#endif
-
 	return (*key1 != *key2);
 }
 
@@ -220,11 +208,10 @@ static inline __u32 kparser_gnric_hash_fn_name(const void *hkey, __u32 key_len,
 		__u32 seed)
 {
 	const char *key = hkey;
-	// TODO: check if seed needs to be used here
-	// TODO: replace xxh32() with siphash
-#if 0
-	pr_debug("%s:%s\n", __FUNCTION__, key);
-#endif
+	/*
+	 * TODO: check if seed needs to be used here
+	 * TODO: replace xxh32() with siphash
+	 */
 	return xxh32(hkey, strlen(key), 0);
 }
 
@@ -232,11 +219,9 @@ static inline __u32 kparser_gnric_hash_fn_id(const void *hkey, __u32 key_len,
 		__u32 seed)
 {
 	const __u16 *key = hkey;
-	// TODO: check if seed needs to be used here
-	// TODO: replace xxh32() with siphash
-#if 0
-	pr_debug("%s:%u\n", __FUNCTION__, *key);
-#endif
+	/*
+	 * TODO: check if seed needs to be used here
+	 */
 	return *key;
 }
 
@@ -244,14 +229,14 @@ static inline __u32 kparser_gnric_obj_hashfn_name(const void *obj, __u32 key_len
 		__u32 seed)
 {
 	const struct kparser_hkey *key;
+
 	key = obj;
-	// TODO: check if seed needs to be used here
-	// TODO: replace xxh32() with siphash
-	// Note: this only works because key always in the start place
-	// of all the differnt kparser objects
-#if 0
-	pr_debug("Fn:%s:%s\n", __FUNCTION__, key->name);
-#endif
+	/*
+	 * TODO: check if seed needs to be used here
+	 * TODO: replace xxh32() with siphash
+	 * Note: this only works because key always in the start place
+	 * of all the differnt kparser objects
+	 */
 	return xxh32(key->name, strlen(key->name), 0);
 }
 
@@ -259,14 +244,14 @@ static inline __u32 kparser_gnric_obj_hashfn_id(const void *obj, __u32 key_len,
 		__u32 seed)
 {
 	const struct kparser_hkey *key;
+
 	key = obj;
-	// TODO: check if seed needs to be used here
-	// TODO: replace xxh32() with siphash
-	// Note: this only works because key always in the start place
-	// of all the differnt kparser objects
-#if 0
-	pr_debug("Fn:%s:%u\n", __FUNCTION__, key->id);
-#endif
+	/*
+	 * TODO: check if seed needs to be used here
+	 * TODO: replace xxh32() with siphash
+	 * Note: this only works because key always in the start place
+	 * of all the differnt kparser objects
+	 */
 	return key->id;
 }
 

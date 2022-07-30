@@ -102,7 +102,6 @@ struct kparser_parse_ops {
 	bool flag_fields_length;
 	bool len_parameterized;
 	struct kparser_parameterized_len pflen;
-	bool next_proto_parameterized;
 	struct kparser_parameterized_next_proto pfnext_proto;
 	bool cond_exprs_parameterized;
 	struct kparser_condexpr_tables cond_exprs;
