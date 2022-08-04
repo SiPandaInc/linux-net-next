@@ -486,10 +486,9 @@ struct kparser_parse_flag_fields_node {
 };
 
 static inline ssize_t __kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
-		const struct kparser_flag_fields
-		*flag_fields)
+		const struct kparser_flag_fields *flag_fields)
 {
-	size_t offset = 0;
+	ssize_t offset = 0;
 	__u32 mask;
 	int i;
 
@@ -506,8 +505,7 @@ static inline ssize_t __kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
 
 /* Determine offset of a field given a set of flags */
 static inline ssize_t kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
-		const struct kparser_flag_fields
-		*flag_fields)
+		const struct kparser_flag_fields *flag_fields)
 {
 	__u32 mask;
 

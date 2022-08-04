@@ -112,9 +112,6 @@
  *	    bit offset of the fragment offset of IPv4 header, add_off would
  *	    have the value fifty-one. For a plain IPv4 Ethernet packet, the
  *	    extract bit offset would then be 163
- *          If set_high_bit is set, the sign bit of the __u16 *dptr will be
- *          set to indicate the user that valid meta data extraction is stored
- *          in that memory location.
  *    - KPARSER_METADATA_CTRL_HDR_LENGTH: control field
  *	    Write the length of the current header to metadata. The length is
  *	    written in two bytes. A counter operation may be specified as
@@ -221,8 +218,7 @@ struct kparser_metadata_extract {
 			__u32 cntr: 3;	// Counter number
 			__u32 dst_off: 9; // Target offset in frame or meta
 			__u32 bit_offset: 1;
-			__u32 set_high_bit: 1; // set the sign bit in dptr
-			__u32 rsvd: 1;
+			__u32 rsvd: 2;
 			__u32 add_off: 12; // 3 bits for bit offset
 		} offset;
 		struct {
@@ -342,25 +338,23 @@ __kparser_metadata_set_const_halfword(bool frame, size_t dst_off,
 }
 
 #define __KPARSER_METADATA_MAKE_OFFSET_SET(FRAME, DST_OFF, BIT_OFFSET,	\
-		HIGH_BIT_OFFSET, ADD_OFF, CNTR)				\
+		ADD_OFF, CNTR)						\
 {									\
 	.offset.code = KPARSER_METADATA_OFFSET_SET,			\
 	.offset.frame = FRAME,						\
 	.offset.dst_off = DST_OFF,					\
 	.offset.bit_offset = BIT_OFFSET,				\
-	.offset.set_high_bit = HIGH_BIT_OFFSET,				\
 	.offset.add_off = ADD_OFF,					\
 	.offset.cntr = CNTR,						\
 }
 
 static inline struct kparser_metadata_extract
 __kparser_metadata_offset_set(bool frame, size_t dst_off,
-		bool bit_offset, bool set_high_bit, 
-		size_t add_off, unsigned int cntr)
+		bool bit_offset, size_t add_off, unsigned int cntr)
 {
 	const struct kparser_metadata_extract mde =
 		__KPARSER_METADATA_MAKE_OFFSET_SET(frame, dst_off,
-				bit_offset, set_high_bit, add_off, cntr);
+				bit_offset, add_off, cntr);
 	return mde;
 }
 
@@ -743,11 +737,6 @@ static inline int kparser_metadata_set_offset(
 		*dptr = mde.offset.bit_offset ?
 			8 * hdr_offset + mde.offset.add_off :
 			hdr_offset + mde.offset.add_off;
-		/* set the sign bit to indicate the dptr has
-		 * extracted value set
-		 */
-		if (mde.offset.set_high_bit)
-			*dptr |= 0x8000;
 	}
 
 	return KPARSER_OKAY;
@@ -852,8 +841,6 @@ static inline bool kparser_metadata_convert(
 		const struct kparser_conf_metadata *conf,
 		struct kparser_metadata_extract *mde)
 {
-	size_t add_off = conf->add_off;
-	bool bit_offset = false;
 	__u32 encoding_type;
 
 	switch(conf->type) {
@@ -864,17 +851,19 @@ static inline bool kparser_metadata_convert(
 					conf->e_bit, conf->cntr);
 			return true;
 
-		case KPARSER_METADATA_OFFSET: 
-			if (conf->add_bit_off !=
-				 KPARSER_METADATA_OFFSET_INVALID) {
-				bit_offset = true;
-				add_off = conf->add_bit_off;
-			}
+		case KPARSER_METADATA_BIT_OFFSET: 
 			*mde = 	__kparser_metadata_offset_set(conf->frame,
 					conf->doff,
-					bit_offset,
-					conf->set_high_bit,
-					add_off,
+					true,
+					conf->add_off,
+					conf->cntr);
+			return true;
+
+		case KPARSER_METADATA_OFFSET: 
+			*mde = 	__kparser_metadata_offset_set(conf->frame,
+					conf->doff,
+					false,
+					conf->add_off,
 					conf->cntr);
 			return true;
 

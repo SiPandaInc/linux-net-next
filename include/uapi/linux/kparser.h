@@ -23,79 +23,6 @@
 
 /* *********************** NETLINK CLI *********************** */
 #define KPARSER_ERR_STR_MAX_LEN		256
-#define KPARSER_MAX_STR_LEN_U8		6
-#define KPARSER_MAX_STR_LEN_U16 	8
-#define KPARSER_MAX_STR_LEN_U32 	12
-#define KPARSER_MAX_STR_LEN_U64 	16
-
-enum kparser_arg_val_type {
-	KPARSER_ARG_VAL_STR,
-	KPARSER_ARG_VAL_U8,
-	KPARSER_ARG_VAL_U16,
-	KPARSER_ARG_VAL_U32,
-	KPARSER_ARG_VAL_U64,
-	KPARSER_ARG_VAL_BOOL,
-	KPARSER_ARG_VAL_FLAG,
-	KPARSER_ARG_VAL_SET,
-	KPARSER_ARG_VAL_ARRAY,
-	KPARSER_ARG_VAL_HYB_KEY_NAME,
-	KPARSER_ARG_VAL_HYB_KEY_ID,
-	KPARSER_ARG_VAL_HYB_IDX,
-	KPARSER_ARG_VAL_INVALID
-};
-
-#define KPARSER_SET_VAL_LEN_MAX 64
-
-struct kparser_arg_set {
-	const char *set_value_str;
-	__u64 set_value_enum;
-};
-
-enum kparser_print_id {
-	KPARSER_PRINT_INT,
-	KPARSER_PRINT_HEX,
-};
-
-#define KPARSER_CONFIG_MAX_KEYS 64 
-
-struct kparser_arg_key_val_token {
-	enum kparser_arg_val_type type;
-	const char *key_name;
-	bool mandatory;
-	bool semi_optional;
-	int other_mandatory_idx;
-	bool immutable;
-	size_t str_arg_len_max;
-	size_t w_offset;
-	size_t w_len;
-	union {
-		struct {
-			size_t default_val_size;
-			const void *default_val;
-		};
-		struct {
-			size_t value_set_len;
-			const struct kparser_arg_set *value_set;
-			__u64 def_value_enum;
-		};
-		struct {
-			__u64 min_value;
-			__u64 def_value;
-			__u64 max_value;
-			enum kparser_print_id print_id;
-		};
-	};
-	struct {
-		enum kparser_arg_val_type elem_type;
-		size_t elem_counter;
-		size_t elem_size;
-		size_t offset_adjust;
-	};
-	const char *help_msg;
-	const struct kparser_arg_key_val_token *default_template_token;
-	const char *incompatible_keys[KPARSER_CONFIG_MAX_KEYS];
-};
-
 /* *********************** Namespaces/objects *********************** */
 enum kparser_global_namespace_ids {
 	KPARSER_NS_INVALID,
@@ -132,6 +59,7 @@ struct kparser_global_namespaces {
 	enum kparser_global_namespace_ids name_space_id;
 	const char *name;
 	const char *alias;
+	const char *description;
 	size_t arg_tokens_count;
 	const struct kparser_arg_key_val_token *arg_tokens; 
 	int create_attr_id;
@@ -276,6 +204,7 @@ enum kparser_metadata_type {
 	KPARSER_METADATA_CONSTANT_BYTE,
 	KPARSER_METADATA_CONSTANT_HALFWORD,
 	KPARSER_METADATA_OFFSET,
+	KPARSER_METADATA_BIT_OFFSET,
 	KPARSER_METADATA_NUMENCAPS,
 	KPARSER_METADATA_NUMNODES,
 	KPARSER_METADATA_TIMESTAMP,
@@ -303,8 +232,6 @@ struct kparser_conf_metadata {
 	enum kparser_metadata_counter_op_type cntr_op; // 3 bit
 	bool frame;
 	bool e_bit;
-	// bool bit_offset;
-	bool set_high_bit;
 	__u8 cntr; // 3 bit
 	__u8 cntr_data; // 3 bit
 	__u8 constant_value;
@@ -312,7 +239,6 @@ struct kparser_conf_metadata {
 	size_t doff;
 	size_t len;
 	size_t add_off;
-	size_t add_bit_off;
 };
 
 /* *********************** metadata list/table *********************** */
@@ -335,9 +261,6 @@ enum kparser_node_type {
 	KPARSER_NODE_TYPE_MAX,
 };
 
-#define KPARSER_DEFAULT_U16_MASK 0xffff
-#define KPARSER_DEFAULT_U32_MASK 0xffffffff
-
 /* Types for parameterized functions */
 struct kparser_parameterized_len {
         __u16 src_off;
@@ -357,7 +280,7 @@ struct kparser_parameterized_next_proto {
 };
 
 struct kparser_conf_parse_ops {
-	bool flag_fields_length;
+	// bool flag_fields_length; // TODO
 	bool len_parameterized;
         struct kparser_parameterized_len pflen;
         struct kparser_parameterized_next_proto pfnext_proto;
@@ -463,7 +386,7 @@ struct kparser_proto_flag_fields_ops {
 	struct kparser_parameterized_get_value pfget_flags;
 	bool start_fields_offset_parameterized;
 	struct kparser_parameterized_len pfstart_fields_offset;
-	bool flag_feilds_len;
+	bool flag_fields_len;
 	__u16 hdr_length;
 };
 

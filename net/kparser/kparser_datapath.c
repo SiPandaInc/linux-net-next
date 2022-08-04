@@ -311,7 +311,7 @@ static __u64 eval_get_value(const struct kparser_parameterized_get_value *pf,
 		void *_hdr)
 {
 	__u64 ret;
-
+	/* TODO: pf->mask unused */
 	(void) __kparser_metadata_bytes_extract(_hdr + pf->src_off,
 			(__u8 *)&ret, pf->size, false);
 
@@ -556,7 +556,8 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 		 * table based on index in proto flag-fields
 		 */
 		parse_flag_field_node = lookup_flag_field_node(i,
-				parse_flag_fields_node->flag_fields_proto_table);
+				parse_flag_fields_node->
+				flag_fields_proto_table);
 		if (parse_flag_field_node) {
 			const struct kparser_parse_flag_field_node_ops
 				*ops = &parse_flag_field_node->ops;
@@ -960,6 +961,11 @@ int kparser_parse(struct sk_buff *skb,
 	size_t pktlen;
 	int err;
 
+	/*
+	 * TODO: since we only need the first 512 bytes, we don't need to pull
+	 * the whole skb.
+	 * See if skb_linearize() can be shortened only for first 512 bytes.
+	 */
 	err = skb_linearize(skb);
 	if (err < 0)
 		return err;
@@ -989,8 +995,7 @@ int kparser_parse(struct sk_buff *skb,
 		return ENOENT;
 	}
 
-	err = __kparser_parse(parser, data, pktlen,
-			_metadata, metadata_len);
+	err = __kparser_parse(parser, data, pktlen, _metadata, metadata_len);
 
 	rcu_read_unlock();
 
@@ -1026,6 +1031,7 @@ bool kparser_put_parser(const struct kparser_hkey *kparser_key)
 	return true;
 }
 
+EXPORT_SYMBOL(__kparser_parse);
 EXPORT_SYMBOL(kparser_parse);
 EXPORT_SYMBOL(kparser_get_parser);
 EXPORT_SYMBOL(kparser_put_parser);

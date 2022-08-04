@@ -1008,7 +1008,7 @@ static void kparser_dump_flags_proto_node(
 	kparser_dump_param_len(&obj->ops.pfstart_fields_offset);
 
 	pr_debug("ops.flag_feilds_len:%u ops.hdr_length:%u\n",
-		obj->ops.flag_feilds_len, obj->ops.hdr_length);
+		obj->ops.flag_fields_len, obj->ops.hdr_length);
 
 	kparser_dump_flag_fields(obj->flag_fields);
 done:
@@ -2582,24 +2582,35 @@ static inline bool kparser_conf_node_convert(
 	plain_parse_node->proto_node.min_len =
 		conf->plain_parse_node.proto_node.min_len;
 
+	/*
+	// TODO
 	plain_parse_node->proto_node.ops.flag_fields_length =
 		conf->plain_parse_node.proto_node.ops.flag_fields_length;
-	plain_parse_node->proto_node.ops.len_parameterized =
-		conf->plain_parse_node.proto_node.ops.len_parameterized;
+	*/
 	plain_parse_node->proto_node.ops.pflen =
 		conf->plain_parse_node.proto_node.ops.pflen;
+
+	if (plain_parse_node->proto_node.ops.pflen.src_off ||
+		plain_parse_node->proto_node.ops.pflen.size ||
+		plain_parse_node->proto_node.ops.pflen.endian ||
+		plain_parse_node->proto_node.ops.pflen.right_shift ||
+		plain_parse_node->proto_node.ops.pflen.multiplier ||
+		plain_parse_node->proto_node.ops.pflen.add_value)
+		plain_parse_node->proto_node.ops.len_parameterized = true;
+
 	plain_parse_node->proto_node.ops.pfnext_proto =
 		conf->plain_parse_node.proto_node.ops.pfnext_proto;
-	plain_parse_node->proto_node.ops.cond_exprs_parameterized =
-		conf->plain_parse_node.proto_node.ops.cond_exprs_parameterized;
 
 	kcond_tables = kparser_namespace_lookup(
 			KPARSER_NS_CONDEXPRS_TABLES,
 			&conf->plain_parse_node.proto_node.
 			ops.cond_exprs_table);
-	if (kcond_tables)
+	if (kcond_tables) {
 		plain_parse_node->proto_node.ops.cond_exprs =
 			kcond_tables->table;
+		plain_parse_node->proto_node.ops.cond_exprs_parameterized =
+			true;
+	}
 
 	strcpy(plain_parse_node->name, conf->key.name);
 
@@ -2634,6 +2645,30 @@ static inline bool kparser_conf_node_convert(
 		tlvs_parse_node->parse_node.tlvs_proto_node.
 			ops = conf->tlvs_parse_node.
 			proto_node.ops;
+
+		if (tlvs_parse_node->parse_node.tlvs_proto_node.ops.pflen.
+				src_off ||
+				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				pflen.size ||
+				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				pflen.endian ||
+				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				pflen.right_shift ||
+				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				pflen.multiplier ||
+				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				pflen.add_value)
+			tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				len_parameterized = true;
+
+		if (tlvs_parse_node->parse_node.tlvs_proto_node.ops.pftype.
+				src_off ||
+				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				pftype.size ||
+				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				pftype.right_shift) 
+			tlvs_parse_node->parse_node.tlvs_proto_node.ops.
+				type_parameterized = true;
 
 		tlvs_parse_node->parse_node.tlvs_proto_node.start_offset = 
 			conf->tlvs_parse_node.proto_node.start_offset;
@@ -2679,8 +2714,44 @@ static inline bool kparser_conf_node_convert(
 		if (node_len < sizeof(*flag_fields_parse_node))
 			return false;
 		flag_fields_parse_node = node;
+
 		flag_fields_parse_node->parse_node.flag_fields_proto_node.ops =
 			conf->flag_fields_parse_node.proto_node.ops;
+		if (flag_fields_parse_node->parse_node.flag_fields_proto_node.
+				ops.pfget_flags.src_off ||
+				flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.pfget_flags.size)
+			flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.
+				get_flags_parameterized = true;
+
+		if (flag_fields_parse_node->parse_node.flag_fields_proto_node.
+				ops.pfstart_fields_offset.src_off ||
+				flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.
+				pfstart_fields_offset.size ||
+				flag_fields_parse_node->
+				parse_node.flag_fields_proto_node.ops.
+				pfstart_fields_offset.endian ||
+				flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.
+				pfstart_fields_offset.right_shift ||
+				flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.
+				pfstart_fields_offset.multiplier ||
+				flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.
+				pfstart_fields_offset.add_value)
+			flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.
+				start_fields_offset_parameterized = true;
+
+		if (flag_fields_parse_node->parse_node.flag_fields_proto_node.
+				ops.hdr_length)
+			flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.flag_fields_len =
+				true;
+
 		kflag_fields = kparser_namespace_lookup(
 				KPARSER_NS_FLAG_FIELD_TABLE,
 				&conf->flag_fields_parse_node.proto_node.
@@ -3130,17 +3201,20 @@ static inline bool kparser_conf_tlv_node_convert(
 	node->proto_tlv_node.min_len = conf->node_proto.min_len;
 	node->proto_tlv_node.max_len = conf->node_proto.max_len;
 	node->proto_tlv_node.is_padding = conf->node_proto.is_padding;
-	node->proto_tlv_node.ops.overlay_type_parameterized =
-		conf->node_proto.ops.overlay_type_parameterized;
+
 	node->proto_tlv_node.ops.pfoverlay_type =
 		conf->node_proto.ops.pfoverlay_type;
-	node->proto_tlv_node.ops.cond_exprs_parameterized =
-		conf->node_proto.ops.cond_exprs_parameterized;
+	if (node->proto_tlv_node.ops.pfoverlay_type.src_off ||
+			node->proto_tlv_node.ops.pfoverlay_type.size ||
+			node->proto_tlv_node.ops.pfoverlay_type.right_shift)
+		node->proto_tlv_node.ops.overlay_type_parameterized = true;
+
 	kcond_tables = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLES,
 			&conf->node_proto.ops.cond_exprs_table);
-	if (kcond_tables)
+	if (kcond_tables) {
 		node->proto_tlv_node.ops.cond_exprs = kcond_tables->table;
-
+		node->proto_tlv_node.ops.cond_exprs_parameterized = true;
+	}
 
 	kprototbl = kparser_namespace_lookup(KPARSER_NS_TLV_PROTO_TABLE,
 					     &conf->
@@ -4589,12 +4663,13 @@ struct user_metadata {
 	__u16 dst_ip_offset;
 	__u16 src_port_offset;
 	__u16 dst_port_offset;
+	__u16 dst_counter;
 } __packed;
 
 static void run_dummy_parser(const struct kparser_parser *kparsr)
 {
 	// struct user_metadata mdata = {};
-	__u16 usermetadata[5] = {};
+	__u16 usermetadata[6] = {};
 	int rc = 0, i;
 
 	rc = __kparser_parse(kparsr, pktbuf, sizeof(pktbuf),
@@ -4843,7 +4918,8 @@ done:
 
 	if (kparsr && strcmp(key->name, "test_parser") == 0) {
 		run_dummy_parser(&kparsr->parser);
-		// kparser_dump_parser_tree(&kparsr->parser);
+		if (0)
+			kparser_dump_parser_tree(&kparsr->parser);
 	}
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
