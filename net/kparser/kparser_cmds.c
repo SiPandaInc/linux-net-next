@@ -2573,7 +2573,9 @@ static inline bool kparser_conf_node_convert(
 
 	plain_parse_node = node;
 	plain_parse_node->node_type = conf->type;
-	plain_parse_node->unknown_ret = conf->plain_parse_node.unknown_ret;
+	plain_parse_node->unknown_ret = KPARSER_STOP_UNKNOWN_PROTO;
+	/* TODO: CLI yet to handle signed int
+	 * conf->plain_parse_node.unknown_ret; */
 
 	plain_parse_node->proto_node.encap =
 		conf->plain_parse_node.proto_node.encap;
@@ -2594,7 +2596,7 @@ static inline bool kparser_conf_node_convert(
 		plain_parse_node->proto_node.ops.pflen.size ||
 		plain_parse_node->proto_node.ops.pflen.endian ||
 		plain_parse_node->proto_node.ops.pflen.right_shift ||
-		plain_parse_node->proto_node.ops.pflen.multiplier ||
+		plain_parse_node->proto_node.ops.pflen.multiplier != 1 ||
 		plain_parse_node->proto_node.ops.pflen.add_value)
 		plain_parse_node->proto_node.ops.len_parameterized = true;
 
@@ -2655,7 +2657,7 @@ static inline bool kparser_conf_node_convert(
 				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
 				pflen.right_shift ||
 				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pflen.multiplier ||
+				pflen.multiplier != 1 ||
 				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
 				pflen.add_value)
 			tlvs_parse_node->parse_node.tlvs_proto_node.ops.
@@ -4644,56 +4646,150 @@ done:
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
 }
 
-static __u8 pktbuf[] = {0x00,0x26,0x62,0x2f,0x47,0x87,0x00,
-			0x1d,0x60,0xb3,0x01,0x84,0x08,0x00,0x45,
-			0x00,0x00,0x3c,0xa8,0xcf,0x40,0x00,0x40,
-			0x06,0x9d,0x6b,
-			0xc0,0xa8,0x01,0x03,
-			0x3f,0x74,0xf3,0x61,
-			0xe5,0xc0,0x00,0x50,0xe5,
-			0x94,0x3d,0xaa,0x00,0x00,0x00,0x00,0xa0,
-			0x02,0x16,0xd0,0x9d,0xe2,0x00,0x00,0x02,
-			0x04,0x05,0xb4,0x04,0x02,0x08,0x0a,0x00,
-			0x17,0x95,0x65,0x00,0x00,0x00,0x00,0x01,
-			0x03,0x03,0x07};
+#if 1
+static __u8 pktbuf[] = {
+	0x00,0x26,0x62,0x2f,0x47,0x87,0x00,0x1d,0x60,0xb3,0x01,0x84,0x08,
+	0x00,0x45,0x00,0x00,0x3c,0xa8,0xcf,0x40,0x00,0x40,0x06,0x9d,0x6b,
+	0xc0,0xa8,0x01,0x03,0x3f,0x74,0xf3,0x61,0xe5,0xc0,0x00,0x50,0xe5,
+	0x94,0x3d,0xaa,0x00,0x00,0x00,0x00,0xa0,0x02,0x16,0xd0,0x9d,0xe2,
+	0x00,0x00,0x02,0x04,0x05,0xb4,0x04,0x02,0x08,0x0a,0x00,0x17,0x95,
+	0x65,0x00,0x00,0x00,0x00,0x01,0x03,0x03,0x07
+};
 
+#endif
+
+#if 0
+	/* gre flags packet: (pkt no: 17)
+	 * https://www.cloudshark.org/captures/7a6644ad437e
+	 */
+static __u8 pktbuf[] = {
+	0x00,0x09,0xe9,0x55,0xc0,0x1c,0x00,0x14,0x00,0x00,0x02,0x00,0x08,0x00,
+	0x45,0x00,0x00,0x36,0x18,0xd3,0x00,0x00,0x40,0x2f,0x39,0xc4,0x14,0x00,
+	0x00,0x02,0x14,0x00,0x00,0x01,0x30,0x81,0x88,0x0b,0x00,0x12,0x00,0x18,
+	0x00,0x00,0x00,0x03,0x00,0x00,0x00,0x02,0xff,0x03,0xc0,0x23,0x01,0x00,
+	0x00,0x0e,0x04,0x69,0x78,0x69,0x61,0x04,0x69,0x78,0x69,0x61
+};
 struct user_metadata {
-	__u16 dont_fragment_bit_offset;
+} __packed;
+#endif
+
+#if 0
+/* From sipada/data/pcaps/tcp_sack.pcap
+ * packet no: 33
+ */
+static __u8 pktbuf[] = {
+	0x00,0x26,0x62,0x2f,0x47,0x87,0x00,0x1d,0x60,0xb3,
+	0x01,0x84,0x08,0x00,0x45,0x00,0x00,0x40,0xa8,0xdf,
+	0x40,0x00,0x40,0x06,0x9d,0x57,0xc0,0xa8,0x01,0x03,
+	0x3f,0x74,0xf3,0x61,0xe5,0xc0,0x00,0x50,0xe5,0x94,
+	0x3f,0x77,0xa3,0xc4,0xc4,0x80,0xb0,0x10,0x01,0x3e,
+	0x2f,0x0e,0x00,0x00,0x01,0x01,0x08,0x0a,0x00,0x17,
+	0x95,0x6f,0x8d,0x9d,0x9e,0x27,0x01,0x01,0x05,0x0a,
+	0xa3,0xc4,0xca,0x28,0xa3,0xc4,0xd5,0x78
+};
+#endif
+
+#define MAX_ENCAP 3
+
+struct user_metametadata {
+	__u32 num_nodes;
+	__u32 num_encaps;
+	int ret_code;
+} __packed;
+
+struct user_frame {
+	__u16 fragment_bit_offset;
 	__u16 src_ip_offset;
 	__u16 dst_ip_offset;
 	__u16 src_port_offset;
 	__u16 dst_port_offset;
-	__u16 dst_counter;
+	__u16 mss_offset;
+	__u32 tcp_ts_value;
+	__u16 sack_left_edge_offset;
+	__u16 sack_rght_edge_offset;
 } __packed;
+
+struct user_metadata {
+	struct user_metametadata metametadata;
+	struct user_frame frames[MAX_ENCAP];
+} __packed;
+
+static inline void dump_parsed_user_buf(const void *buffer, size_t len)
+{
+	/* char (*__warn1)[sizeof(struct user_metadata)] = 1; */
+	const struct user_metadata *buf = buffer;
+	int i;
+
+	pr_debug("user_metametadata:%lu user_frame:%lu user_metadata:%lu\n",
+		sizeof(struct user_metametadata),
+		sizeof(struct user_frame),
+		sizeof(struct user_metadata));
+
+	if (!buf || len < sizeof(*buf)) {
+		pr_debug("%s: Insufficient buffer\n", __FUNCTION__);
+		return;
+	}
+
+	pr_debug("metametadata: num_nodes:%u\n", buf->metametadata.num_nodes);
+	pr_debug("metametadata: num_encaps:%u\n", buf->metametadata.num_encaps);
+	pr_debug("metametadata: ret_code:%d\n", buf->metametadata.ret_code);
+
+	for (i = 0; i <= buf->metametadata.num_encaps; i++) {
+		pr_debug("fragment_bit_offset[%d]:{doff:%lu value:%u}\n", i,
+			offsetof(struct user_metadata,
+				frames[i].fragment_bit_offset),
+			buf->frames[i].fragment_bit_offset);
+		pr_debug("src_ip_offset[%d]:{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].src_ip_offset),
+				buf->frames[i].src_ip_offset);
+		pr_debug("dst_ip_offset[%d]:{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].dst_ip_offset),
+				buf->frames[i].dst_ip_offset);
+		pr_debug("src_port_offset[%d]:{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].src_port_offset),
+				buf->frames[i].src_port_offset);
+		pr_debug("dst_port_offset[%d]:{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].dst_port_offset),
+				buf->frames[i].dst_port_offset);
+		pr_debug("mss_offset[%d]:{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].mss_offset),
+				buf->frames[i].mss_offset);
+		pr_debug("tcp_ts[%d]:{doff:%lu value:0x%04x}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].tcp_ts_value),
+				buf->frames[i].tcp_ts_value);
+		pr_debug("sack_left_edge_offset[%d]:{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].sack_left_edge_offset),
+				buf->frames[i].sack_left_edge_offset);
+		pr_debug("sack_rght_edge_offset[%d]:{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].sack_rght_edge_offset),
+				buf->frames[i].sack_rght_edge_offset);
+	}
+}
 
 static void run_dummy_parser(const struct kparser_parser *kparsr)
 {
-	// struct user_metadata mdata = {};
-	__u16 usermetadata[6] = {};
-	int rc = 0, i;
+	char user_buffer[512] = {};
+	int rc = 0;
+
+	memset(user_buffer, 0xff, sizeof(user_buffer));
 
 	rc = __kparser_parse(kparsr, pktbuf, sizeof(pktbuf),
-		//	&mdata, sizeof(mdata));
-			&usermetadata, sizeof(usermetadata));
+			user_buffer, sizeof(user_buffer));
 
-	pr_debug("%s:rc:%d\n", __FUNCTION__, rc);
-	if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL) {
+	pr_debug("%s:rc:{%d:%s}\n", __FUNCTION__, rc, kparser_code_to_text(rc));
+	if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL)
 		printk("parser ok: %s\n", kparser_code_to_text(rc));
-	}
 
-	for (i = 0; i < (sizeof(usermetadata) / sizeof(usermetadata[0])); i++) {
-		if (usermetadata[i] & 0x8000)
-			pr_debug("metadata[%d]: 0x%02x\n", i, usermetadata[i]);
-		else
-			pr_debug("metadata[%d]: %u\n", i, usermetadata[i]);
-	}
 
-#if 0
-	pr_debug("metadata offset:%lu value:%04x\n",
-			offsetof(struct user_metadata,
-				dont_fragment_bit_offset),
-			mdata.dont_fragment_bit_offset);
-#endif
+	dump_parsed_user_buf(user_buffer, sizeof(user_buffer));
 }
 
 #if 0

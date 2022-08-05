@@ -63,10 +63,14 @@ static const struct kparser_parse_tlv_node *lookup_tlv_node(int type,
 {
 	int i;
 
-	for (i = 0; i < table->num_ents; i++)
+	for (i = 0; i < table->num_ents; i++) {
+		pr_debug("%d: table_type:%d\n", __LINE__,
+				table->entries[i].type);
 		if (type == table->entries[i].type)
 			return table->entries[i].node;
+	}
 
+	pr_debug("%d: type:%d\n", __LINE__, type);
 	return NULL;
 }
 
@@ -229,8 +233,10 @@ parse_again:
 	if (flags & KPARSER_F_DEBUG)
 		pr_debug("kParser parsing TLV %s\n", parse_tlv_node->name);
 
-	if (proto_tlv_node && ((tlv_len < proto_tlv_node->min_len) ||
-				(tlv_len > proto_tlv_node->max_len))) {
+	pr_debug("%d: tlv_len:%lu min_len:%lu\n", __LINE__,
+			tlv_len, proto_tlv_node->min_len);
+	if ((tlv_len < proto_tlv_node->min_len) ||
+			(tlv_len > proto_tlv_node->max_len)) {
 		/* Treat check length error as an unrecognized TLV */
 		parse_tlv_node = rcu_dereference(
 				parse_tlvs_node->tlv_wildcard_node);
@@ -240,9 +246,12 @@ parse_again:
 			return parse_tlvs_node->unknown_tlv_type_ret;
 	}
 
-	proto_ops = proto_tlv_node ? &proto_tlv_node->ops : NULL;
+	proto_ops = &proto_tlv_node->ops;
 
-	if (proto_ops && proto_ops->cond_exprs_parameterized) {
+	pr_debug("%d:cond_exprs_parameterized:%d\n", __LINE__,
+			proto_ops->cond_exprs_parameterized);
+
+	if (proto_ops->cond_exprs_parameterized) {
 		ret = eval_cond_exprs(&proto_ops->cond_exprs, _hdr);
 		if (ret != KPARSER_OKAY)
 			return ret;
@@ -342,12 +351,17 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 	proto_tlvs_node = (struct kparser_proto_tlvs_node *)
 		&parse_node->tlvs_proto_node;
 
+	pr_debug("%d: fixed_start_offset:%d start_offset:%lu\n", __LINE__,
+		proto_tlvs_node->fixed_start_offset,
+		proto_tlvs_node->start_offset);
 	/* Assume hlen marks end of TLVs */
 	if (proto_tlvs_node->fixed_start_offset)
 		off = proto_tlvs_node->start_offset;
 	else
 		off = eval_parameterized_len(
 				&proto_tlvs_node->ops.pfstart_offset, cp);
+
+	pr_debug("%d: off:%ld\n", __LINE__, off);
 
 	if (off < 0)
 		return KPARSER_STOP_LENGTH;
@@ -357,6 +371,8 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 
 	cp += off;
 	tlv_offset = hdr_offset + off;
+
+	pr_debug("%d: len:%ld tlv_offset:%ld\n", __LINE__, len, tlv_offset);
 
 	while (len > 0) {
 		if (++loop_cnt > parse_tlvs_node->config.max_loop)
@@ -398,6 +414,10 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 		 * itself now that I think about it)
 		 */
 		do {
+			pr_debug("%d: len_parameterized:%d min_len:%lu\n",
+					__LINE__,
+					proto_tlvs_node->ops.len_parameterized,
+					proto_tlvs_node->min_len);
 			if (proto_tlvs_node->ops.len_parameterized) {
 				tlv_len = eval_parameterized_len(
 						&proto_tlvs_node->ops.pflen, cp);
@@ -405,6 +425,8 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 				tlv_len = proto_tlvs_node->min_len;
 				break;
 			}
+
+			pr_debug("%d: tlv_len:%lu\n", __LINE__, tlv_len);
 
 			if (!tlv_len || len < tlv_len)
 				return loop_limit_exceeded(
@@ -420,6 +442,10 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 		if (proto_tlvs_node->ops.type_parameterized)
 			type = eval_parameterized_next_proto(
 					&proto_tlvs_node->ops.pftype, cp);
+
+		pr_debug("%d: type_parameterized:%d type:%d\n", __LINE__,
+			proto_tlvs_node->ops.type_parameterized,
+			type);
 
 		if (proto_tlvs_node->padn_enable &&
 				type == proto_tlvs_node->padn_val) {
@@ -442,6 +468,8 @@ parse_one_tlv:
 		if (parse_tlv_node) {
 			const struct kparser_proto_tlv_node *proto_tlv_node =
 				&parse_tlv_node->proto_tlv_node;
+
+			pr_debug("%d:parse_tlv_node", __LINE__);
 
 			if (proto_tlv_node) {
 				if (proto_tlv_node->is_padding) {
@@ -648,7 +676,8 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 
 	if (!parser || !_metadata || metadata_len == 0 || !_hdr ||
 			parse_len == 0 ||
-			((parser->config.max_frames *
+			(parser->config.max_encaps *
+			 (parser->config.max_frames *
 			  parser->config.frame_size) +
 			 parser->config.metameta_size) > metadata_len) {
 		pr_debug("%s: one or more empty/invalid param(s).\n",
@@ -717,6 +746,9 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 			hdr_len = eval_parameterized_len(&proto_node->ops.pflen,
 					_hdr);
 
+			pr_debug("eval_hdr_len:%ld min_len:%lu\n",
+				hdr_len, proto_node->min_len);
+
 			if (hdr_len < proto_node->min_len) {
 				ctrl.ret = hdr_len < 0 ? hdr_len :
 					KPARSER_STOP_LENGTH;
@@ -758,7 +790,8 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 				break;
 			case KPARSER_NODE_TYPE_TLVS:
 				/* Process TLV nodes */
-				ctrl.ret = kparser_parse_tlvs(parser, parse_node, flags,
+				ctrl.ret = kparser_parse_tlvs(parser,
+						parse_node, flags,
 						_obj_ref, _hdr, hdr_len,
 						hdr_offset, _metadata,
 						_frame, &ctrl);
@@ -867,6 +900,7 @@ after_post_processing:
 						->ops.
 						pfnext_proto,
 						_hdr);
+				pr_debug("nxt_proto key:%d\n", type);
 				if (type < 0) {
 					ctrl.ret = type;
 					goto parser_out;
