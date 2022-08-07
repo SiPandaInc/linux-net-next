@@ -443,6 +443,7 @@ struct kparser_flag_field {
 	__u32 flag;
 	__u32 mask;
 	size_t size;
+	bool endian;
 };
 
 struct kparser_conf_flag_field {

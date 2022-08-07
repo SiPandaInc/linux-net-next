@@ -43,6 +43,8 @@ static const struct kparser_parse_node *lookup_node(int type,
 	if (!table)
 		return NULL;
 
+	pr_debug("Ln:%d: ents:%d\n", __LINE__, table->num_ents);
+
 	for (i = 0; i < table->num_ents; i++) {
 		entries = rcu_dereference(table->entries); 
 		host_type = type;
@@ -50,9 +52,12 @@ static const struct kparser_parse_node *lookup_node(int type,
 			/* multi byte, need for endian swap */
 			host_type = ntohs(host_type);
 		}
+		pr_debug("%d: type:0x%04x\n", __LINE__, host_type);
 		if (host_type == entries[i].value)
 			return entries[i].node;
 	}
+
+	pr_debug("Ln:%d: type:0x%04x\n", __LINE__, type);
 
 	return NULL;
 }
@@ -135,6 +140,7 @@ static int eval_parameterized_next_proto(
 static ssize_t eval_parameterized_len(
 		const struct kparser_parameterized_len *pf, void *_hdr)
 {
+	/* TODO: handle endian */
 	__u32 len;
 
 	_hdr += pf->src_off;
@@ -469,8 +475,6 @@ parse_one_tlv:
 			const struct kparser_proto_tlv_node *proto_tlv_node =
 				&parse_tlv_node->proto_tlv_node;
 
-			pr_debug("%d:parse_tlv_node", __LINE__);
-
 			if (proto_tlv_node) {
 				if (proto_tlv_node->is_padding) {
 					if ((pad_len += tlv_len) >
@@ -563,11 +567,15 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 				_hdr);
 
 	/* Position at start of field data */
-	if (proto_flag_fields_node->ops.start_fields_offset_parameterized)
+	if (proto_flag_fields_node->ops.flag_fields_len)
+		off = proto_flag_fields_node->ops.hdr_length;
+	else if (proto_flag_fields_node->ops.start_fields_offset_parameterized)
 		off = eval_parameterized_len(
 				&proto_flag_fields_node->ops.
 				pfstart_fields_offset,
 				_hdr);
+	else
+		return KPARSER_STOP_LENGTH; 
 
 	if (off < 0)
 		return off;
@@ -577,6 +585,7 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 
 	for (i = 0; i < flag_fields->num_idx; i++) {
 		off = kparser_flag_fields_offset(i, flags, flag_fields);
+		pr_debug("Ln:%d off:%ld\n", __LINE__, off);
 		if (off < 0)
 			continue;
 
@@ -605,7 +614,8 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 					parse_flag_field_node->metadata_table);
 			if (metadata_table) {
 				ret = extract_metadata_table(parser,
-						parse_flag_field_node->metadata_table,
+						parse_flag_field_node->
+						metadata_table,
 						cp, field_len, field_offset,
 						_metadata, _frame, ctrl);
 				if (ret != KPARSER_OKAY)
@@ -660,6 +670,7 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 		size_t parse_len, void *_metadata, size_t metadata_len)
 {
 	const struct kparser_parse_node *next_parse_node, *atencap_node;
+	int type = -1, i, ret, framescnt = parser->config.max_frames;
 	const struct kparser_parse_node *parse_node, *wildcard_node;
 	struct kparser_ctrl_data ctrl = { .ret = KPARSER_OKAY };
 	const struct kparser_metadata_table *metadata_table;
@@ -671,15 +682,15 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 	ssize_t hdr_offset = 0;
 	__u32 frame_num = 0;
 	unsigned int flags;
-	int type = -1, i, ret;
 	ssize_t hdr_len;
+
+	if (parser->config.max_encaps > framescnt)
+		framescnt = parser->config.max_encaps;
 
 	if (!parser || !_metadata || metadata_len == 0 || !_hdr ||
 			parse_len == 0 ||
-			(parser->config.max_encaps *
-			 (parser->config.max_frames *
-			  parser->config.frame_size) +
-			 parser->config.metameta_size) > metadata_len) {
+			(((framescnt * parser->config.frame_size) +
+			 parser->config.metameta_size) > metadata_len)) {
 		pr_debug("%s: one or more empty/invalid param(s).\n",
 				__FUNCTION__);
 		return EINVAL;
@@ -909,6 +920,8 @@ after_post_processing:
 				pr_debug("Ln:%d: %d\n", __LINE__, type);
 
 				/* Get next node */
+				pr_debug("Ln:%d N:%s\n", __LINE__,
+						parse_node->name);
 				next_parse_node = lookup_node(type,
 						proto_table);
 

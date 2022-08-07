@@ -505,6 +505,7 @@ static inline void *metadata_get_dst_cntr(const struct kparser_parser *parser,
 		step = parser->cntrs->cntr[cntr];
 	}
 
+	/* TODO: Check if array elem offset is missing ? */
 	dptr += cntr_conf->el_size * step;
 
 	return dptr;

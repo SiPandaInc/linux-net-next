@@ -2719,6 +2719,11 @@ static inline bool kparser_conf_node_convert(
 
 		flag_fields_parse_node->parse_node.flag_fields_proto_node.ops =
 			conf->flag_fields_parse_node.proto_node.ops;
+
+		if (conf->flag_fields_parse_node.proto_node.ops.hdr_length)
+			flag_fields_parse_node->parse_node.
+				flag_fields_proto_node.ops.
+				flag_fields_len = true;
 		if (flag_fields_parse_node->parse_node.flag_fields_proto_node.
 				ops.pfget_flags.src_off ||
 				flag_fields_parse_node->parse_node.
@@ -3727,6 +3732,9 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 	kref_init(&kobj->glue.refcount);
 
 	kobj->flag_field = arg->conf;
+	/*TODO: ntohl causing issues with 16 bit flags */
+	if (arg->conf.endian)
+		kobj->flag_field.flag = ntohs(kobj->flag_field.flag); 
 
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
@@ -3734,6 +3742,7 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
 	(*rsp)->objects_len = 0;
+
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -4279,6 +4288,9 @@ static bool kparser_create_flag_field_proto_table_ent(
 	}
 
 	(*proto_table)->flags_proto_table.entries[
+		(*proto_table)->flags_proto_table.num_ents - 1].index =
+			arg->optional_value1;
+	(*proto_table)->flags_proto_table.entries[
 		(*proto_table)->flags_proto_table.num_ents - 1].node =
 			&kparsenode->node_flag_field;
 
@@ -4458,6 +4470,8 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 		objects[i].table_conf.idx = i;
 		if (!proto_table->flags_proto_table.entries[i].node)
 			continue;
+		objects[i].table_conf.optional_value1 =
+			proto_table->flags_proto_table.entries[i].index;
 		parse_node = container_of(
 				proto_table->flags_proto_table.entries[i].node,
 				struct kparser_glue_flag_field_node,
@@ -4646,7 +4660,8 @@ done:
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
 }
 
-#if 1
+#if 0
+/* from ip_1.pcap */
 static __u8 pktbuf[] = {
 	0x00,0x26,0x62,0x2f,0x47,0x87,0x00,0x1d,0x60,0xb3,0x01,0x84,0x08,
 	0x00,0x45,0x00,0x00,0x3c,0xa8,0xcf,0x40,0x00,0x40,0x06,0x9d,0x6b,
@@ -4656,8 +4671,26 @@ static __u8 pktbuf[] = {
 	0x65,0x00,0x00,0x00,0x00,0x01,0x03,0x03,0x07
 };
 
+/*
+	Fn:__kparser_parse Ln:843
+	run_dummy_parser:rc:{-4:stop-okay}
+	parser ok: stop-okay
+	user_metametadata:20 user_frame:22 user_metadata:86
+	metametadata: num_nodes:3
+	metametadata: num_encaps:0
+	metametadata: ret_code:-4
+	metametadata: cntr:0
+	metametadata: cntrs[0]:0
+	metametadata: cntrs[1]:0
+	[67973.533730] fragment_bit_offset[0]:{doff:20 value:165}
+	[67973.533731] src_ip_offset[0]:{doff:22 value:26}
+	[67973.533732] dst_ip_offset[0]:{doff:24 value:30}
+	[67973.533733] src_port_offset[0]:{doff:26 value:34}
+	[67973.533733] dst_port_offset[0]:{doff:28 value:36}
+	[67973.533734] mss_offset[0]:{doff:30 value:56}
+	[67973.533734] tcp_ts[0]:{doff:32 value:0x65951700}
+*/
 #endif
-
 #if 0
 	/* gre flags packet: (pkt no: 17)
 	 * https://www.cloudshark.org/captures/7a6644ad437e
@@ -4669,10 +4702,7 @@ static __u8 pktbuf[] = {
 	0x00,0x00,0x00,0x03,0x00,0x00,0x00,0x02,0xff,0x03,0xc0,0x23,0x01,0x00,
 	0x00,0x0e,0x04,0x69,0x78,0x69,0x61,0x04,0x69,0x78,0x69,0x61
 };
-struct user_metadata {
-} __packed;
 #endif
-
 #if 0
 /* From sipada/data/pcaps/tcp_sack.pcap
  * packet no: 33
@@ -4687,14 +4717,96 @@ static __u8 pktbuf[] = {
 	0x95,0x6f,0x8d,0x9d,0x9e,0x27,0x01,0x01,0x05,0x0a,
 	0xa3,0xc4,0xca,0x28,0xa3,0xc4,0xd5,0x78
 };
+/*
+	run_dummy_parser:rc:{-4:stop-okay}
+	parser ok: stop-okay
+	user_metametadata:20 user_frame:22 user_metadata:86
+	metametadata: num_nodes:3
+	metametadata: num_encaps:0
+	metametadata: ret_code:-4
+	metametadata: cntr:0
+	metametadata: cntrs[0]:0
+	metametadata: cntrs[1]:0
+	fragment_bit_offset[0]:{doff:20 value:165}
+	src_ip_offset[0]:{doff:22 value:26}
+	dst_ip_offset[0]:{doff:24 value:30}
+	src_port_offset[0]:{doff:26 value:34}
+	dst_port_offset[0]:{doff:28 value:36}
+	tcp_ts[0]:{doff:32 value:0x6f951700}
+	sack_left_edge_offset[0]:{doff:36 value:70}
+	sack_right_edge_offset[0]:{doff:38 value:74}
+*/
+#endif
+#if 0
+/* From sipada/data/pcaps/vlan_icmp.pcap
+ * packet no: 1 
+ */
+static __u8 pktbuf[] = {
+	0x00,0x1b,0xd4,0x1b,0xa4,0xd8,0x00,0x13,0xc3,0xdf,
+	0xae,0x18,0x81,0x00,0x00,0x76,0x81,0x00,0x00,0x0a,
+	0x08,0x00,0x45,0x00,0x00,0x64,0x00,0x0f,0x00,0x00,
+	0xff,0x01,0x92,0x9b,0x0a,0x76,0x0a,0x01,0x0a,0x76,
+	0x0a,0x02,0x08,0x00,0xce,0xb7,0x00,0x03,0x00,0x00,
+	0x00,0x00,0x00,0x00,0x00,0x1f,0xaf,0x70,0xab,0xcd,
+	0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,
+	0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,
+	0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,
+	0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,
+	0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,
+	0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,0xab,0xcd,
+	0xab,0xcd
+};
+/*
+	run_dummy_parser:rc:{-14:stop-unknown-proto}
+	user_metametadata:20 user_frame:22 user_metadata:86
+	metametadata: num_nodes:4
+	metametadata: num_encaps:0
+	metametadata: ret_code:-14
+	metametadata: cntr:0
+	metametadata: cntrs[0]:0
+	metametadata: cntrs[1]:0
+	fragment_bit_offset[0]:{doff:20 value:229}
+	src_ip_offset[0]:{doff:22 value:34}
+	dst_ip_offset[0]:{doff:24 value:38}
+*/
+#endif
+#if 1
+	/* gre flags packet: (pkt no: 1)
+	 * https://www.cloudshark.org/captures/7be9ea02c984
+	 */
+static __u8 pktbuf[] = {
+	0xc5,0x00,0x00,0x00,0x82,0xc4,0x00,0x12,0x1e,0xf2,
+	0x61,0x3d,0x81,0x00,0x00,0x64,0x86,0xdd,0x60,0x00,
+	0x00,0x00,0x00,0x8b,0x04,0xf6,0x24,0x02,0xf0,0x00,
+	0x00,0x01,0x8e,0x01,0x00,0x00,0x00,0x00,0x00,0x00,
+	0x55,0x55,0x26,0x07,0xfc,0xd0,0x01,0x00,0x23,0x00,
+	0x00,0x00,0x00,0x00,0xb1,0x08,0x2a,0x6b,0x45,0x00,
+	0x00,0x8b,0x8c,0xaf,0x00,0x00,0x40,0x2f,0x75,0xfe,
+	0x10,0x00,0x00,0xc8,0xc0,0x34,0xa6,0x9a,0x30,0x81,
+	0x88,0x0b,0x00,0x67,0x17,0x80,0x00,0x06,0x8f,0xb1,
+	0x00,0x08,0x3a,0x76,0xff,0x03,0x00,0x21,0x45,0x00,
+	0x00,0x63,0x00,0x00,0x40,0x00,0x3c,0x11,0x56,0x67,
+	0xac,0x10,0x2c,0x03,0x08,0x08,0x08,0x08,0x9f,0x40,
+	0x00,0x35,0x00,0x4f,0x2d,0x23,0xa6,0x2c,0x01,0x00,
+	0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x35,0x78,
+	0x71,0x74,0x2d,0x64,0x65,0x74,0x65,0x63,0x74,0x2d,
+	0x6d,0x6f,0x64,0x65,0x32,0x2d,0x39,0x37,0x37,0x31,
+	0x32,0x65,0x38,0x38,0x2d,0x31,0x36,0x37,0x61,0x2d,
+	0x34,0x35,0x62,0x39,0x2d,0x39,0x33,0x65,0x65,0x2d,
+	0x39,0x31,0x33,0x31,0x34,0x30,0x65,0x37,0x36,0x36,
+	0x37,0x38,0x00,0x00,0x1c,0x00,0x01
+};
 #endif
 
 #define MAX_ENCAP 3
+#define CNTR_ARRAY_SIZE 2
 
 struct user_metametadata {
 	__u32 num_nodes;
 	__u32 num_encaps;
 	int ret_code;
+	__u32 cntr;
+	__u16 cntrs[CNTR_ARRAY_SIZE];
 } __packed;
 
 struct user_frame {
@@ -4706,7 +4818,10 @@ struct user_frame {
 	__u16 mss_offset;
 	__u32 tcp_ts_value;
 	__u16 sack_left_edge_offset;
-	__u16 sack_rght_edge_offset;
+	__u16 sack_right_edge_offset;
+	__u16 gre_flags;
+	__u16 gre_seqno_offset;
+	__u32 gre_seqno;
 } __packed;
 
 struct user_metadata {
@@ -4733,63 +4848,102 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 	pr_debug("metametadata: num_nodes:%u\n", buf->metametadata.num_nodes);
 	pr_debug("metametadata: num_encaps:%u\n", buf->metametadata.num_encaps);
 	pr_debug("metametadata: ret_code:%d\n", buf->metametadata.ret_code);
+	pr_debug("metametadata: cntr:%d\n", buf->metametadata.cntr);
+	for (i = 0; i < CNTR_ARRAY_SIZE; i++) {
+		pr_debug("metametadata: cntrs[%d]:%u\n",
+				i, buf->metametadata.cntrs[i]);
+	}
 
 	for (i = 0; i <= buf->metametadata.num_encaps; i++) {
-		pr_debug("fragment_bit_offset[%d]:{doff:%lu value:%u}\n", i,
-			offsetof(struct user_metadata,
-				frames[i].fragment_bit_offset),
-			buf->frames[i].fragment_bit_offset);
-		pr_debug("src_ip_offset[%d]:{doff:%lu value:%u}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].src_ip_offset),
-				buf->frames[i].src_ip_offset);
-		pr_debug("dst_ip_offset[%d]:{doff:%lu value:%u}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].dst_ip_offset),
-				buf->frames[i].dst_ip_offset);
-		pr_debug("src_port_offset[%d]:{doff:%lu value:%u}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].src_port_offset),
-				buf->frames[i].src_port_offset);
-		pr_debug("dst_port_offset[%d]:{doff:%lu value:%u}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].dst_port_offset),
-				buf->frames[i].dst_port_offset);
-		pr_debug("mss_offset[%d]:{doff:%lu value:%u}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].mss_offset),
-				buf->frames[i].mss_offset);
-		pr_debug("tcp_ts[%d]:{doff:%lu value:0x%04x}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].tcp_ts_value),
-				buf->frames[i].tcp_ts_value);
-		pr_debug("sack_left_edge_offset[%d]:{doff:%lu value:%u}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].sack_left_edge_offset),
-				buf->frames[i].sack_left_edge_offset);
-		pr_debug("sack_rght_edge_offset[%d]:{doff:%lu value:%u}\n", i,
-				offsetof(struct user_metadata,
-					frames[i].sack_rght_edge_offset),
-				buf->frames[i].sack_rght_edge_offset);
+		if (buf->frames[i].fragment_bit_offset != 0xffff)
+			pr_debug(
+				"fragment_bit_offset[%d]:{doff:%lu value:%u}\n",
+				i, offsetof(struct user_metadata,
+					frames[i].fragment_bit_offset),
+				buf->frames[i].fragment_bit_offset);
+		if (buf->frames[i].src_ip_offset != 0xffff)
+			pr_debug("src_ip_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].src_ip_offset),
+					buf->frames[i].src_ip_offset);
+		if (buf->frames[i].dst_ip_offset != 0xffff)
+			pr_debug("dst_ip_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].dst_ip_offset),
+					buf->frames[i].dst_ip_offset);
+		if (buf->frames[i].src_port_offset != 0xffff)
+			pr_debug("src_port_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].src_port_offset),
+					buf->frames[i].src_port_offset);
+		if (buf->frames[i].dst_port_offset != 0xffff)
+			pr_debug("dst_port_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].dst_port_offset),
+					buf->frames[i].dst_port_offset);
+		if (buf->frames[i].mss_offset != 0xffff)
+			pr_debug("mss_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].mss_offset),
+					buf->frames[i].mss_offset);
+		/* below check to detect if field is set can be a bug */
+		if (buf->frames[i].tcp_ts_value != 0xffffffff)
+			pr_debug("tcp_ts[%d]:{doff:%lu value:0x%04x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].tcp_ts_value),
+					buf->frames[i].tcp_ts_value);
+		if (buf->frames[i].sack_left_edge_offset != 0xffff)
+			pr_debug("sack_left_edge_offset[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].
+						sack_left_edge_offset),
+					buf->frames[i].sack_left_edge_offset);
+		if (buf->frames[i].sack_right_edge_offset != 0xffff)
+			pr_debug("sack_right_edge_offset[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].
+						sack_right_edge_offset),
+					buf->frames[i].sack_right_edge_offset);
+		if (buf->frames[i].gre_flags != 0xffff)
+			pr_debug("gre_flags[%d]:"
+					"{doff:%lu value:0x%02x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].gre_flags),
+					buf->frames[i].gre_flags);
+		if (buf->frames[i].gre_seqno_offset != 0xffff)
+			pr_debug("gre_seqno_offset[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].gre_seqno_offset),
+					buf->frames[i].gre_seqno_offset);
+		if (buf->frames[i].gre_seqno != 0xffffffff)
+			pr_debug("gre_seqno[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].gre_seqno),
+					buf->frames[i].gre_seqno);
 	}
 }
 
 static void run_dummy_parser(const struct kparser_parser *kparsr)
 {
-	char user_buffer[512] = {};
+	struct user_metadata user_buffer;
 	int rc = 0;
 
-	memset(user_buffer, 0xff, sizeof(user_buffer));
+	memset(&user_buffer.metametadata, 0, sizeof(user_buffer.metametadata));
+	memset(&user_buffer.frames, 0xff, sizeof(user_buffer.frames));
 
 	rc = __kparser_parse(kparsr, pktbuf, sizeof(pktbuf),
-			user_buffer, sizeof(user_buffer));
+			&user_buffer, sizeof(user_buffer));
 
 	pr_debug("%s:rc:{%d:%s}\n", __FUNCTION__, rc, kparser_code_to_text(rc));
 	if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL)
 		printk("parser ok: %s\n", kparser_code_to_text(rc));
 
 
-	dump_parsed_user_buf(user_buffer, sizeof(user_buffer));
+	dump_parsed_user_buf(&user_buffer, sizeof(user_buffer));
 }
 
 #if 0
@@ -4908,7 +5062,7 @@ static bool kparser_dump_protocol_table(
 	struct kparser_cmd_rsp_hdr *new_rsp = NULL;
 	size_t new_rsp_len = 0;
 	void *ptr;
-	int rc, i;
+	int rc; // , i;
 
 	if (!obj || !rsp || !rsp_len)
 		return true;
@@ -4933,13 +5087,14 @@ static bool kparser_dump_protocol_table(
 	memcpy(ptr, new_rsp, new_rsp_len);
 	kfree(new_rsp);
 	new_rsp = NULL;
-
+#if 0
 	for (i = 0; i < glue_obj->proto_table.num_ents; i++) {
 		if (!kparser_dump_parse_node(
 					glue_obj->proto_table.entries[i].node,
 					rsp, rsp_len))
 			goto error;;
 	}	
+#endif
 
 	return true;
 error:
@@ -5014,8 +5169,9 @@ done:
 
 	if (kparsr && strcmp(key->name, "test_parser") == 0) {
 		run_dummy_parser(&kparsr->parser);
-		if (0)
+		if (0) {
 			kparser_dump_parser_tree(&kparsr->parser);
+		}
 	}
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
