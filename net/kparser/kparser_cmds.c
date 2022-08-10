@@ -1392,7 +1392,7 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 	arg = &conf->table_conf;
 
 	//create a table entry
-	if (arg->idx != 0xffff) {
+	if (arg->add_entry) {
 		if(kparser_create_cond_table_ent(arg,
 					&proto_table, *rsp) == false)
 			goto done;
@@ -1459,7 +1459,7 @@ done:
 	mutex_unlock(&kparser_config_lock);
 
 	if ((*rsp)->op_ret_code != 0) {
-		if (proto_table && (arg->idx == 0xffff))
+		if (proto_table && !arg->add_entry)
 			kfree(proto_table);
 	}
 
@@ -1536,7 +1536,6 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 			proto_table->glue.config.namespace_id;
 		objects[i].table_conf =
 			proto_table->glue.config.table_conf;
-		objects[i].table_conf.idx = i;
 		if (!proto_table->table.entries)
 			continue;
 		kcondent = container_of(
@@ -1645,7 +1644,7 @@ int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 	arg = &conf->table_conf;
 
 	//create a table entry
-	if (arg->idx != 0xffff) {
+	if (arg->add_entry) {
 		if(kparser_create_cond_tables_ent(arg,
 					&proto_table, *rsp) == false)
 			goto done;
@@ -1710,7 +1709,7 @@ done:
 	mutex_unlock(&kparser_config_lock);
 
 	if ((*rsp)->op_ret_code != 0) {
-		if (proto_table && (arg->idx == 0xffff))
+		if (proto_table && !arg->add_entry)
 			kfree(proto_table);
 	}
 
@@ -1782,7 +1781,6 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 			proto_table->glue.config.namespace_id;
 		objects[i].table_conf =
 			proto_table->glue.config.table_conf;
-		objects[i].table_conf.idx = i;
 		if (!proto_table->table.entries)
 			continue;
 		kcondent = container_of(proto_table->table.entries[i],
@@ -1977,19 +1975,25 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	//create a table entry
-	if (arg->idx != 0xffff) {
-		if (arg->idx > KPARSER_CNTR_NUM_CNTRS) {
+	if (arg->add_entry) {
+		table = kparser_namespace_lookup(conf->namespace_id,
+				&arg->key);
+		if (!table) {
+			(*rsp)->op_ret_code = ENOENT;
+			(void) snprintf((*rsp)->err_str_buf,
+					sizeof((*rsp)->err_str_buf),
+					"%s: table key not found",
+					__FUNCTION__);
+			goto done;
+		}
+		if (table->elems_cnt >= KPARSER_CNTR_NUM_CNTRS) {
 			(*rsp)->op_ret_code = EINVAL;
 			(void) snprintf((*rsp)->err_str_buf,
 					sizeof((*rsp)->err_str_buf),
-					"%s: invalid idx %d",
-					__FUNCTION__, arg->idx);
+					"%s: table full:%u",
+					__FUNCTION__, table->elems_cnt);
 			goto done;
 		}
-
-		table = kparser_namespace_lookup(conf->namespace_id,
-				&arg->key);
-
 		kcntr = kparser_namespace_lookup(KPARSER_NS_COUNTER,
 				&arg->elem_key);
 		if (!kcntr) {
@@ -2000,7 +2004,7 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 					__FUNCTION__);
 			goto done;
 		}
-		table->k_cntrs[arg->idx] = *kcntr;
+		table->k_cntrs[table->elems_cnt++] = *kcntr;
 		goto skip_table_create;
 	}
 
@@ -2059,10 +2063,9 @@ skip_table_create:
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	if ((*rsp)->op_ret_code != 0) {
-		if (table && (arg->idx == 0xffff))
+	if ((*rsp)->op_ret_code != 0)
+		if (table && !arg->add_entry)
 			kfree(table);
-	}
 
 	synchronize_rcu();
 
@@ -3035,7 +3038,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	arg = &conf->table_conf;
 
 	//create a table entry
-	if (arg->idx != 0xffff) {
+	if (arg->add_entry) {
 		if(kparser_create_proto_table_ent(arg,
 					&proto_table, *rsp) == false)
 			goto done;
@@ -3099,10 +3102,9 @@ skip_table_create:
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	if ((*rsp)->op_ret_code != 0) {
-		if (proto_table && (arg->idx == 0xffff))
+	if ((*rsp)->op_ret_code != 0)
+		if (proto_table && !arg->add_entry)
 			kfree(proto_table);
-	}
 
 	synchronize_rcu();
 
@@ -3171,7 +3173,6 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 			proto_table->glue.config.namespace_id;
 		objects[i].table_conf =
 			proto_table->glue.config.table_conf;
-		objects[i].table_conf.idx = i;
 		objects[i].table_conf.optional_value1 =
 			proto_table->proto_table.entries[i].value;
 		if (!proto_table->proto_table.entries[i].node)
@@ -3498,7 +3499,7 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 	arg = &conf->table_conf;
 
 	//create a table entry
-	if (arg->idx != 0xffff) {
+	if (arg->add_entry) {
 		if(kparser_create_tlv_proto_table_ent(arg,
 					&proto_table, *rsp) == false)
 			goto done;
@@ -3562,10 +3563,9 @@ skip_table_create:
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	if ((*rsp)->op_ret_code != 0) {
-		if (proto_table && (arg->idx == 0xffff))
+	if ((*rsp)->op_ret_code != 0)
+		if (proto_table && !arg->add_entry)
 			kfree(proto_table);
-	}
 
 	synchronize_rcu();
 
@@ -3634,7 +3634,6 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 			proto_table->glue.config.namespace_id;
 		objects[i].table_conf =
 			proto_table->glue.config.table_conf;
-		objects[i].table_conf.idx = i;
 		objects[i].table_conf.optional_value1 =
 			proto_table->tlvs_proto_table.entries[i].type;
 		if (!proto_table->tlvs_proto_table.entries[i].node)
@@ -3895,7 +3894,7 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 	arg = &conf->table_conf;
 
 	//create a table entry
-	if (arg->idx != 0xffff) {
+	if (arg->add_entry) {
 		if(kparser_create_flag_field_table_ent(arg,
 					&proto_table, *rsp) == false)
 			goto done;
@@ -3959,10 +3958,9 @@ skip_table_create:
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	if ((*rsp)->op_ret_code != 0) {
-		if (proto_table && (arg->idx == 0xffff))
+	if ((*rsp)->op_ret_code != 0)
+		if (proto_table && !arg->add_entry)
 			kfree(proto_table);
-	}
 
 	synchronize_rcu();
 
@@ -4032,7 +4030,6 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 			proto_table->glue.config.namespace_id;
 		objects[i].table_conf =
 			proto_table->glue.config.table_conf;
-		objects[i].table_conf.idx = i;
 		if (!proto_table->flag_fields.fields)
 			continue;
 		kflagent = container_of(
@@ -4330,7 +4327,7 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 	arg = &conf->table_conf;
 
 	//create a table entry
-	if (arg->idx != 0xffff) {
+	if (arg->add_entry) {
 		if(kparser_create_flag_field_proto_table_ent(arg,
 					&proto_table, *rsp) == false)
 			goto done;
@@ -4394,10 +4391,9 @@ skip_table_create:
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	if ((*rsp)->op_ret_code != 0) {
-		if (proto_table && (arg->idx == 0xffff))
+	if ((*rsp)->op_ret_code != 0)
+		if (proto_table && !arg->add_entry)
 			kfree(proto_table);
-	}
 
 	synchronize_rcu();
 
@@ -4467,7 +4463,6 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 			proto_table->glue.config.namespace_id;
 		objects[i].table_conf =
 			proto_table->glue.config.table_conf;
-		objects[i].table_conf.idx = i;
 		if (!proto_table->flags_proto_table.entries[i].node)
 			continue;
 		objects[i].table_conf.optional_value1 =
@@ -4527,12 +4522,10 @@ static inline bool kparser_parser_convert(
 
 	cntrs = kparser_namespace_lookup(KPARSER_NS_COUNTER_TABLE,
 			&conf->cntrs_table_key);
-	if (cntrs) {
-		for (i = 0; i < KPARSER_CNTR_NUM_CNTRS; i++) {
+	if (cntrs)
+		for (i = 0; i < KPARSER_CNTR_NUM_CNTRS; i++)
 			parser->cntrs_conf.cntrs[i] =
 				cntrs->k_cntrs[i].counter_cnf;
-		}
-	}
 
 	parser->config = conf->config;
 	return true;
@@ -4737,7 +4730,7 @@ static __u8 pktbuf[] = {
 	sack_right_edge_offset[0]:{doff:38 value:74}
 */
 #endif
-#if 0
+#if 1
 /* From sipada/data/pcaps/vlan_icmp.pcap
  * packet no: 1 
  */
@@ -4770,7 +4763,7 @@ static __u8 pktbuf[] = {
 	dst_ip_offset[0]:{doff:24 value:38}
 */
 #endif
-#if 1
+#if 0
 	/* gre flags packet: (pkt no: 1)
 	 * https://www.cloudshark.org/captures/7be9ea02c984
 	 */
@@ -4796,6 +4789,25 @@ static __u8 pktbuf[] = {
 	0x39,0x31,0x33,0x31,0x34,0x30,0x65,0x37,0x36,0x36,
 	0x37,0x38,0x00,0x00,0x1c,0x00,0x01
 };
+/*
+	run_dummy_parser:rc:{-4:stop-okay}
+	parser ok: stop-okay
+	user_metametadata:20 user_frame:36 user_metadata:128
+	metametadata: num_nodes:65541
+	metametadata: num_encaps:0
+	metametadata: ret_code:-4
+	metametadata: cntr:0
+	metametadata: cntrs[0]:0
+	metametadata: cntrs[1]:0
+	fragment_bit_offset[0]:{doff:20 value:517}
+	src_ip_offset[0]:{doff:22 value:70}
+	dst_ip_offset[0]:{doff:24 value:74}
+	dst_port_offset[0]:{doff:28 value:0}
+	gre_flags[0]:{doff:40 value:0x3081}
+	gre_seqno_offset[0]:{doff:42 value:86}
+	gre_seqno[0]:{doff:44 value:430001}
+	vlantcis[0][0]:{doff:52 value:0x6400}
+*/
 #endif
 
 #define MAX_ENCAP 3
@@ -4805,9 +4817,11 @@ struct user_metametadata {
 	__u32 num_nodes;
 	__u32 num_encaps;
 	int ret_code;
-	__u32 cntr;
+	__u16 cntr;
 	__u16 cntrs[CNTR_ARRAY_SIZE];
 } __packed;
+
+#define VLAN_COUNT_MAX 2
 
 struct user_frame {
 	__u16 fragment_bit_offset;
@@ -4822,6 +4836,8 @@ struct user_frame {
 	__u16 gre_flags;
 	__u16 gre_seqno_offset;
 	__u32 gre_seqno;
+	__u16 vlan_cntr;
+	__u16 vlantcis[VLAN_COUNT_MAX];
 } __packed;
 
 struct user_metadata {
@@ -4848,7 +4864,8 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 	pr_debug("metametadata: num_nodes:%u\n", buf->metametadata.num_nodes);
 	pr_debug("metametadata: num_encaps:%u\n", buf->metametadata.num_encaps);
 	pr_debug("metametadata: ret_code:%d\n", buf->metametadata.ret_code);
-	pr_debug("metametadata: cntr:%d\n", buf->metametadata.cntr);
+	pr_debug("metametadata: cntr:%u, addr: %p\n", buf->metametadata.cntr,
+		&buf->metametadata.cntr);
 	for (i = 0; i < CNTR_ARRAY_SIZE; i++) {
 		pr_debug("metametadata: cntrs[%d]:%u\n",
 				i, buf->metametadata.cntrs[i]);
@@ -4924,6 +4941,24 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 					offsetof(struct user_metadata,
 						frames[i].gre_seqno),
 					buf->frames[i].gre_seqno);
+		if (buf->frames[i].vlan_cntr != 0xffff)
+			pr_debug("vlan_cntr[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].vlan_cntr),
+					buf->frames[i].vlan_cntr);
+		if (buf->frames[i].vlantcis[0] != 0xffff)
+			pr_debug("vlantcis[%d][0]:"
+					"{doff:%lu value:0x%02x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].vlantcis[0]),
+					buf->frames[i].vlantcis[0]);
+		if (buf->frames[i].vlantcis[1] != 0xffff)
+			pr_debug("vlantcis[%d][1]:"
+					"{doff:%lu value:0x%02x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].vlantcis[1]),
+					buf->frames[i].vlantcis[1]);
 	}
 }
 
@@ -4934,6 +4969,8 @@ static void run_dummy_parser(const struct kparser_parser *kparsr)
 
 	memset(&user_buffer.metametadata, 0, sizeof(user_buffer.metametadata));
 	memset(&user_buffer.frames, 0xff, sizeof(user_buffer.frames));
+
+	user_buffer.frames[0].vlan_cntr = 0;
 
 	rc = __kparser_parse(kparsr, pktbuf, sizeof(pktbuf),
 			&user_buffer, sizeof(user_buffer));

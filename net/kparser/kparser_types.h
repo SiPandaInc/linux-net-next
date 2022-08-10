@@ -162,7 +162,7 @@ struct kparser_cntrs_conf {
 };
 
 struct kparser_counters {
-	unsigned int cntr[KPARSER_CNTR_NUM_CNTRS];
+	__u16 cntr[KPARSER_CNTR_NUM_CNTRS];
 };
 
 /*****************************************************************************/

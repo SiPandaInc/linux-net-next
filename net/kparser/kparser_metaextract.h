@@ -481,14 +481,16 @@ static bool __metatdata_validate_counter(const struct kparser_parser *parser,
 
 static inline void *metadata_get_dst_cntr(const struct kparser_parser *parser,
 		size_t dst_off, void *mdata,
-		unsigned int cntr)
+		unsigned int cntr, int code)
 {
 	const struct kparser_cntr_conf *cntr_conf;
 	__u8 *dptr = &((__u8 *)mdata)[dst_off];
 	size_t step;
 
-	if (!cntr)
+	if (!cntr) {
+		// TODO: check why?
 		return dptr;
+	}
 
 	cntr--; // Make zero based to access array
 
@@ -497,16 +499,19 @@ static inline void *metadata_get_dst_cntr(const struct kparser_parser *parser,
 
 	cntr_conf = &parser->cntrs_conf.cntrs[cntr];
 
-	if (parser->cntrs->cntr[cntr] >= cntr_conf->array_limit) {
-		if (!cntr_conf->array_limit || !cntr_conf->overwrite_last)
-			return NULL;
-		step = cntr_conf->array_limit - 1;
-	} else {
-		step = parser->cntrs->cntr[cntr];
-	}
+	if (code != KPARSER_METADATA_CTRL_COUNTER) {
+		if (parser->cntrs->cntr[cntr] >= cntr_conf->array_limit) {
+			if (!cntr_conf->array_limit ||
+					!cntr_conf->overwrite_last)
+				return NULL;
+			step = cntr_conf->array_limit - 1;
+		} else {
+			step = parser->cntrs->cntr[cntr];
+		}
 
-	/* TODO: Check if array elem offset is missing ? */
-	dptr += cntr_conf->el_size * step;
+		/* TODO: Check if array elem offset is missing ? */
+		dptr += cntr_conf->el_size * step;
+	}
 
 	return dptr;
 }
@@ -553,7 +558,7 @@ static inline int kparser_metadata_bytes_extract(
 		const void *hdr, void *mdata)
 {
 	__u8 *dptr = metadata_get_dst_cntr(parser, mde.bytes.dst_off, mdata,
-			mde.bytes.cntr);
+			mde.bytes.cntr, 0);
 	const __u8 *sptr = &((__u8 *)hdr)[mde.bytes.src_off];
 
 	if (!dptr)
@@ -570,7 +575,7 @@ static inline int kparser_metadata_nibbs_extract(
 		const void *hdr, void *mdata)
 {
 	__u8 *dptr = metadata_get_dst_cntr(parser, mde.nibbs.dst_off, mdata,
-			mde.nibbs.cntr);
+			mde.nibbs.cntr, 0);
 	const __u8 *sptr = &((__u8 *)hdr)[mde.nibbs.src_off / 2];
 	size_t nibb_len = mde.nibbs.length + 1;
 	__u8 data;
@@ -704,7 +709,7 @@ static inline int kparser_metadata_const_set_byte(
 		void *mdata)
 {
 	__u16 *dptr = metadata_get_dst_cntr(parser, mde.constant_byte.dst_off,
-			mdata, mde.constant_byte.cntr);
+			mdata, mde.constant_byte.cntr, 0);
 
 	if (dptr)
 		*dptr = mde.constant_byte.data;
@@ -718,7 +723,7 @@ static inline int kparser_metadata_const_set_hword(
 		void *mdata)
 {
 	__u16 *dptr = metadata_get_dst_cntr(parser, mde.constant_hword.dst_off,
-			mdata, mde.constant_hword.cntr);
+			mdata, mde.constant_hword.cntr, 0);
 
 	if (dptr)
 		*dptr = mde.constant_hword.data;
@@ -732,7 +737,7 @@ static inline int kparser_metadata_set_offset(
 		void *mdata, size_t hdr_offset)
 {
 	__u16 *dptr = metadata_get_dst_cntr(parser, mde.offset.dst_off, mdata,
-			mde.offset.cntr);
+			mde.offset.cntr, 0);
 
 	if (dptr) {
 		*dptr = mde.offset.bit_offset ?
@@ -751,7 +756,7 @@ static inline int __kparser_metadata_control_extract(
 		const struct kparser_ctrl_data *ctrl)
 {
 	__u16 *dptr = metadata_get_dst_cntr(parser, mde.control.dst_off, mdata,
-			mde.control.cntr);
+			mde.control.cntr, mde.control.code);
 
 	switch (mde.control.code) {
 		case KPARSER_METADATA_CTRL_HDR_LENGTH:

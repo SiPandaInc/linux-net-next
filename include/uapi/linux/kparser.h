@@ -465,7 +465,8 @@ struct kparser_conf_node_parse_flag_field {
 /* *********************** generic tables *********************** */
 struct kparser_conf_table {
 	struct kparser_hkey key;
-	__u16 idx;
+	bool add_entry;
+	__u16 elems_cnt;
 	int optional_value1;
 	int optional_value2;
 	struct kparser_hkey elem_key;

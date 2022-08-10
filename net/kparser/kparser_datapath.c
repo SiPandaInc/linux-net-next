@@ -326,7 +326,6 @@ static __u64 eval_get_value(const struct kparser_parameterized_get_value *pf,
 		void *_hdr)
 {
 	__u64 ret;
-	/* TODO: pf->mask unused */
 	(void) __kparser_metadata_bytes_extract(_hdr + pf->src_off,
 			(__u8 *)&ret, pf->size, false);
 
@@ -922,6 +921,7 @@ after_post_processing:
 				/* Get next node */
 				pr_debug("Ln:%d N:%s\n", __LINE__,
 						parse_node->name);
+				// TODO: add encap and overlay
 				next_parse_node = lookup_node(type,
 						proto_table);
 
@@ -948,7 +948,7 @@ after_post_processing:
 
 found_next:
 		/* Found next protocol node, set up to process */
-
+		// TODO: handle table's overlay config here
 		if (!proto_node->overlay) {
 			/* Move over current header */
 			_hdr += hdr_len;
@@ -956,6 +956,8 @@ found_next:
 		}
 
 		parse_node = next_parse_node;
+
+		// TODO: handle encap here, for both current table or node
 	} while (1);
 
 parser_out:

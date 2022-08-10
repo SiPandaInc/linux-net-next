@@ -115,6 +115,7 @@ struct kparser_glue_counter {
 
 struct kparser_glue_counter_table {
 	struct kparser_glue glue;
+	__u8 elems_cnt;
 	struct kparser_glue_counter k_cntrs[KPARSER_CNTR_NUM_CNTRS];
 };
 
