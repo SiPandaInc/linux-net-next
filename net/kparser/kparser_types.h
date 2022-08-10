@@ -598,7 +598,10 @@ static inline __u64 kparser_get_flag_field64(const __u8 *fields, __u32 targ_idx,
  * parser_xdp_entry_point: Function entry point for XDP parser
  * config: Parser conifguration
  */
+#define KPARSERSTARTSIGNATURE 0xabcd
+#define KPARSERENDSIGNATURE 0xdcba
 struct kparser_parser {
+	__u16 kparser_start_signature;
 	char name[KPARSER_MAX_NAME];
 	const struct kparser_parse_node __rcu *root_node;
 	const struct kparser_parse_node __rcu *okay_node;
@@ -608,6 +611,7 @@ struct kparser_parser {
 	struct kparser_counters __rcu *cntrs;
 	struct kparser_config config;
 	struct kparser_cntrs_conf cntrs_conf;
+	__u16 kparser_end_signature;
 };
 
 #endif /* __KPARSER_TYPES_H */

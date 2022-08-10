@@ -683,7 +683,7 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 	unsigned int flags;
 	ssize_t hdr_len;
 
-	if (parser->config.max_encaps > framescnt)
+	if (parser && parser->config.max_encaps > framescnt)
 		framescnt = parser->config.max_encaps;
 
 	if (!parser || !_metadata || metadata_len == 0 || !_hdr ||
@@ -692,6 +692,16 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 			 parser->config.metameta_size) > metadata_len)) {
 		pr_debug("%s: one or more empty/invalid param(s).\n",
 				__FUNCTION__);
+		return EINVAL;
+	}
+
+	if ((parser->kparser_start_signature != KPARSERSTARTSIGNATURE) ||
+		(parser->kparser_end_signature != KPARSERENDSIGNATURE)) {
+		pr_debug("%s:corrupted kparser signature:"
+				"start:0x%02x, end:0x%02x\n",
+				__FUNCTION__,
+				parser->kparser_start_signature,
+				parser->kparser_end_signature);
 		return EINVAL;
 	}
 
@@ -986,26 +996,29 @@ parser_out:
 	return ctrl.ret;
 }
 
-static inline const struct kparser_parser *
+static void kparser_release_parser(struct kref *kref)
+{
+}
+
+static inline void *
 kparser_get_parser_ctx(const struct kparser_hkey *kparser_key)
 {
-	const struct kparser_parser *parser;
-	void *ptr;
+	void *ptr, *parser;
 
 	if (!kparser_key)
 		return NULL;
 
 	ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
 	parser = rcu_dereference(ptr);
-	return NULL;
+	return parser;
 }
 
 int kparser_parse(struct sk_buff *skb,
 		const struct kparser_hkey *kparser_key,
 		void *_metadata, size_t metadata_len)
 {
-	const struct kparser_parser *parser;
 	struct kparser_glue_parser *k_prsr;
+	struct kparser_parser *parser;
 	void *data, *ptr;
 	size_t pktlen;
 	int err;
@@ -1024,14 +1037,14 @@ int kparser_parse(struct sk_buff *skb,
 	data = skb_mac_header(skb);
 	pktlen = skb_mac_header_len(skb) + skb->len;
 
-	parser = kparser_get_parser_ctx(kparser_key);
-	if (!parser) {
+	k_prsr = kparser_get_parser_ctx(kparser_key);
+	if (!k_prsr) {
 		pr_debug("%s: parser is not found \n", __FUNCTION__);
 		return EINVAL;
 	}
 
-	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
 	kref_get(&k_prsr->glue.refcount);
+	parser = &k_prsr->parser;
 
 	rcu_read_lock();
 
@@ -1048,35 +1061,32 @@ int kparser_parse(struct sk_buff *skb,
 
 	rcu_read_unlock();
 
-	kref_put(&k_prsr->glue.refcount, NULL);
+	kref_put(&k_prsr->glue.refcount, kparser_release_parser);
 
 	return err;
 }
 
-const struct kparser_parser * kparser_get_parser(
-		const struct kparser_hkey *kparser_key)
+const void * kparser_get_parser(const struct kparser_hkey *kparser_key)
 {
-	const struct kparser_parser *parser;
 	struct kparser_glue_parser *k_prsr;
 
-	parser = kparser_get_parser_ctx(kparser_key);
-	if (!parser)
+	k_prsr = kparser_get_parser_ctx(kparser_key);
+	if (!k_prsr)
 		return NULL;
-	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
 	kref_get(&k_prsr->glue.refcount);
-	return parser;	
+	return &k_prsr->parser;	
 }
 
-bool kparser_put_parser(const struct kparser_hkey *kparser_key)
+bool kparser_put_parser(const void *prsr)
 {
 	const struct kparser_parser *parser;
 	struct kparser_glue_parser *k_prsr;
 
-	parser = kparser_get_parser_ctx(kparser_key);
-	if (!parser)
+	if (!prsr)
 		return false;
+	parser = prsr;
 	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
-	kref_put(&k_prsr->glue.refcount, NULL);
+	kref_put(&k_prsr->glue.refcount, kparser_release_parser);
 	return true;
 }
 

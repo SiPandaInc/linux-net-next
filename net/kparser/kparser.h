@@ -281,8 +281,7 @@ int kparser_do_parse(const struct kparser_hkey *kparser_key, void *_hdr,
 void * kparser_namespace_lookup(enum kparser_global_namespace_ids ns_id,
 		const struct kparser_hkey *key);
 
-const struct kparser_parser * kparser_get_parser(
-		const struct kparser_hkey *kparser_key);
+const void * kparser_get_parser(const struct kparser_hkey *kparser_key);
 
-bool kparser_put_parser(const struct kparser_hkey *kparser_key);
+bool kparser_put_parser(const void *parser);
 #endif /* __KPARSER_H */

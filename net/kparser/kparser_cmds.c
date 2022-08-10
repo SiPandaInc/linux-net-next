@@ -4617,6 +4617,8 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 	kref_init(&kparsr->glue.refcount);
 	rcu_assign_pointer(kparsr->parser.cntrs, cntrs);
 	kparsr->parser.cntrs_len = sizeof(*cntrs);
+	kparsr->parser.kparser_start_signature = KPARSERSTARTSIGNATURE;
+	kparsr->parser.kparser_end_signature = KPARSERENDSIGNATURE;
 
 	if (!kparser_parser_convert(arg, &kparsr->parser)) {
 		(*rsp)->op_ret_code = EINVAL;
@@ -4962,23 +4964,37 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 	}
 }
 
-static void run_dummy_parser(const struct kparser_parser *kparsr)
+static void run_dummy_parser(const struct kparser_hkey *key)
 {
 	struct user_metadata user_buffer;
+	const void *parser;
 	int rc = 0;
+
+	if (!key) {
+		pr_debug("key missing\n");
+		return;
+	}
 
 	memset(&user_buffer.metametadata, 0, sizeof(user_buffer.metametadata));
 	memset(&user_buffer.frames, 0xff, sizeof(user_buffer.frames));
-
 	user_buffer.frames[0].vlan_cntr = 0;
 
-	rc = __kparser_parse(kparsr, pktbuf, sizeof(pktbuf),
+	parser = kparser_get_parser(key);
+	if (!parser) {
+		pr_debug("kparser_get_parser() failed, key:{%s:%u}\n",
+			key->name, key->id);
+		return;
+	}
+
+	rc = __kparser_parse(parser, pktbuf, sizeof(pktbuf),
 			&user_buffer, sizeof(user_buffer));
+
+	if (kparser_put_parser(parser) != true)
+		pr_debug("kparser_put_parser() failed\n");
 
 	pr_debug("%s:rc:{%d:%s}\n", __FUNCTION__, rc, kparser_code_to_text(rc));
 	if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL)
 		printk("parser ok: %s\n", kparser_code_to_text(rc));
-
 
 	dump_parsed_user_buf(&user_buffer, sizeof(user_buffer));
 }
@@ -5205,7 +5221,7 @@ done:
 	mutex_unlock(&kparser_config_lock);
 
 	if (kparsr && strcmp(key->name, "test_parser") == 0) {
-		run_dummy_parser(&kparsr->parser);
+		run_dummy_parser(key);
 		if (0) {
 			kparser_dump_parser_tree(&kparsr->parser);
 		}
@@ -5275,6 +5291,8 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
 		    size_t *rsp_len)
 {
+	const struct kparser_glue_parser *kparsr;
+
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
 	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
@@ -5293,7 +5311,18 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 
 	mutex_lock(&kparser_config_lock);
 
-	if (!kparser_put_parser(key)) {
+	kparsr = kparser_namespace_lookup(KPARSER_NS_PARSER, key);
+	if (!kparsr) {
+		// kparser_iterate_parser();
+		(*rsp)->op_ret_code = ENOENT;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: Object key not found",
+				__FUNCTION__);
+		goto done;
+	}
+
+	if (!kparser_put_parser(&kparsr->parser)) {
 		(*rsp)->op_ret_code = EINVAL;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
