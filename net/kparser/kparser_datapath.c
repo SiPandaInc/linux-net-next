@@ -52,7 +52,7 @@ static const struct kparser_parse_node *lookup_node(int type,
 			/* multi byte, need for endian swap */
 			host_type = ntohs(host_type);
 		}
-		pr_debug("%d: type:0x%04x\n", __LINE__, host_type);
+		pr_debug("%d: type:0x%04x 0x%04x\n", __LINE__, host_type, entries[i].value);
 		if (host_type == entries[i].value)
 			return entries[i].node;
 	}
@@ -444,13 +444,10 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 						parse_tlvs_node->config.disp_limit_exceed);
 		} while (0);
 
-		if (proto_tlvs_node->ops.type_parameterized)
-			type = eval_parameterized_next_proto(
-					&proto_tlvs_node->ops.pftype, cp);
+		type = eval_parameterized_next_proto(
+				&proto_tlvs_node->ops.pftype, cp);
 
-		pr_debug("%d: type_parameterized:%d type:%d\n", __LINE__,
-			proto_tlvs_node->ops.type_parameterized,
-			type);
+		pr_debug("%d: type:%d\n", __LINE__, type);
 
 		if (proto_tlvs_node->padn_enable &&
 				type == proto_tlvs_node->padn_val) {
@@ -741,6 +738,8 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 	 */
 
 	do {
+		pr_debug("Ln:%d Parsing node:%s\n", __LINE__, parse_node->name);
+
 		proto_node = &parse_node->proto_node;
 
 		hdr_len = proto_node->min_len;

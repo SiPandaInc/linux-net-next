@@ -55,20 +55,6 @@ enum kparser_global_namespace_ids {
 	KPARSER_NS_MAX
 };
 
-struct kparser_global_namespaces {
-	enum kparser_global_namespace_ids name_space_id;
-	const char *name;
-	const char *alias;
-	const char *description;
-	size_t arg_tokens_count;
-	const struct kparser_arg_key_val_token *arg_tokens; 
-	int create_attr_id;
-	int update_attr_id;
-	int read_attr_id;
-	int delete_attr_id;
-	int rsp_attr_id;
-};
-
 #define KPARSER_ATTR_RSP(id)		KPARSER_ATTR_RSP_##id
 
 #define KPARSER_DEFINE_ATTR_IDS(id)			\
@@ -183,6 +169,8 @@ struct kparser_conf_condexpr_tables {
 #define KPARSER_CNTR_NUM_CNTRS		7
 
 struct kparser_cntr_conf {
+        bool valid_entry;
+	__u8 index;
 	__u32 max_value;
 	__u32 array_limit;
         size_t el_size;
@@ -309,12 +297,13 @@ struct kparser_proto_tlvs_opts {
         struct kparser_parameterized_len pfstart_offset;
         bool len_parameterized;
         struct kparser_parameterized_len pflen;
-        bool type_parameterized;
         struct kparser_parameterized_next_proto pftype;
 };
 
 struct kparser_conf_proto_tlvs_node {
 	struct kparser_proto_tlvs_opts ops;
+	bool tlvsstdfmt;
+	bool fixed_start_offset;
 	size_t start_offset;
 	__u8 pad1_val;
 	__u8 padn_val;
@@ -322,7 +311,6 @@ struct kparser_conf_proto_tlvs_node {
 	bool pad1_enable;
 	bool padn_enable;
 	bool eol_enable;
-	bool fixed_start_offset;
 	size_t min_len;
 };
 
@@ -507,7 +495,6 @@ struct kparser_conf_parser {
 	struct kparser_hkey ok_node_key;
 	struct kparser_hkey fail_node_key;
 	struct kparser_hkey atencap_node_key;
-	struct kparser_hkey cntrs_table_key;
 };
 
 /* *********************** CLI config interface *********************** */

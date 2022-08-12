@@ -373,6 +373,8 @@ static struct kparser_mod_namespaces *g_mod_namespaces[] =
         [KPARSER_NS_MAX] = NULL,
 };
 
+static struct kparser_cntrs_conf cntrs_conf = {};
+
 extern void rhashtable_destroy(struct rhashtable *ht);
 extern void rhashtable_free_and_destroy(struct rhashtable *ht,
 		void (*free_fn)(void *ptr, void *arg), void *arg);
@@ -865,8 +867,6 @@ static void kparser_dump_tlvs_proto_node(
 	pr_debug("ops.len_parameterized:%d \n",
 			obj->ops.len_parameterized);
 	kparser_dump_param_len(&obj->ops.pflen);
-	pr_debug("ops.type_parameterized:%d \n",
-			obj->ops.type_parameterized);
 	kparser_dump_param_next_proto(&obj->ops.pftype);
 
 	pr_debug("start_offset:%lu \n", obj->start_offset);
@@ -1827,6 +1827,24 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->cntr_conf;
 
+	if (!arg->conf.valid_entry) {
+		(*rsp)->op_ret_code = EINVAL;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: counter entry is not valid", __FUNCTION__);
+		goto done;
+	}
+
+	if (arg->conf.index >= KPARSER_CNTR_NUM_CNTRS) {
+		(*rsp)->op_ret_code = EINVAL;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: counter index %d can not be >= %d",
+				__FUNCTION__, arg->conf.index,
+				KPARSER_CNTR_NUM_CNTRS);
+		goto done;
+	}
+
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
 				&key, *rsp)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
@@ -1873,6 +1891,8 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 	kref_init(&kcntr->glue.refcount);
 
 	kcntr->counter_cnf = arg->conf;
+
+	cntrs_conf.cntrs[arg->conf.index] = arg->conf;
 
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
@@ -2592,16 +2612,10 @@ static inline bool kparser_conf_node_convert(
 	plain_parse_node->proto_node.ops.flag_fields_length =
 		conf->plain_parse_node.proto_node.ops.flag_fields_length;
 	*/
+	plain_parse_node->proto_node.ops.len_parameterized =
+		conf->plain_parse_node.proto_node.ops.len_parameterized;
 	plain_parse_node->proto_node.ops.pflen =
 		conf->plain_parse_node.proto_node.ops.pflen;
-
-	if (plain_parse_node->proto_node.ops.pflen.src_off ||
-		plain_parse_node->proto_node.ops.pflen.size ||
-		plain_parse_node->proto_node.ops.pflen.endian ||
-		plain_parse_node->proto_node.ops.pflen.right_shift ||
-		plain_parse_node->proto_node.ops.pflen.multiplier != 1 ||
-		plain_parse_node->proto_node.ops.pflen.add_value)
-		plain_parse_node->proto_node.ops.len_parameterized = true;
 
 	plain_parse_node->proto_node.ops.pfnext_proto =
 		conf->plain_parse_node.proto_node.ops.pfnext_proto;
@@ -2647,33 +2661,8 @@ static inline bool kparser_conf_node_convert(
 
 		tlvs_parse_node = node;
 
-		tlvs_parse_node->parse_node.tlvs_proto_node.
-			ops = conf->tlvs_parse_node.
-			proto_node.ops;
-
-		if (tlvs_parse_node->parse_node.tlvs_proto_node.ops.pflen.
-				src_off ||
-				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pflen.size ||
-				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pflen.endian ||
-				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pflen.right_shift ||
-				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pflen.multiplier != 1 ||
-				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pflen.add_value)
-			tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				len_parameterized = true;
-
-		if (tlvs_parse_node->parse_node.tlvs_proto_node.ops.pftype.
-				src_off ||
-				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pftype.size ||
-				tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				pftype.right_shift) 
-			tlvs_parse_node->parse_node.tlvs_proto_node.ops.
-				type_parameterized = true;
+		tlvs_parse_node->parse_node.tlvs_proto_node.ops =
+			conf->tlvs_parse_node.proto_node.ops;
 
 		tlvs_parse_node->parse_node.tlvs_proto_node.start_offset = 
 			conf->tlvs_parse_node.proto_node.start_offset;
@@ -2722,45 +2711,6 @@ static inline bool kparser_conf_node_convert(
 
 		flag_fields_parse_node->parse_node.flag_fields_proto_node.ops =
 			conf->flag_fields_parse_node.proto_node.ops;
-
-		if (conf->flag_fields_parse_node.proto_node.ops.hdr_length)
-			flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.
-				flag_fields_len = true;
-		if (flag_fields_parse_node->parse_node.flag_fields_proto_node.
-				ops.pfget_flags.src_off ||
-				flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.pfget_flags.size)
-			flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.
-				get_flags_parameterized = true;
-
-		if (flag_fields_parse_node->parse_node.flag_fields_proto_node.
-				ops.pfstart_fields_offset.src_off ||
-				flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.
-				pfstart_fields_offset.size ||
-				flag_fields_parse_node->
-				parse_node.flag_fields_proto_node.ops.
-				pfstart_fields_offset.endian ||
-				flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.
-				pfstart_fields_offset.right_shift ||
-				flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.
-				pfstart_fields_offset.multiplier ||
-				flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.
-				pfstart_fields_offset.add_value)
-			flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.
-				start_fields_offset_parameterized = true;
-
-		if (flag_fields_parse_node->parse_node.flag_fields_proto_node.
-				ops.hdr_length)
-			flag_fields_parse_node->parse_node.
-				flag_fields_proto_node.ops.flag_fields_len =
-				true;
 
 		kflag_fields = kparser_namespace_lookup(
 				KPARSER_NS_FLAG_FIELD_TABLE,
@@ -4488,9 +4438,7 @@ static inline bool kparser_parser_convert(
 		const struct kparser_conf_parser *conf,
 		struct kparser_parser *parser)
 {
-	struct kparser_glue_counter_table *cntrs; 
 	struct kparser_glue_glue_parse_node *node;
-	int i;
 
 	strcpy(parser->name, conf->key.name);
 
@@ -4520,12 +4468,7 @@ static inline bool kparser_parser_convert(
 		rcu_assign_pointer(parser->atencap_node,
 				   &node->parse_node.node);
 
-	cntrs = kparser_namespace_lookup(KPARSER_NS_COUNTER_TABLE,
-			&conf->cntrs_table_key);
-	if (cntrs)
-		for (i = 0; i < KPARSER_CNTR_NUM_CNTRS; i++)
-			parser->cntrs_conf.cntrs[i] =
-				cntrs->k_cntrs[i].counter_cnf;
+	parser->cntrs_conf = cntrs_conf;
 
 	parser->config = conf->config;
 	return true;
@@ -4698,7 +4641,7 @@ static __u8 pktbuf[] = {
 	0x00,0x0e,0x04,0x69,0x78,0x69,0x61,0x04,0x69,0x78,0x69,0x61
 };
 #endif
-#if 0
+#if 1
 /* From sipada/data/pcaps/tcp_sack.pcap
  * packet no: 33
  */
@@ -4732,7 +4675,7 @@ static __u8 pktbuf[] = {
 	sack_right_edge_offset[0]:{doff:38 value:74}
 */
 #endif
-#if 1
+#if 0
 /* From sipada/data/pcaps/vlan_icmp.pcap
  * packet no: 1 
  */
@@ -4763,6 +4706,25 @@ static __u8 pktbuf[] = {
 	fragment_bit_offset[0]:{doff:20 value:229}
 	src_ip_offset[0]:{doff:22 value:34}
 	dst_ip_offset[0]:{doff:24 value:38}
+*/
+/*
+new:
+[202333.320699] Ln:60: type:0x0001
+[202333.320702] run_dummy_parser:rc:{-14:stop-unknown-proto}
+[202333.320704] user_metametadata:18 user_frame:34 user_metadata:120
+[202333.320706] metametadata: num_nodes:4
+[202333.320707] metametadata: num_encaps:0
+[202333.320708] metametadata: ret_code:-14
+[202333.320709] metametadata: cntr:2, addr: 00000000da704f1d
+[202333.320712] metametadata: cntrs[0]:0
+[202333.320714] metametadata: cntrs[1]:0
+[202333.320715] fragment_bit_offset[0]:{doff:18 value:229}
+[202333.320716] src_ip_offset[0]:{doff:20 value:34}
+[202333.320718] dst_ip_offset[0]:{doff:22 value:38}
+[202333.320719] vlan_cntr[0]:{doff:46 value:1}
+[202333.320721] vlantcis[0][0]:{doff:48 value:0x7600}
+[202333.320722] vlantcis[0][1]:{doff:50 value:0xa00}
+
 */
 #endif
 #if 0
