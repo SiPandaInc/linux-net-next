@@ -4641,7 +4641,7 @@ static __u8 pktbuf[] = {
 	0x00,0x0e,0x04,0x69,0x78,0x69,0x61,0x04,0x69,0x78,0x69,0x61
 };
 #endif
-#if 1
+#if 0
 /* From sipada/data/pcaps/tcp_sack.pcap
  * packet no: 33
  */
@@ -4727,7 +4727,7 @@ new:
 
 */
 #endif
-#if 0
+#if 1
 	/* gre flags packet: (pkt no: 1)
 	 * https://www.cloudshark.org/captures/7be9ea02c984
 	 */
@@ -4813,12 +4813,12 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 {
 	/* char (*__warn1)[sizeof(struct user_metadata)] = 1; */
 	const struct user_metadata *buf = buffer;
-	int i;
+	int i, j;
 
 	pr_debug("user_metametadata:%lu user_frame:%lu user_metadata:%lu\n",
-		sizeof(struct user_metametadata),
-		sizeof(struct user_frame),
-		sizeof(struct user_metadata));
+			sizeof(struct user_metametadata),
+			sizeof(struct user_frame),
+			sizeof(struct user_metadata));
 
 	if (!buf || len < sizeof(*buf)) {
 		pr_debug("%s: Insufficient buffer\n", __FUNCTION__);
@@ -4828,20 +4828,22 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 	pr_debug("metametadata: num_nodes:%u\n", buf->metametadata.num_nodes);
 	pr_debug("metametadata: num_encaps:%u\n", buf->metametadata.num_encaps);
 	pr_debug("metametadata: ret_code:%d\n", buf->metametadata.ret_code);
-	pr_debug("metametadata: cntr:%u, addr: %p\n", buf->metametadata.cntr,
-		&buf->metametadata.cntr);
-	for (i = 0; i < CNTR_ARRAY_SIZE; i++) {
-		pr_debug("metametadata: cntrs[%d]:%u\n",
-				i, buf->metametadata.cntrs[i]);
-	}
+	pr_debug("metametadata: cntr:%u\n", buf->metametadata.cntr);
+
+	if (buf->metametadata.cntr >= CNTR_ARRAY_SIZE)
+		printk("FATAL error, cntr:%u >= Max:%u\n",
+				buf->metametadata.cntr, CNTR_ARRAY_SIZE);
+	else
+		for (i = 0; i < buf->metametadata.cntr; i++) 
+			pr_debug("metametadata: cntrs[%d]:%u\n",
+					i, buf->metametadata.cntrs[i]);
 
 	for (i = 0; i <= buf->metametadata.num_encaps; i++) {
 		if (buf->frames[i].fragment_bit_offset != 0xffff)
-			pr_debug(
-				"fragment_bit_offset[%d]:{doff:%lu value:%u}\n",
-				i, offsetof(struct user_metadata,
-					frames[i].fragment_bit_offset),
-				buf->frames[i].fragment_bit_offset);
+			pr_debug("fragment_bit_offset[%d]:{doff:%lu value:%u}\n",
+					i, offsetof(struct user_metadata,
+						frames[i].fragment_bit_offset),
+					buf->frames[i].fragment_bit_offset);
 		if (buf->frames[i].src_ip_offset != 0xffff)
 			pr_debug("src_ip_offset[%d]:{doff:%lu value:%u}\n", i,
 					offsetof(struct user_metadata,
@@ -4905,24 +4907,30 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 					offsetof(struct user_metadata,
 						frames[i].gre_seqno),
 					buf->frames[i].gre_seqno);
-		if (buf->frames[i].vlan_cntr != 0xffff)
-			pr_debug("vlan_cntr[%d]:"
-					"{doff:%lu value:%u}\n", i,
+
+		if (buf->frames[i].vlan_cntr == 0xffff)
+			continue;
+
+		pr_debug("vlan_cntr[%d]:"
+				"{doff:%lu value:%u}\n", i,
+				offsetof(struct user_metadata,
+					frames[i].vlan_cntr),
+				buf->frames[i].vlan_cntr);
+
+		if (buf->frames[i].vlan_cntr > VLAN_COUNT_MAX) {
+			printk("FATAL error, cntr:%u >= Max:%u\n",
+					buf->frames[i].vlan_cntr,
+					VLAN_COUNT_MAX);
+			continue;
+		}
+
+		for (j = 0; j < buf->frames[i].vlan_cntr; j++)
+			if (buf->frames[i].vlantcis[j] != 0xffff)
+				pr_debug("vlantcis[%d][%d]:"
+					"{doff:%lu value:0x%02x}\n", i, j,
 					offsetof(struct user_metadata,
-						frames[i].vlan_cntr),
-					buf->frames[i].vlan_cntr);
-		if (buf->frames[i].vlantcis[0] != 0xffff)
-			pr_debug("vlantcis[%d][0]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlantcis[0]),
-					buf->frames[i].vlantcis[0]);
-		if (buf->frames[i].vlantcis[1] != 0xffff)
-			pr_debug("vlantcis[%d][1]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlantcis[1]),
-					buf->frames[i].vlantcis[1]);
+						frames[i].vlantcis[j]),
+					buf->frames[i].vlantcis[j]);
 	}
 }
 
