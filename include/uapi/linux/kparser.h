@@ -507,8 +507,6 @@ struct kparser_conf_cmd {
 
 		/* KPARSER_NS_CONDEXPRS */
 		struct kparser_conf_condexpr cond_conf;
-		struct kparser_conf_condexpr_table cond_table_conf;
-		struct kparser_conf_condexpr_tables cond_tables_conf;
 
 		/* KPARSER_NS_COUNTER */
 		struct kparser_conf_cntr cntr_conf;

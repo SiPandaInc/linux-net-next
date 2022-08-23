@@ -2153,6 +2153,7 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 			table->k_cntrs[i].glue.config.namespace_id;
 		objects[i].cntr_conf =
 			table->k_cntrs[i].glue.config.cntr_conf;
+		objects[i].cntr_conf.conf = cntrs_conf.cntrs[i];
 	}
 
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
@@ -2596,9 +2597,7 @@ static inline bool kparser_conf_node_convert(
 
 	plain_parse_node = node;
 	plain_parse_node->node_type = conf->type;
-	plain_parse_node->unknown_ret = KPARSER_STOP_UNKNOWN_PROTO;
-	/* TODO: CLI yet to handle signed int
-	 * conf->plain_parse_node.unknown_ret; */
+	plain_parse_node->unknown_ret = conf->plain_parse_node.unknown_ret;
 
 	plain_parse_node->proto_node.encap =
 		conf->plain_parse_node.proto_node.encap;
@@ -2949,6 +2948,9 @@ static bool kparser_create_proto_table_ent(
 	(*proto_table)->proto_table.entries[
 		(*proto_table)->proto_table.num_ents - 1].value =
 			arg->optional_value1;
+	(*proto_table)->proto_table.entries[
+		(*proto_table)->proto_table.num_ents - 1].encap =
+			arg->optional_value2;
 	(*proto_table)->proto_table.entries[
 		(*proto_table)->proto_table.num_ents - 1].node =
 			&kparsenode->parse_node.node; // TODO:
@@ -3788,7 +3790,13 @@ static bool kparser_create_flag_field_table_ent(
 		return false;
 	}
 
-	(*proto_table)->flag_fields.num_idx++;
+	if (arg->optional_value1 &&
+			((*proto_table)->flag_fields.num_idx <
+			 arg->optional_value1))
+		(*proto_table)->flag_fields.num_idx = arg->optional_value1 + 1;
+	else
+		(*proto_table)->flag_fields.num_idx++;
+
 	rcu_assign_pointer((*proto_table)->flag_fields.fields,
 			krealloc((*proto_table)->flag_fields.fields,
 			(*proto_table)->flag_fields.num_idx *
@@ -3805,8 +3813,7 @@ static bool kparser_create_flag_field_table_ent(
 		return false;
 	}
 
-	(*proto_table)->flag_fields.fields[
-		(*proto_table)->flag_fields.num_idx - 1] =
+	(*proto_table)->flag_fields.fields[arg->optional_value1] =
 			kflagent->flag_field;
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -4730,6 +4737,7 @@ new:
 #if 1
 	/* gre flags packet: (pkt no: 1)
 	 * https://www.cloudshark.org/captures/7be9ea02c984
+	 * gre_and_4over6.cap
 	 */
 static __u8 pktbuf[] = {
 	0xc5,0x00,0x00,0x00,0x82,0xc4,0x00,0x12,0x1e,0xf2,

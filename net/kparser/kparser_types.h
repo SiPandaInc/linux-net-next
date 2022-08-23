@@ -142,6 +142,7 @@ struct kparser_proto_node {
  */
 struct kparser_proto_table_entry {
 	int value;
+	bool encap;
 	const struct kparser_parse_node __rcu *node;
 };
 

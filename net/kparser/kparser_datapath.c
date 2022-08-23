@@ -35,7 +35,7 @@
 
 /* Lookup a type in a node table*/
 static const struct kparser_parse_node *lookup_node(int type,
-		const struct kparser_proto_table *table)
+		const struct kparser_proto_table *table, bool *isencap)
 {
 	struct kparser_proto_table_entry __rcu *entries;
 	int i, host_type;
@@ -52,9 +52,12 @@ static const struct kparser_parse_node *lookup_node(int type,
 			/* multi byte, need for endian swap */
 			host_type = ntohs(host_type);
 		}
-		pr_debug("%d: type:0x%04x 0x%04x\n", __LINE__, host_type, entries[i].value);
-		if (host_type == entries[i].value)
+		pr_debug("%d: type:0x%04x 0x%04x\n", __LINE__, host_type,
+				entries[i].value);
+		if (host_type == entries[i].value) {
+			*isencap = entries[i].encap;
 			return entries[i].node;
+		}
 	}
 
 	pr_debug("Ln:%d: type:0x%04x\n", __LINE__, type);
@@ -547,6 +550,7 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 	__u32 flags = 0;
 	int i, ret;
 
+
 	parse_flag_fields_node =
 		(struct kparser_parse_flag_fields_node *)parse_node;
 	proto_flag_fields_node =
@@ -578,6 +582,9 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 
 	_hdr += off;
 	hdr_offset += off;
+
+	pr_debug("Ln:%d flag_fields->num_idx:%lu\n",
+			__LINE__, flag_fields->num_idx);
 
 	for (i = 0; i < flag_fields->num_idx; i++) {
 		off = kparser_flag_fields_offset(i, flags, flag_fields);
@@ -679,6 +686,7 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 	__u32 frame_num = 0;
 	unsigned int flags;
 	ssize_t hdr_len;
+	bool currencap;
 
 	if (parser && parser->config.max_encaps > framescnt)
 		framescnt = parser->config.max_encaps;
@@ -739,6 +747,7 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 
 	do {
 		pr_debug("Ln:%d Parsing node:%s\n", __LINE__, parse_node->name);
+		currencap = false;
 
 		proto_node = &parse_node->proto_node;
 
@@ -804,46 +813,46 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 
 		/* Process node type */
 		switch (parse_node->node_type) {
-			case KPARSER_NODE_TYPE_PLAIN:
-			default:
-				break;
-			case KPARSER_NODE_TYPE_TLVS:
-				/* Process TLV nodes */
-				ctrl.ret = kparser_parse_tlvs(parser,
-						parse_node, flags,
-						_obj_ref, _hdr, hdr_len,
-						hdr_offset, _metadata,
-						_frame, &ctrl);
+		case KPARSER_NODE_TYPE_PLAIN:
+		default:
+			break;
+		case KPARSER_NODE_TYPE_TLVS:
+			/* Process TLV nodes */
+			ctrl.ret = kparser_parse_tlvs(parser,
+					parse_node, flags,
+					_obj_ref, _hdr, hdr_len,
+					hdr_offset, _metadata,
+					_frame, &ctrl);
 check_processing_return:
-				switch (ctrl.ret) {
-					case KPARSER_STOP_OKAY:
-						goto parser_out;
-					case KPARSER_OKAY:
-						break; /* Go to the next node */
-					case KPARSER_STOP_NODE_OKAY:
-						/* Note KPARSER_STOP_NODE_OKAY means that
-						 * post loop processing is not
-						 * performed
-						 */
-						ctrl.ret = KPARSER_OKAY;
-						goto after_post_processing;
-					case KPARSER_STOP_SUB_NODE_OKAY:
-						ctrl.ret = KPARSER_OKAY;
-						break; /* Just go to next node */
-					default:
-						goto parser_out;
-				}
-				break;
-			case KPARSER_NODE_TYPE_FLAG_FIELDS:
-				/* Process flag-fields */
-				ctrl.ret = kparser_parse_flag_fields(parser, parse_node,
-						flags, _obj_ref,
-						_hdr, hdr_len,
-						hdr_offset,
-						_metadata,
-						_frame,
-						&ctrl);
-				goto check_processing_return;
+			switch (ctrl.ret) {
+			case KPARSER_STOP_OKAY:
+				goto parser_out;
+			case KPARSER_OKAY:
+				break; /* Go to the next node */
+			case KPARSER_STOP_NODE_OKAY:
+				/* Note KPARSER_STOP_NODE_OKAY means that
+				 * post loop processing is not
+				 * performed
+				 */
+				ctrl.ret = KPARSER_OKAY;
+				goto after_post_processing;
+			case KPARSER_STOP_SUB_NODE_OKAY:
+				ctrl.ret = KPARSER_OKAY;
+				break; /* Just go to next node */
+			default:
+				goto parser_out;
+			}
+			break;
+		case KPARSER_NODE_TYPE_FLAG_FIELDS:
+			/* Process flag-fields */
+			ctrl.ret = kparser_parse_flag_fields(parser, parse_node,
+					flags, _obj_ref,
+					_hdr, hdr_len,
+					hdr_offset,
+					_metadata,
+					_frame,
+					&ctrl);
+			goto check_processing_return;
 		}
 
 after_post_processing:
@@ -855,49 +864,6 @@ after_post_processing:
 			/* Leaf parse node */
 			pr_debug("Fn:%s Ln:%d\n", __FUNCTION__, __LINE__);
 			goto parser_out;
-		}
-
-		/* TODO: should this block needs to be before leaf check?*/
-		if (proto_node->encap) {
-			/* Check is there is an atencap_node configured for
-			 * the parser
-			 */
-			atencap_node = rcu_dereference(parser->atencap_node);
-			if (atencap_node) {
-				ret = __kparser_run_exit_node(parser,
-						atencap_node, _obj_ref,
-						_hdr, hdr_offset, hdr_len,
-						_metadata, _frame, &ctrl,
-						flags);
-				if (ret != KPARSER_OKAY)
-					goto parser_out;
-			}
-
-			/* New encapsulation layer. Check against
-			 * number of encap layers allowed and also
-			 * if we need a new metadata frame.
-			 */
-			if (++ctrl.encap_levels > parser->config.max_encaps) {
-				ctrl.ret = KPARSER_STOP_ENCAP_DEPTH;
-				goto parser_out;
-			}
-
-			if (frame_num < parser->config.max_frames) {
-				_frame += parser->config.frame_size;
-				frame_num++;
-			}
-
-			/* Check is parser has counters that need to be reset
-			 * at encap
-			 */
-			if (parser->cntrs) {
-				for (i = 0; i < KPARSER_CNTR_NUM_CNTRS;
-						i++) {
-					if (parser->cntrs_conf.cntrs[i].
-							reset_on_encap)
-						cntrs->cntr[i] = 0;
-				}
-			}
 		}
 
 		if (proto_table) {
@@ -932,7 +898,7 @@ after_post_processing:
 						parse_node->name);
 				// TODO: add encap and overlay
 				next_parse_node = lookup_node(type,
-						proto_table);
+						proto_table, &currencap);
 
 				if (next_parse_node)
 					goto found_next;
@@ -967,6 +933,48 @@ found_next:
 		parse_node = next_parse_node;
 
 		// TODO: handle encap here, for both current table or node
+		if (currencap || proto_node->encap) {
+			/* Check is there is an atencap_node configured for
+			 * the parser
+			 */
+			atencap_node = rcu_dereference(parser->atencap_node);
+			if (atencap_node) {
+				ret = __kparser_run_exit_node(parser,
+						atencap_node, _obj_ref,
+						_hdr, hdr_offset, hdr_len,
+						_metadata, _frame, &ctrl,
+						flags);
+				if (ret != KPARSER_OKAY)
+					goto parser_out;
+			}
+
+			/* New encapsulation layer. Check against
+			 * number of encap layers allowed and also
+			 * if we need a new metadata frame.
+			 */
+			if (++ctrl.encap_levels > parser->config.max_encaps) {
+				ctrl.ret = KPARSER_STOP_ENCAP_DEPTH;
+				goto parser_out;
+			}
+
+			if (frame_num < parser->config.max_frames) {
+				_frame += parser->config.frame_size;
+				frame_num++;
+			}
+
+			/* Check if parser has counters that need to be reset
+			 * at encap
+			 */
+			if (parser->cntrs) {
+				for (i = 0; i < KPARSER_CNTR_NUM_CNTRS;
+						i++) {
+					if (parser->cntrs_conf.cntrs[i].
+							reset_on_encap)
+						cntrs->cntr[i] = 0;
+				}
+			}
+		}
+
 	} while (1);
 
 parser_out:
