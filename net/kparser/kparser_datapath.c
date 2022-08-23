@@ -38,29 +38,26 @@ static const struct kparser_parse_node *lookup_node(int type,
 		const struct kparser_proto_table *table, bool *isencap)
 {
 	struct kparser_proto_table_entry __rcu *entries;
-	int i, host_type;
+	int i;
 
 	if (!table)
 		return NULL;
 
-	pr_debug("Ln:%d: ents:%d\n", __LINE__, table->num_ents);
+	pr_debug("Ln:%d: type:0x%04x ents:%d\n",
+			__LINE__, type, table->num_ents);
 
 	for (i = 0; i < table->num_ents; i++) {
 		entries = rcu_dereference(table->entries); 
-		host_type = type;
-		if (entries[i].value > 0xff) {
-			/* multi byte, need for endian swap */
-			host_type = ntohs(host_type);
-		}
-		pr_debug("%d: type:0x%04x 0x%04x\n", __LINE__, host_type,
-				entries[i].value);
-		if (host_type == entries[i].value) {
+		pr_debug("Ln:%d: type:0x%04x evalue:0x%04x\n",
+				__LINE__, type, entries[i].value);
+		if (type == entries[i].value) {
+			*isencap = entries[i].encap;
+			return entries[i].node;
+		} else if (ntohs(type) == entries[i].value) {
 			*isencap = entries[i].encap;
 			return entries[i].node;
 		}
 	}
-
-	pr_debug("Ln:%d: type:0x%04x\n", __LINE__, type);
 
 	return NULL;
 }
@@ -539,7 +536,8 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 		void *_hdr, size_t hdr_len,
 		size_t hdr_offset, void *_metadata,
 		void *_frame,
-		const struct kparser_ctrl_data *ctrl)
+		const struct kparser_ctrl_data *ctrl,
+		const void **nxt_hdr_off)
 {
 	const struct kparser_parse_flag_fields_node *parse_flag_fields_node;
 	const struct kparser_proto_flag_fields_node *proto_flag_fields_node;
@@ -550,6 +548,7 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 	__u32 flags = 0;
 	int i, ret;
 
+	*nxt_hdr_off = _hdr;
 
 	parse_flag_fields_node =
 		(struct kparser_parse_flag_fields_node *)parse_node;
@@ -582,6 +581,7 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 
 	_hdr += off;
 	hdr_offset += off;
+	*nxt_hdr_off = _hdr;
 
 	pr_debug("Ln:%d flag_fields->num_idx:%lu\n",
 			__LINE__, flag_fields->num_idx);
@@ -592,6 +592,7 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 		if (off < 0)
 			continue;
 
+		(*nxt_hdr_off) += flag_fields->fields[i].size;
 		/* Flag field is present, try to find in the parse node
 		 * table based on index in proto flag-fields
 		 */
@@ -680,6 +681,12 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 	const struct kparser_proto_table *proto_table;
 	const struct kparser_proto_node *proto_node;
 	struct kparser_counters *cntrs;
+	/* TODO: currently there is a bug in hdr len calculation for flag fields
+	 * For flag fields, we need something line gre_v1_len_check, which
+	 * looks like currently not there for parameterized len version.
+	 * Hence we will need to internally increment the _hdr for flagfields.
+	 */
+	const void *nxt_hdr_off = NULL;
 	void *_frame, *_obj_ref = NULL;
 	const void *base_hdr = _hdr;
 	ssize_t hdr_offset = 0;
@@ -748,6 +755,7 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 	do {
 		pr_debug("Ln:%d Parsing node:%s\n", __LINE__, parse_node->name);
 		currencap = false;
+		nxt_hdr_off = NULL;
 
 		proto_node = &parse_node->proto_node;
 
@@ -851,7 +859,7 @@ check_processing_return:
 					hdr_offset,
 					_metadata,
 					_frame,
-					&ctrl);
+					&ctrl, &nxt_hdr_off);
 			goto check_processing_return;
 		}
 
@@ -926,6 +934,8 @@ found_next:
 		// TODO: handle table's overlay config here
 		if (!proto_node->overlay) {
 			/* Move over current header */
+			if (nxt_hdr_off)
+				hdr_len = nxt_hdr_off - _hdr;
 			_hdr += hdr_len;
 			parse_len -= hdr_len;
 		}

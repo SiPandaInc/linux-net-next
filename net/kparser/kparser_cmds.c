@@ -4847,6 +4847,8 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 					i, buf->metametadata.cntrs[i]);
 
 	for (i = 0; i <= buf->metametadata.num_encaps; i++) {
+		pr_debug("dumping metadata for encap layer:%d\n", i);
+
 		if (buf->frames[i].fragment_bit_offset != 0xffff)
 			pr_debug("fragment_bit_offset[%d]:{doff:%lu value:%u}\n",
 					i, offsetof(struct user_metadata,
