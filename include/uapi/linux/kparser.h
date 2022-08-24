@@ -144,6 +144,7 @@ struct kparser_condexpr_expr {
 	__u8 length;
 	__u32 mask;
 	__u32 value;
+        __u8 right_shift;
 };
 
 struct kparser_conf_condexpr {

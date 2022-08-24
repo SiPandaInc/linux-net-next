@@ -53,7 +53,7 @@ struct kparser_condexpr_table {
 	int default_fail;
 	enum kparser_condexpr_types type;
 	unsigned int num_ents;
-	struct kparser_condexpr_expr __rcu *entries;
+	const struct kparser_condexpr_expr __rcu **entries;
 };
 
 /* A table of tables of conditional expressions. This is used to create more

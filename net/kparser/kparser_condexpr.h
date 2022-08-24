@@ -39,10 +39,14 @@ static inline bool kparser_expr_evaluate(
 {
 	__u64 val;
 
+	pr_debug("{%s:%d}: soff:%u len:%u mask:%04x type:%d rs:%d\n",
+			__FUNCTION__, __LINE__, expr->src_off,
+			expr->length, expr->mask, expr->type,
+			expr->right_shift);
 	__kparser_metadata_bytes_extract(hdr + expr->src_off, (__u8 *)&val,
-					expr->length, 0);
+					expr->length, false);
 
-	val &= expr->mask;
+	val = (val & expr->mask) >> expr->right_shift;
 
 	switch (expr->type) {
 	case KPARSER_CONDEXPR_TYPE_EQUAL:

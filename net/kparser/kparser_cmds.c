@@ -708,7 +708,7 @@ static void kparser_dump_cond_table(const struct kparser_condexpr_table *obj)
 		goto done;
 
 	for (i = 0; i < obj->num_ents; i++)
-		kparser_dump_cond_expr(&obj->entries[i]);
+		kparser_dump_cond_expr(obj->entries[i]);
 
 done:
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
@@ -1340,7 +1340,7 @@ static bool kparser_create_cond_table_ent(
 	rcu_assign_pointer((*proto_table)->table.entries,
 			krealloc((*proto_table)->table.entries,
 			(*proto_table)->table.num_ents *
-			sizeof(struct kparser_condexpr_expr),
+			sizeof(struct kparser_condexpr_expr *),
 			GFP_KERNEL | ___GFP_ZERO));
 	if (!(*proto_table)->table.entries) {
 		rsp->op_ret_code = ENOMEM;
@@ -1354,8 +1354,7 @@ static bool kparser_create_cond_table_ent(
 	}
 
 	(*proto_table)->table.entries[
-		(*proto_table)->table.num_ents - 1] =
-			kcondent->expr;
+		(*proto_table)->table.num_ents - 1] = &kcondent->expr;
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 	return true;
@@ -1539,7 +1538,7 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 		if (!proto_table->table.entries)
 			continue;
 		kcondent = container_of(
-				&proto_table->table.entries[i],
+				proto_table->table.entries[i],
 				struct kparser_glue_condexpr_expr, expr);
 		objects[i].table_conf.elem_key= kcondent->glue.key;
 	}
