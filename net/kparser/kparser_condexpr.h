@@ -39,7 +39,7 @@ static inline bool kparser_expr_evaluate(
 {
 	__u64 val;
 
-	pr_debug("{%s:%d}: soff:%u len:%u mask:%04x type:%d rs:%d\n",
+	pr_debug("{%s:%d}: soff:%u len:%u mask:%x type:%d rs:%d\n",
 			__FUNCTION__, __LINE__, expr->src_off,
 			expr->length, expr->mask, expr->type,
 			expr->right_shift);
@@ -47,6 +47,10 @@ static inline bool kparser_expr_evaluate(
 					expr->length, false);
 
 	val = (val & expr->mask) >> expr->right_shift;
+
+	pr_debug("{%s:%d}: type:%d val:%llx expr->value:%u\n",
+			__FUNCTION__, __LINE__,
+			expr->type, val, expr->value);
 
 	switch (expr->type) {
 	case KPARSER_CONDEXPR_TYPE_EQUAL:

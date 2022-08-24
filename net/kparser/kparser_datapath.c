@@ -202,6 +202,9 @@ static int eval_cond_exprs(const struct kparser_condexpr_tables *tables,
 		const struct kparser_condexpr_table *table =
 			tables->entries[i];
 
+		pr_debug("{%s:%d}: type:%d err:%d\n", __FUNCTION__, __LINE__,
+				table->type, table->default_fail);
+
 		switch (table->type) {
 			case KPARSER_CONDEXPR_TYPE_OR:
 				res = eval_cond_exprs_or_table(table, _hdr);
@@ -210,8 +213,13 @@ static int eval_cond_exprs(const struct kparser_condexpr_tables *tables,
 				res = eval_cond_exprs_and_table(table, _hdr);
 				break;
 		}
-		if (!res)
+		if (!res) {
+			pr_debug("{%s:%d}: i:%d type:%d err:%d\n",
+					__FUNCTION__, __LINE__,
+					i, table->type, table->default_fail);
+
 			return table->default_fail;
+		}
 	}
 
 	return KPARSER_OKAY;
