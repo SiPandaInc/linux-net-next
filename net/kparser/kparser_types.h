@@ -462,7 +462,7 @@ struct kparser_parse_flag_field_node {
  *	node: associated TLV parse structure for the type
  */
 struct kparser_proto_flag_fields_table_entry {
-	int index;
+	__u32 flag;
 	const struct kparser_parse_flag_field_node __rcu *node;
 };
 
@@ -490,14 +490,15 @@ static inline ssize_t __kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
 		const struct kparser_flag_fields *flag_fields)
 {
 	ssize_t offset = 0;
-	__u32 mask;
+	__u32 mask, flag;
 	int i;
 
 	for (i = 0; i < targ_idx; i++) {
-		mask = flag_fields->fields[i].mask ? :
-			flag_fields->fields[i].flag;
-
-		if ((flags & mask) == flag_fields->fields[i].flag)
+		flag = flag_fields->fields[i].flag;
+		if (flag_fields->fields[i].endian)
+				flag = ntohs(flag);
+		mask = flag_fields->fields[i].mask ? : flag;
+		if ((flags & mask) == flag)
 			offset += flag_fields->fields[i].size;
 	}
 
@@ -508,11 +509,13 @@ static inline ssize_t __kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
 static inline ssize_t kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
 		const struct kparser_flag_fields *flag_fields)
 {
-	__u32 mask;
+	__u32 mask, flag;
 
-	mask = flag_fields->fields[targ_idx].mask ? :
-		flag_fields->fields[targ_idx].flag;
-	if ((flags & mask) != flag_fields->fields[targ_idx].flag) {
+	flag = flag_fields->fields[targ_idx].flag;
+	if (flag_fields->fields[targ_idx].endian)
+			flag = ntohs(flag);
+	mask = flag_fields->fields[targ_idx].mask ? : flag;
+	if ((flags & mask) != flag) {
 		/* Flag not set */
 		return -1;
 	}

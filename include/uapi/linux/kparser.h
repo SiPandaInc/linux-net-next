@@ -12,9 +12,9 @@
 #define BITS_IN_U32	(sizeof(__u32) * BITS_IN_BYTE)
 
 /* TODO: find these from linux header file, maybe bitmasks.h */
-#define setbit(A,k)	(A[(k)/BITS_IN_U32] |= (1 << ((k) % BITS_IN_U32)))
-#define clearbit(A,k)	(A[(k)/BITS_IN_U32] &= ~(1 << ((k) % BITS_IN_U32)))
-#define testbit(A,k)    (1 & (A[(k)/BITS_IN_U32] >> ((k) % BITS_IN_U32)))
+#define kparsersetbit(A,k) (A[(k)/BITS_IN_U32] |= (1 << ((k) % BITS_IN_U32)))
+#define kparserclearbit(A,k) (A[(k)/BITS_IN_U32] &= ~(1 << ((k) % BITS_IN_U32)))
+#define kparsertestbit(A,k) (1 & (A[(k)/BITS_IN_U32] >> ((k) % BITS_IN_U32)))
 
 /* *********************** NETLINK_GENERIC *********************** */
 #define KPARSER_GENL_NAME		"kParser"
@@ -144,7 +144,6 @@ struct kparser_condexpr_expr {
 	__u8 length;
 	__u32 mask;
 	__u32 value;
-        __u8 right_shift;
 };
 
 struct kparser_conf_condexpr {
@@ -228,6 +227,7 @@ struct kparser_conf_metadata {
 	size_t doff;
 	size_t len;
 	size_t add_off;
+	struct kparser_hkey counterkey;
 };
 
 /* *********************** metadata list/table *********************** */
@@ -430,6 +430,7 @@ struct kparser_conf_node_parse_tlv {
  */
 struct kparser_flag_field {
 	__u32 flag;
+	__u32 networkflag;
 	__u32 mask;
 	size_t size;
 	bool endian;
@@ -465,8 +466,8 @@ struct kparser_conf_table {
 /* Flags for parser configuration */
 #define KPARSER_F_DEBUG		(1 << 0)
 
-#define KPARSER_MAX_NODES	1
-#define KPARSER_MAX_ENCAPS	4
+#define KPARSER_MAX_NODES	10
+#define KPARSER_MAX_ENCAPS	1
 #define KPARSER_MAX_FRAMES	255 
 
 /* Configuration for a KPARSER parser
@@ -499,6 +500,7 @@ struct kparser_conf_parser {
 };
 
 /* *********************** CLI config interface *********************** */
+#define KPARSER_CONFIG_MAX_KEYS			128 
 struct kparser_conf_cmd {
 	enum kparser_global_namespace_ids namespace_id;
 	union {

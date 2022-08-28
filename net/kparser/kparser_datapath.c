@@ -81,15 +81,20 @@ static const struct kparser_parse_tlv_node *lookup_tlv_node(int type,
 }
 
 /* Lookup a flag-fields index in a protocol node flag-fields table */
-static const struct kparser_parse_flag_field_node *lookup_flag_field_node(int idx,
+static const struct kparser_parse_flag_field_node *lookup_flag_field_node(
+		__u32 flag,
 		const struct kparser_proto_flag_fields_table
 		*table)
 {
 	int i;
 
-	for (i = 0; i < table->num_ents; i++)
-		if (idx == table->entries[i].index)
+	for (i = 0; i < table->num_ents; i++) {
+		pr_debug("{%s:%d}:flag:%x eflag[%d]:%x\n",
+				__FUNCTION__, __LINE__, flag, i,
+				table->entries[i].flag);
+		if (flag == table->entries[i].flag)
 			return table->entries[i].node;
+	}
 
 	return NULL;
 }
@@ -104,6 +109,9 @@ static int extract_metadata_table(const struct kparser_parser *parser,
 {
 	struct kparser_metadata_extract *entries;
 	int i, ret;
+
+	pr_debug("{%s:%d}: cnt:%d\n", __FUNCTION__, __LINE__,
+			metadata_table->num_ents);
 
 	for (i = 0; i < metadata_table->num_ents; i++) {
 		entries = rcu_dereference(metadata_table->entries);
@@ -452,12 +460,14 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 			if (!tlv_len || len < tlv_len)
 				return loop_limit_exceeded(
 						KPARSER_STOP_TLV_LENGTH,
-						parse_tlvs_node->config.disp_limit_exceed);
+						parse_tlvs_node->config.
+						disp_limit_exceed);
 
 			if (tlv_len < proto_tlvs_node->min_len)
 				return loop_limit_exceeded(
 						KPARSER_STOP_TLV_LENGTH,
-						parse_tlvs_node->config.disp_limit_exceed);
+						parse_tlvs_node->config.
+						disp_limit_exceed);
 		} while (0);
 
 		type = eval_parameterized_next_proto(
@@ -470,10 +480,12 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 			/* N byte padding, just advance */
 			if ((pad_len += tlv_len) >
 					parse_tlvs_node->config.max_plen ||
-					++consec_pad > parse_tlvs_node->config.max_c_pad)
+					++consec_pad >
+					parse_tlvs_node->config.max_c_pad)
 				return loop_limit_exceeded(
 						KPARSER_STOP_TLV_PADDING,
-						parse_tlvs_node->config.disp_limit_exceed);
+						parse_tlvs_node->config.
+						disp_limit_exceed);
 			goto next_tlv;
 		}
 
@@ -496,9 +508,9 @@ parse_one_tlv:
 							parse_tlvs_node->
 							config.max_c_pad)
 						return loop_limit_exceeded(
-								KPARSER_STOP_TLV_PADDING,
-								parse_tlvs_node->config.
-								disp_limit_exceed);
+							KPARSER_STOP_TLV_PADDING,
+							parse_tlvs_node->config.
+							disp_limit_exceed);
 				} else if (++non_pad_cnt >
 						parse_tlvs_node->
 						config.max_non) {
@@ -546,25 +558,23 @@ next_tlv:
 	return KPARSER_OKAY;
 }
 
-static int kparser_parse_flag_fields(const struct kparser_parser *parser,
+static ssize_t kparser_parse_flag_fields(const struct kparser_parser *parser,
 		const struct kparser_parse_node *parse_node,
 		unsigned int pflags, void *_obj_ref,
 		void *_hdr, size_t hdr_len,
 		size_t hdr_offset, void *_metadata,
 		void *_frame,
 		const struct kparser_ctrl_data *ctrl,
-		const void **nxt_hdr_off)
+		size_t parse_len)
 {
 	const struct kparser_parse_flag_fields_node *parse_flag_fields_node;
 	const struct kparser_proto_flag_fields_node *proto_flag_fields_node;
 	const struct kparser_parse_flag_field_node *parse_flag_field_node;
 	const struct kparser_metadata_table *metadata_table;
+	ssize_t off = -1, field_len, field_offset, res = 0;
 	const struct kparser_flag_fields *flag_fields;
-	ssize_t off = -1, field_len, field_offset;
 	__u32 flags = 0;
 	int i, ret;
-
-	*nxt_hdr_off = _hdr;
 
 	parse_flag_fields_node =
 		(struct kparser_parse_flag_fields_node *)parse_node;
@@ -595,24 +605,32 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 	if (off < 0)
 		return off;
 
+	if (hdr_offset + off > parse_len)
+		return KPARSER_STOP_LENGTH;
 	_hdr += off;
 	hdr_offset += off;
-	*nxt_hdr_off = _hdr;
 
 	pr_debug("{%s:%d}: flag_fields->num_idx:%lu\n", __FUNCTION__,
 			__LINE__, flag_fields->num_idx);
 
 	for (i = 0; i < flag_fields->num_idx; i++) {
 		off = kparser_flag_fields_offset(i, flags, flag_fields);
-		pr_debug("{%s:%d}: off:%ld\n", __FUNCTION__, __LINE__, off);
+		pr_debug("{%s:%d}: off:%ld pflag:%x flag:%x\n",
+				__FUNCTION__, __LINE__, off, flags,
+				flag_fields->fields[i].flag);
 		if (off < 0)
 			continue;
 
-		(*nxt_hdr_off) += flag_fields->fields[i].size;
+		if (hdr_offset + flag_fields->fields[i].size > parse_len)
+			return KPARSER_STOP_LENGTH;
+
+		res += flag_fields->fields[i].size;
+
 		/* Flag field is present, try to find in the parse node
 		 * table based on index in proto flag-fields
 		 */
-		parse_flag_field_node = lookup_flag_field_node(i,
+		parse_flag_field_node = lookup_flag_field_node(
+				flag_fields->fields[i].flag,
 				parse_flag_fields_node->
 				flag_fields_proto_table);
 		if (parse_flag_field_node) {
@@ -622,6 +640,9 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 
 			field_len = flag_fields->fields[i].size;
 			field_offset = hdr_offset + off;
+
+			if (field_offset > parse_len)
+				return KPARSER_STOP_LENGTH;
 
 			if (pflags & KPARSER_F_DEBUG)
 				pr_debug("kParser parsing flag-field %s\n",
@@ -645,7 +666,7 @@ static int kparser_parse_flag_fields(const struct kparser_parser *parser,
 		}
 	}
 
-	return KPARSER_OKAY;
+	return res;
 }
 
 static int __kparser_run_exit_node(const struct kparser_parser *parser,
@@ -697,18 +718,12 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 	const struct kparser_proto_table *proto_table;
 	const struct kparser_proto_node *proto_node;
 	struct kparser_counters *cntrs;
-	/* TODO: currently there is a bug in hdr len calculation for flag fields
-	 * For flag fields, we need something line gre_v1_len_check, which
-	 * looks like currently not there for parameterized len version.
-	 * Hence we will need to internally increment the _hdr for flagfields.
-	 */
-	const void *nxt_hdr_off = NULL;
 	void *_frame, *_obj_ref = NULL;
 	const void *base_hdr = _hdr;
 	ssize_t hdr_offset = 0;
+	ssize_t hdr_len, res;
 	__u32 frame_num = 0;
 	unsigned int flags;
-	ssize_t hdr_len;
 	bool currencap;
 
 	if (parser && parser->config.max_encaps > framescnt)
@@ -772,7 +787,6 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 		pr_debug("{%s:%d}: Parsing node:%s\n",
 				__FUNCTION__, __LINE__, parse_node->name);
 		currencap = false;
-		nxt_hdr_off = NULL;
 
 		proto_node = &parse_node->proto_node;
 
@@ -871,14 +885,18 @@ check_processing_return:
 			break;
 		case KPARSER_NODE_TYPE_FLAG_FIELDS:
 			/* Process flag-fields */
-			ctrl.ret = kparser_parse_flag_fields(parser, parse_node,
+			res = kparser_parse_flag_fields(parser, parse_node,
 					flags, _obj_ref,
 					_hdr, hdr_len,
 					hdr_offset,
 					_metadata,
 					_frame,
-					&ctrl, &nxt_hdr_off);
-			goto check_processing_return;
+					&ctrl, parse_len);
+			if (res < 0) {
+				ctrl.ret = res;
+				goto check_processing_return;
+			}
+			hdr_len += res;
 		}
 
 after_post_processing:
@@ -948,8 +966,6 @@ found_next:
 		// TODO: handle table's overlay config here
 		if (!proto_node->overlay) {
 			/* Move over current header */
-			if (nxt_hdr_off)
-				hdr_len = nxt_hdr_off - _hdr;
 			_hdr += hdr_len;
 			parse_len -= hdr_len;
 		}

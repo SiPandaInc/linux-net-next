@@ -39,14 +39,13 @@ static inline bool kparser_expr_evaluate(
 {
 	__u64 val;
 
-	pr_debug("{%s:%d}: soff:%u len:%u mask:%x type:%d rs:%d\n",
+	pr_debug("{%s:%d}: soff:%u len:%u mask:%x type:%d\n",
 			__FUNCTION__, __LINE__, expr->src_off,
-			expr->length, expr->mask, expr->type,
-			expr->right_shift);
+			expr->length, expr->mask, expr->type);
 	__kparser_metadata_bytes_extract(hdr + expr->src_off, (__u8 *)&val,
 					expr->length, false);
 
-	val = (val & expr->mask) >> expr->right_shift;
+	val &= expr->mask;
 
 	pr_debug("{%s:%d}: type:%d val:%llx expr->value:%u\n",
 			__FUNCTION__, __LINE__,

@@ -90,6 +90,7 @@ struct kparser_glue {
 	struct rhash_head ht_node_id;
 	struct rhash_head ht_node_name;
 	struct kref refcount;
+	struct kparser_list bookkeeperctx;
 	struct kparser_conf_cmd config;
 };
 

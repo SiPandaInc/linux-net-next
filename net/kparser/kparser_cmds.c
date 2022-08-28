@@ -26,6 +26,7 @@
 #include "kparser.h"
 #include <linux/rhashtable.h>
 #include <linux/slab.h>
+#include <linux/sort.h>
 
 static DEFINE_MUTEX(kparser_config_lock);
 
@@ -100,8 +101,8 @@ kparser_obj_create_update
 	kparser_create_cond_tables,
 	kparser_create_counter,
 	kparser_create_counter_table,
-	kparser_create_metalist,
 	kparser_create_metadata,
+	kparser_create_metalist,
 	kparser_create_parse_node,
 	kparser_create_proto_table,
 	kparser_create_parse_tlv_node,
@@ -119,8 +120,8 @@ kparser_obj_read_del
 	kparser_read_cond_tables,
 	kparser_read_counter,
 	kparser_read_counter_table,
-	kparser_read_metalist,
 	kparser_read_metadata,
+	kparser_read_metalist,
 	kparser_read_parse_node,
 	kparser_read_proto_table,
 	kparser_read_parse_tlv_node,
@@ -374,6 +375,7 @@ static struct kparser_mod_namespaces *g_mod_namespaces[] =
 };
 
 static struct kparser_cntrs_conf cntrs_conf = {};
+static __u8 cntrs_conf_idx = 0;
 
 extern void rhashtable_destroy(struct rhashtable *ht);
 extern void rhashtable_free_and_destroy(struct rhashtable *ht,
@@ -386,9 +388,9 @@ static inline __u16 allocate_id(__u16 id, int *bv, size_t bvsize)
 
 	if (id != KPARSER_INVALID_ID) {
 		// try to allocate passed id
-		if (!testbit(bv, id)) // already allocated, conflict
+		if (!kparsertestbit(bv, id)) // already allocated, conflict
 			return KPARSER_INVALID_ID;
-		clearbit(bv, id);
+		kparserclearbit(bv, id);
 		return id;
 	}
 
@@ -401,7 +403,7 @@ static inline __u16 allocate_id(__u16 id, int *bv, size_t bvsize)
 			if (id) {
 				id--;
 				id += (i * BITS_IN_U32);
-				clearbit(bv, id);
+				kparserclearbit(bv, id);
 				return (id + KPARSER_KMOD_ID_MIN);
 			}
 			printk("failed here:%d:%d\n", id, i);
@@ -960,8 +962,8 @@ static void kparser_dump_proto_flag_fields_table(
 		goto done;
 
 	for (i = 0; i < obj->num_ents; i++) {
-		pr_debug("proto_flag_fields_table_entry_index:%d\n",
-			obj->entries[i].index);
+		pr_debug("proto_flag_fields_table_entry_flag:%x\n",
+			obj->entries[i].flag);
 		kparser_dump_parse_flag_field_node(obj->entries[i].node);
 	}
 done:
@@ -1834,12 +1836,12 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 		goto done;
 	}
 
-	if (arg->conf.index >= KPARSER_CNTR_NUM_CNTRS) {
+	if (cntrs_conf_idx >= KPARSER_CNTR_NUM_CNTRS) {
 		(*rsp)->op_ret_code = EINVAL;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
 				"%s: counter index %d can not be >= %d",
-				__FUNCTION__, arg->conf.index,
+				__FUNCTION__, cntrs_conf_idx,
 				KPARSER_CNTR_NUM_CNTRS);
 		goto done;
 	}
@@ -1890,8 +1892,11 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 	kref_init(&kcntr->glue.refcount);
 
 	kcntr->counter_cnf = arg->conf;
+	kcntr->counter_cnf.index = cntrs_conf_idx;
+	
+	cntrs_conf.cntrs[cntrs_conf_idx] = kcntr->counter_cnf;
 
-	cntrs_conf.cntrs[arg->conf.index] = arg->conf;
+	cntrs_conf_idx++;
 
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
@@ -2169,10 +2174,11 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len)
 {
-	const struct kparser_conf_metadata *arg;
 	struct kparser_glue_metadata_extract *kmde = NULL;
+	const struct kparser_conf_metadata *arg;
+	struct kparser_glue_counter *kcntr;
 	struct kparser_hkey key;
-	int rc;
+	int rc, cntridx = 0;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -2211,6 +2217,20 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		goto done;
 	}
 
+	if (arg->type == KPARSER_METADATA_COUNTER) {
+		kcntr = kparser_namespace_lookup(KPARSER_NS_COUNTER,
+				&arg->counterkey);
+		if (!kcntr) {
+			(*rsp)->op_ret_code = ENOENT;
+			(void) snprintf((*rsp)->err_str_buf,
+					sizeof((*rsp)->err_str_buf),
+					"%s: Counter object key not found",
+					__FUNCTION__);
+			goto done;
+		}
+		cntridx = kcntr->counter_cnf.index + 1;
+	}
+
 	kmde = kzalloc(sizeof(*kmde), GFP_KERNEL);
 	if (!kmde) {
 		(*rsp)->op_ret_code = ENOMEM;
@@ -2239,7 +2259,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 	kmde->glue.config.md_conf.key = key;
 	kref_init(&kmde->glue.refcount);
 
-	if (!kparser_metadata_convert(arg, &kmde->mde)) {
+	if (!kparser_metadata_convert(arg, &kmde->mde, cntridx)) {
 		(*rsp)->op_ret_code = EINVAL;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
@@ -3682,9 +3702,6 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 	kref_init(&kobj->glue.refcount);
 
 	kobj->flag_field = arg->conf;
-	/*TODO: ntohl causing issues with 16 bit flags */
-	if (arg->conf.endian)
-		kobj->flag_field.flag = ntohs(kobj->flag_field.flag); 
 
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
@@ -3754,12 +3771,26 @@ done:
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD);
 }
 
+static int compare(const void *lhs, const void *rhs)
+{
+	const struct kparser_flag_field *lhs_flag = lhs;
+	const struct kparser_flag_field *rhs_flag = rhs;
+
+	pr_debug("lflag:%x rflag:%x\n", lhs_flag->flag, rhs_flag->flag);
+
+	if (lhs_flag->flag < rhs_flag->flag) return -1;
+	if (lhs_flag->flag > rhs_flag->flag) return 1;
+
+	return 0;
+}
+
 static bool kparser_create_flag_field_table_ent(
 		const struct kparser_conf_table *arg,
 		struct kparser_glue_flag_fields **proto_table,
 		struct kparser_cmd_rsp_hdr *rsp)
 {
 	const struct kparser_glue_flag_field *kflagent;
+	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -3789,12 +3820,7 @@ static bool kparser_create_flag_field_table_ent(
 		return false;
 	}
 
-	if (arg->optional_value1 &&
-			((*proto_table)->flag_fields.num_idx <
-			 arg->optional_value1))
-		(*proto_table)->flag_fields.num_idx = arg->optional_value1 + 1;
-	else
-		(*proto_table)->flag_fields.num_idx++;
+	(*proto_table)->flag_fields.num_idx++;
 
 	rcu_assign_pointer((*proto_table)->flag_fields.fields,
 			krealloc((*proto_table)->flag_fields.fields,
@@ -3812,8 +3838,17 @@ static bool kparser_create_flag_field_table_ent(
 		return false;
 	}
 
-	(*proto_table)->flag_fields.fields[arg->optional_value1] =
-			kflagent->flag_field;
+	(*proto_table)->flag_fields.fields[
+		(*proto_table)->flag_fields.num_idx - 1] = kflagent->flag_field;
+
+	sort((*proto_table)->flag_fields.fields,
+			(*proto_table)->flag_fields.num_idx, 
+			sizeof(struct kparser_flag_field),
+			&compare, NULL);
+
+	for (i = 0; i < (*proto_table)->flag_fields.num_idx; i++)
+		pr_debug("List[%d]:%x\n",
+				i, (*proto_table)->flag_fields.fields[i].flag);
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 	return true;
@@ -3986,6 +4021,7 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 			proto_table->glue.config.namespace_id;
 		objects[i].table_conf =
 			proto_table->glue.config.table_conf;
+		objects[i].table_conf.optional_value1 = i;
 		if (!proto_table->flag_fields.fields)
 			continue;
 		kflagent = container_of(
@@ -4241,7 +4277,7 @@ static bool kparser_create_flag_field_proto_table_ent(
 	}
 
 	(*proto_table)->flags_proto_table.entries[
-		(*proto_table)->flags_proto_table.num_ents - 1].index =
+		(*proto_table)->flags_proto_table.num_ents - 1].flag =
 			arg->optional_value1;
 	(*proto_table)->flags_proto_table.entries[
 		(*proto_table)->flags_proto_table.num_ents - 1].node =
@@ -4422,7 +4458,7 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 		if (!proto_table->flags_proto_table.entries[i].node)
 			continue;
 		objects[i].table_conf.optional_value1 =
-			proto_table->flags_proto_table.entries[i].index;
+			proto_table->flags_proto_table.entries[i].flag;
 		parse_node = container_of(
 				proto_table->flags_proto_table.entries[i].node,
 				struct kparser_glue_flag_field_node,
@@ -4647,7 +4683,7 @@ static __u8 pktbuf[] = {
 	0x00,0x0e,0x04,0x69,0x78,0x69,0x61,0x04,0x69,0x78,0x69,0x61
 };
 #endif
-#if 0
+#if 1
 /* From sipada/data/pcaps/tcp_sack.pcap
  * packet no: 33
  */
@@ -4733,7 +4769,7 @@ new:
 
 */
 #endif
-#if 1
+#if 0
 	/* gre flags packet: (pkt no: 1)
 	 * https://www.cloudshark.org/captures/7be9ea02c984
 	 * gre_and_4over6.cap
@@ -4781,6 +4817,7 @@ static __u8 pktbuf[] = {
 */
 #endif
 
+#if 0
 #define MAX_ENCAP 3
 #define CNTR_ARRAY_SIZE 2
 
@@ -4809,6 +4846,7 @@ struct user_frame {
 	__u32 gre_seqno;
 	__u16 vlan_cntr;
 	__u16 vlantcis[VLAN_COUNT_MAX];
+	__u16 ipproto_offset;
 } __packed;
 
 struct user_metadata {
@@ -4917,6 +4955,10 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 						frames[i].gre_seqno),
 					buf->frames[i].gre_seqno);
 
+		if (buf->frames[i].ipproto_offset != 0xffff)
+			pr_debug("ipproto_offset:%u\n",
+					buf->frames[i].ipproto_offset);
+
 		if (buf->frames[i].vlan_cntr == 0xffff)
 			continue;
 
@@ -4942,6 +4984,64 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 					buf->frames[i].vlantcis[j]);
 	}
 }
+#else
+struct user_frame {
+	__u16 ipproto_offset;
+	__u16 src_ip_offset;
+	__u16 dst_ip_offset;
+	__u16 src_port_offset;
+	__u16 dst_port_offset;
+} __packed;
+
+struct user_metadata {
+	struct user_frame frame;
+} __packed;
+
+static inline void dump_parsed_user_buf(const void *buffer, size_t len)
+{
+	/* char (*__warn1)[sizeof(struct user_metadata)] = 1; */
+	const struct user_metadata *buf = buffer;
+
+	pr_debug("user_metadata:%lu user_frame:%lu\n",
+			sizeof(struct user_metadata),
+			sizeof(struct user_frame));
+
+	if (!buf || len < sizeof(*buf)) {
+		pr_debug("%s: Insufficient buffer\n", __FUNCTION__);
+		return;
+	}
+
+	if (buf->frame.ipproto_offset != 0xffff)
+		pr_debug("ipproto_offset:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.ipproto_offset),
+				buf->frame.ipproto_offset);
+
+	if (buf->frame.src_ip_offset != 0xffff)
+		pr_debug("src_ip_offset:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.src_ip_offset),
+				buf->frame.src_ip_offset);
+
+	if (buf->frame.dst_ip_offset != 0xffff)
+		pr_debug("dst_ip_offset:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.dst_ip_offset),
+				buf->frame.dst_ip_offset);
+
+	if (buf->frame.src_port_offset != 0xffff)
+		pr_debug("src_port_offset:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.src_port_offset),
+				buf->frame.src_port_offset);
+
+	if (buf->frame.dst_port_offset != 0xffff)
+		pr_debug("dst_port_offset:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.dst_port_offset),
+				buf->frame.dst_port_offset);
+}
+#endif
 
 static void run_dummy_parser(const struct kparser_hkey *key)
 {
@@ -4954,9 +5054,7 @@ static void run_dummy_parser(const struct kparser_hkey *key)
 		return;
 	}
 
-	memset(&user_buffer.metametadata, 0, sizeof(user_buffer.metametadata));
-	memset(&user_buffer.frames, 0xff, sizeof(user_buffer.frames));
-	user_buffer.frames[0].vlan_cntr = 0;
+	memset(&user_buffer, 0xff, sizeof(user_buffer));
 
 	parser = kparser_get_parser(key);
 	if (!parser) {

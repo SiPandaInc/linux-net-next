@@ -845,7 +845,7 @@ static inline int kparser_metadata_extract(
 
 static inline bool kparser_metadata_convert(
 		const struct kparser_conf_metadata *conf,
-		struct kparser_metadata_extract *mde)
+		struct kparser_metadata_extract *mde, int cntridx)
 {
 	__u32 encoding_type;
 
@@ -854,7 +854,7 @@ static inline bool kparser_metadata_convert(
 			*mde = __kparser_metadata_make_bytes_extract(
 					conf->frame,
 					conf->soff, conf->doff, conf->len,
-					conf->e_bit, conf->cntr);
+					conf->e_bit, cntridx);
 			return true;
 
 		case KPARSER_METADATA_BIT_OFFSET: 
@@ -862,7 +862,7 @@ static inline bool kparser_metadata_convert(
 					conf->doff,
 					true,
 					conf->add_off,
-					conf->cntr);
+					cntridx);
 			return true;
 
 		case KPARSER_METADATA_OFFSET: 
@@ -870,26 +870,26 @@ static inline bool kparser_metadata_convert(
 					conf->doff,
 					false,
 					conf->add_off,
-					conf->cntr);
+					cntridx);
 			return true;
 
 		case KPARSER_METADATA_CONSTANT_BYTE:
 			*mde = 	__kparser_metadata_set_const_byte(conf->frame,
 					conf->doff, conf->constant_value,
-					conf->cntr);
+					cntridx);
 			return true;
 
 		case KPARSER_METADATA_CONSTANT_HALFWORD:
 			*mde = 	__kparser_metadata_set_const_halfword(
 					conf->frame,
 					conf->doff, conf->constant_value,
-					conf->cntr);
+					cntridx);
 			return true;
 
 		case KPARSER_METADATA_COUNTER:
 			*mde = __kparser_metadata_set_control_counter(
 					conf->frame, conf->doff,
-					conf->cntr_data, conf->cntr,
+					cntridx, cntridx,
 					conf->cntr_op);
 			return true;
 
