@@ -1230,6 +1230,7 @@ int kparser_create_cond_exprs(const struct kparser_conf_cmd *conf,
 	}
 
 	kobj->glue.config.namespace_id = conf->namespace_id;
+	kobj->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	kobj->glue.config.cond_conf = *arg;
 	kobj->glue.config.cond_conf.key = key;
 	kref_init(&kobj->glue.refcount);
@@ -1240,6 +1241,7 @@ int kparser_create_cond_exprs(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.cond_conf = kobj->glue.config.cond_conf;
 	(*rsp)->objects_len = 0;
 done:
@@ -1294,6 +1296,7 @@ int kparser_read_cond_exprs(const struct kparser_hkey *key,
 	(*rsp)->key = kobj->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = kobj->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.cond_conf = kobj->glue.config.cond_conf;
 	(*rsp)->objects_len = 0;
 done:
@@ -1442,6 +1445,7 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
+	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	proto_table->glue.config.table_conf = *arg;
 	proto_table->glue.config.table_conf.key = key;
 	kref_init(&proto_table->glue.refcount);
@@ -1453,6 +1457,7 @@ skip_table_create:
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -1511,6 +1516,7 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->object.table_conf.optional_value1 =
@@ -1694,6 +1700,7 @@ int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
+	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	proto_table->glue.config.table_conf = *arg;
 	proto_table->glue.config.table_conf.key = key;
 	kref_init(&proto_table->glue.refcount);
@@ -1703,6 +1710,7 @@ skip_table_create:
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -1760,6 +1768,7 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 
@@ -1887,6 +1896,7 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 	}
 
 	kcntr->glue.config.namespace_id = conf->namespace_id;
+	kcntr->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	kcntr->glue.config.cntr_conf = *arg;
 	kcntr->glue.config.cntr_conf.key = key;
 	kref_init(&kcntr->glue.refcount);
@@ -1902,6 +1912,7 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.cntr_conf = kcntr->glue.config.cntr_conf;
 	(*rsp)->objects_len = 0;
 done:
@@ -1956,6 +1967,7 @@ int kparser_read_counter(const struct kparser_hkey *key,
 	(*rsp)->key = kcntr->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = kcntr->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = kcntr->glue.config.conf_keys_bv;
 	(*rsp)->object.cntr_conf = kcntr->glue.config.cntr_conf;
 	(*rsp)->objects_len = 0;
 done:
@@ -2072,6 +2084,7 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 	}
 
 	table->glue.config.namespace_id = conf->namespace_id;
+	table->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	table->glue.config.table_conf = *arg;
 	table->glue.config.table_conf.key = key;
 	kref_init(&table->glue.refcount);
@@ -2081,6 +2094,7 @@ skip_table_create:
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -2136,6 +2150,7 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 	(*rsp)->key = table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = table->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -2255,6 +2270,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 	}
 
 	kmde->glue.config.namespace_id = conf->namespace_id;
+	kmde->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	kmde->glue.config.md_conf = *arg;
 	kmde->glue.config.md_conf.key = key;
 	kref_init(&kmde->glue.refcount);
@@ -2272,6 +2288,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
 	(*rsp)->objects_len = 0;
 done:
@@ -2326,6 +2343,7 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 	(*rsp)->key = kmde->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = kmde->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
 	(*rsp)->objects_len = 0;
 done:
@@ -2396,6 +2414,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 
 	kmdl->glue.key = key;
 	kmdl->glue.config.namespace_id = conf->namespace_id;
+	kmdl->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	kmdl->glue.config.mdl_conf = *arg;
 	kmdl->glue.config.mdl_conf.key = key;
 	kmdl->glue.config.mdl_conf.metadata_keys_count = 0;
@@ -2468,6 +2487,8 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		objects = (struct kparser_conf_cmd *) (*rsp)->objects;
 		objects[i].namespace_id =
 			kmde->glue.config.namespace_id;
+		objects[i].conf_keys_bv =
+			kmde->glue.config.conf_keys_bv;
 		objects[i].md_conf = kmde->glue.config.md_conf;
 
 		kmdl->md_configs_len++;
@@ -2487,6 +2508,8 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		}
 		kmdl->md_configs[i].namespace_id =
 			kmde->glue.config.namespace_id;
+		kmdl->md_configs[i].conf_keys_bv =
+			kmde->glue.config.conf_keys_bv;
 		kmdl->md_configs[i].md_conf = kmde->glue.config.md_conf; 
 	}
 
@@ -2506,6 +2529,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 	(*rsp)->object.mdl_conf.metadata_keys_count = 0;
 done:
@@ -2566,6 +2590,7 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 	(*rsp)->key = kmdl->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = kmdl->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = kmdl->glue.config.conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 
 	for (i = 0; i < kmdl->md_configs_len; i++) {
@@ -2583,6 +2608,7 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		objects = (struct kparser_conf_cmd *) (*rsp)->objects;
 		objects[i].namespace_id =
 			kmdl->md_configs[i].namespace_id;
+		objects[i].conf_keys_bv = kmdl->md_configs[i].conf_keys_bv;
 		objects[i].md_conf = kmdl->md_configs[i].md_conf;
 	}
 
@@ -2828,6 +2854,7 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 	}
 
 	kparsenode->glue.glue.config.namespace_id = conf->namespace_id;
+	kparsenode->glue.glue.config.conf_keys_bv = conf->conf_keys_bv;
 	kparsenode->glue.glue.config.node_conf = *arg;
 	kparsenode->glue.glue.config.node_conf.key = key;
 	kref_init(&kparsenode->glue.glue.refcount);
@@ -2846,6 +2873,7 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.node_conf =
 		kparsenode->glue.glue.config.node_conf;
 	(*rsp)->objects_len = 0;
@@ -2902,6 +2930,7 @@ int kparser_read_parse_node(const struct kparser_hkey *key,
 	(*rsp)->key = kparsenode->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = kparsenode->glue.glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.node_conf =
 		kparsenode->glue.glue.config.node_conf;
 	(*rsp)->objects_len = 0;
@@ -3058,6 +3087,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
+	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	proto_table->glue.config.table_conf = *arg;
 	proto_table->glue.config.table_conf.key = key;
 	kref_init(&proto_table->glue.refcount);
@@ -3067,6 +3097,7 @@ skip_table_create:
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -3123,6 +3154,7 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -3293,6 +3325,7 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 	}
 
 	node->glue.glue.config.namespace_id = conf->namespace_id;
+	node->glue.glue.config.conf_keys_bv = conf->conf_keys_bv;
 	node->glue.glue.config.tlv_node_conf = *arg;
 	node->glue.glue.config.tlv_node_conf.key = key;
 	kref_init(&node->glue.glue.refcount);
@@ -3310,6 +3343,7 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.tlv_node_conf =
 		node->glue.glue.config.tlv_node_conf;
 	(*rsp)->objects_len = 0;
@@ -3366,6 +3400,7 @@ int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 	(*rsp)->key = node->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = node->glue.glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.tlv_node_conf =
 		node->glue.glue.config.tlv_node_conf;
 	(*rsp)->objects_len = 0;
@@ -3519,6 +3554,7 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
+	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	proto_table->glue.config.table_conf = *arg;
 	proto_table->glue.config.table_conf.key = key;
 	kref_init(&proto_table->glue.refcount);
@@ -3528,6 +3564,7 @@ skip_table_create:
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -3584,6 +3621,7 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -3697,6 +3735,7 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 	}
 
 	kobj->glue.config.namespace_id = conf->namespace_id;
+	kobj->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	kobj->glue.config.flag_field_conf = *arg;
 	kobj->glue.config.flag_field_conf.key = key;
 	kref_init(&kobj->glue.refcount);
@@ -3707,6 +3746,7 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
 	(*rsp)->objects_len = 0;
 
@@ -3762,6 +3802,7 @@ int kparser_read_flag_field(const struct kparser_hkey *key,
 	(*rsp)->key = kobj->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = kobj->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
 	(*rsp)->objects_len = 0;
 done:
@@ -3934,6 +3975,7 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
+	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	proto_table->glue.config.table_conf = *arg;
 	proto_table->glue.config.table_conf.key = key;
 	kref_init(&proto_table->glue.refcount);
@@ -3943,6 +3985,7 @@ skip_table_create:
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -4000,6 +4043,7 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -4138,6 +4182,7 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 	}
 
 	node->glue.glue.config.namespace_id = conf->namespace_id;
+	node->glue.glue.config.conf_keys_bv = conf->conf_keys_bv;
 	node->glue.glue.config.flag_field_node_conf = *arg;
 	node->glue.glue.config.flag_field_node_conf.key = key;
 	kref_init(&node->glue.glue.refcount);
@@ -4156,6 +4201,7 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.flag_field_node_conf =
 		node->glue.glue.config.flag_field_node_conf;
 	(*rsp)->objects_len = 0;
@@ -4212,6 +4258,7 @@ int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 	(*rsp)->key = node->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = node->glue.glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_node_conf =
 		node->glue.glue.config.flag_field_node_conf;
 	(*rsp)->objects_len = 0;
@@ -4368,6 +4415,7 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
+	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	proto_table->glue.config.table_conf = *arg;
 	proto_table->glue.config.table_conf.key = key;
 	kref_init(&proto_table->glue.refcount);
@@ -4377,6 +4425,7 @@ skip_table_create:
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -4434,6 +4483,7 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
 	(*rsp)->objects_len = 0;
@@ -4597,6 +4647,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 	}
 
 	kparsr->glue.config.namespace_id = conf->namespace_id;
+	kparsr->glue.config.conf_keys_bv = conf->conf_keys_bv;
 	kparsr->glue.config.parser_conf = *arg;
 	kparsr->glue.config.parser_conf.key = key;
 	kref_init(&kparsr->glue.refcount);
@@ -4618,6 +4669,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.parser_conf =
 		kparsr->glue.config.parser_conf;
 	(*rsp)->objects_len = 0;
@@ -5286,6 +5338,7 @@ int kparser_read_parser(const struct kparser_hkey *key,
 	(*rsp)->key = kparsr->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.namespace_id = kparsr->glue.config.namespace_id;
+	(*rsp)->object.conf_keys_bv = kparsr->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf =
 		kparsr->glue.config.parser_conf;
 	(*rsp)->objects_len = 0;
@@ -5353,6 +5406,7 @@ int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 			"Operation successful");
 	(*rsp)->key = *key;
 	(*rsp)->object.namespace_id = conf->namespace_id;
+	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.obj_key = *key;
 	(*rsp)->objects_len = 0;
 done:
