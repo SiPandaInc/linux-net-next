@@ -77,7 +77,7 @@ typedef int kparser_obj_create_update(const struct kparser_conf_cmd *conf,
 
 typedef int kparser_obj_read_del(const struct kparser_hkey *key,
 		struct kparser_cmd_rsp_hdr **rsp,
-		size_t *rsp_len);
+		size_t *rsp_len, __u8 recursive_read);
 
 typedef void kparser_free_obj(void *ptr, void *arg);
 
@@ -560,6 +560,12 @@ int kparser_init(void)
 		g_mod_namespaces[i]->bv_len =
 			((KPARSER_KMOD_ID_MAX - KPARSER_KMOD_ID_MIN) /
 			 BITS_IN_U32) + 1;
+
+		pr_debug("{%s:%d}:bv_len:%lu, total_bytes:%lu, range:[%d:%d]\n",
+				__FUNCTION__, __LINE__,
+				g_mod_namespaces[i]->bv_len,
+				sizeof(__u32) * g_mod_namespaces[i]->bv_len,
+				KPARSER_KMOD_ID_MAX, KPARSER_KMOD_ID_MIN);
 
 		g_mod_namespaces[i]->bv = kzalloc(
 				sizeof(__u32) * g_mod_namespaces[i]->bv_len,
@@ -1259,7 +1265,7 @@ done:
 
 int kparser_read_cond_exprs(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	struct kparser_glue_condexpr_expr *kobj;
 
@@ -1477,7 +1483,7 @@ done:
 
 int kparser_read_cond_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_condexpr_table *proto_table;
 	const struct kparser_glue_condexpr_expr *kcondent;
@@ -1730,7 +1736,7 @@ done:
 
 int kparser_read_cond_tables(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_condexpr_tables *proto_table;
 	const struct kparser_glue_condexpr_table *kcondent;
@@ -1930,7 +1936,7 @@ done:
 
 int kparser_read_counter(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	struct kparser_glue_counter *kcntr;
 
@@ -2113,7 +2119,7 @@ done:
 
 int kparser_read_counter_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_counter_table *table;
 	struct kparser_conf_cmd *objects = NULL;
@@ -2306,7 +2312,7 @@ done:
 
 int kparser_read_metadata(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_metadata_extract *kmde;
 
@@ -2553,7 +2559,7 @@ done:
 
 int kparser_read_metalist(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_metadata_table *kmdl;
 	struct kparser_conf_cmd *objects = NULL;
@@ -2893,7 +2899,7 @@ done:
 
 int kparser_read_parse_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_glue_parse_node *kparsenode;
 
@@ -3116,7 +3122,7 @@ done:
 
 int kparser_read_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_protocol_table *proto_table;
 	const struct kparser_glue_glue_parse_node *parse_node;
@@ -3363,7 +3369,7 @@ done:
 
 int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_parse_tlv_node *node;
 
@@ -3583,7 +3589,7 @@ done:
 
 int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_proto_tlvs_table *proto_table;
 	const struct kparser_glue_parse_tlv_node *parse_node;
@@ -3765,7 +3771,7 @@ done:
 
 int kparser_read_flag_field(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	struct kparser_glue_flag_field *kobj;
 
@@ -4004,7 +4010,7 @@ done:
 
 int kparser_read_flag_field_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_flag_fields *proto_table;
 	const struct kparser_glue_flag_field *kflagent;
@@ -4221,7 +4227,7 @@ done:
 
 int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_flag_field_node *node;
 
@@ -4444,7 +4450,7 @@ done:
 
 int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_proto_flag_fields_table *proto_table;
 	const struct kparser_glue_flag_field_node *parse_node;
@@ -5164,7 +5170,7 @@ static bool kparser_dump_metadata_table(
 
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_metalist(&glue_obj->glue.key,
-			&new_rsp, &new_rsp_len);
+			&new_rsp, &new_rsp_len, false);
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_METALIST)) {
@@ -5206,7 +5212,7 @@ static bool kparser_dump_parse_node(
 
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_parse_node(&glue_obj->glue.glue.key,
-			&new_rsp, &new_rsp_len);
+			&new_rsp, &new_rsp_len, false);
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE)) {
@@ -5254,7 +5260,7 @@ static bool kparser_dump_protocol_table(
 
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_proto_table(&glue_obj->glue.key,
-			&new_rsp, &new_rsp_len);
+			&new_rsp, &new_rsp_len, false);
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE)) {
@@ -5300,7 +5306,7 @@ error:
 
 int kparser_read_parser(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_parser *kparsr;
 
@@ -5343,10 +5349,9 @@ int kparser_read_parser(const struct kparser_hkey *key,
 		kparsr->glue.config.parser_conf;
 	(*rsp)->objects_len = 0;
 
-#if 1
-	if (kparser_dump_parser(kparsr, rsp, rsp_len) == false)
+	if (recursive_read &&
+			kparser_dump_parser(kparsr, rsp, rsp_len) == false)
 		pr_debug("kparser_dump_parser failed");
-#endif
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -5420,7 +5425,7 @@ done:
 
 int kparser_parser_unlock(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len)
+		    size_t *rsp_len, __u8 recursive_read)
 {
 	const struct kparser_glue_parser *kparsr;
 
@@ -5568,7 +5573,8 @@ int kparser_config_handler_read(const void *cmdarg, size_t cmdarglen,
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
 	return g_mod_namespaces[ns_id]->read_handler(
-			&conf->obj_key, rsp, rsp_len);
+			&conf->obj_key, rsp, rsp_len,
+			conf->recursive_read_delete);
 }
 
 int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
@@ -5599,5 +5605,6 @@ int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
 	return g_mod_namespaces[ns_id]->del_handler(
-			&conf->obj_key, rsp, rsp_len);
+			&conf->obj_key, rsp, rsp_len,
+			conf->recursive_read_delete);
 }

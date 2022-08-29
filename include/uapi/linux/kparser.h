@@ -500,14 +500,16 @@ struct kparser_conf_parser {
 };
 
 /* *********************** CLI config interface *********************** */
-#define KPARSER_CONFIG_MAX_KEYS			128 
+#define KPARSER_CONFIG_MAX_KEYS				128 
+#define KPARSER_CONFIG_MAX_KEYS_BV_LEN ((KPARSER_CONFIG_MAX_KEYS / BITS_IN_U32) + 1)
 struct kparser_config_set_keys_bv {
-	__u32 ns_keys_bvs[(KPARSER_CONFIG_MAX_KEYS/BITS_IN_U32) + 1];
+	__u32 ns_keys_bvs[KPARSER_CONFIG_MAX_KEYS_BV_LEN];
 };
 
 struct kparser_conf_cmd {
 	enum kparser_global_namespace_ids namespace_id;
 	struct kparser_config_set_keys_bv conf_keys_bv;
+	__u8 recursive_read_delete;
 	union {
 		/* for read/delete commands */
 		/* KPARSER_NS_OP_PARSER_LOCK_UNLOCK */
