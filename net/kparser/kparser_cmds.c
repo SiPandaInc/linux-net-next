@@ -73,11 +73,12 @@ static void kparser_free_parser(void *ptr, void *arg)
 typedef int kparser_obj_create_update(const struct kparser_conf_cmd *conf,
 		size_t conf_len,
 		struct kparser_cmd_rsp_hdr **rsp,
-		size_t *rsp_len);
+		size_t *rsp_len, const char *op);
 
 typedef int kparser_obj_read_del(const struct kparser_hkey *key,
 		struct kparser_cmd_rsp_hdr **rsp,
-		size_t *rsp_len, __u8 recursive_read);
+		size_t *rsp_len, __u8 recursive_read,
+		const char *op);
 
 typedef void kparser_free_obj(void *ptr, void *arg);
 
@@ -447,14 +448,13 @@ static inline bool kparser_allocate_key_name(
 
 static inline bool kparser_conf_key_manager(
 		enum kparser_global_namespace_ids ns_id,
-		const struct kparser_hkey *key,
-		struct kparser_hkey *new_key,
-		struct kparser_cmd_rsp_hdr *rsp)
+		const struct kparser_hkey *key, struct kparser_hkey *new_key,
+		struct kparser_cmd_rsp_hdr *rsp, const char *op)
 {
 	if (kparser_hkey_empty(key)) {
 		rsp->op_ret_code = -EINVAL;
 		(void) snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-				"%s: HKey missing", __FUNCTION__);
+				"%s:HKey missing", op);
 		return false;
 	}
 
@@ -465,8 +465,8 @@ static inline bool kparser_conf_key_manager(
 	if (kparser_hkey_user_id_invalid(key)) {
 		rsp->op_ret_code = -EINVAL;
 		(void) snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-				"%s: HKey id invalid:%u",
-				__FUNCTION__, key->id);
+				"%s:HKey id invalid:%u",
+				op, key->id);
 		return false;
 	}
 
@@ -531,6 +531,26 @@ static inline int kparser_namespace_insert(
 			g_mod_namespaces[ns_id]->htbl_name.tbl_params);
 
 	return rc;
+}
+
+static inline int alloc_first_rsp(struct kparser_cmd_rsp_hdr **rsp,
+		size_t *rsp_len, int nsid)
+{
+	if (!rsp || *rsp || !rsp_len || (*rsp_len != 0))
+		return EINVAL;
+
+	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
+	if (!(*rsp)) {
+		printk("%s:kzalloc failed for rsp, size:%lu\n",
+				__FUNCTION__,
+				sizeof(struct kparser_cmd_rsp_hdr));
+		return ENOMEM;
+	}
+
+	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
+	(*rsp)->object.namespace_id = nsid;
+	(*rsp)->objects_len = 0;
+	return 0;
 }
 
 static struct list_head g_parser_list;
@@ -1165,91 +1185,94 @@ done:
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 }
 
+static inline bool kparser_cmd_create_pre_process(const char *op,
+		const struct kparser_conf_cmd *conf,
+		const struct kparser_hkey *argkey, struct kparser_hkey *newkey,
+		void **kobj, size_t kobjsize, struct kparser_cmd_rsp_hdr *rsp,
+		size_t glueoffset)
+{
+	struct kparser_glue *glue;
+
+	if (!kparser_conf_key_manager(conf->namespace_id, argkey,
+				newkey, rsp, op)) {
+		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
+		return false;
+	}
+
+	pr_debug("{%s:%d} OP:%s Key{%s:%d}:{%s:%d}\n",
+			__FUNCTION__, __LINE__,
+			op, argkey->name, argkey->id,
+			newkey->name, newkey->id);
+
+	if (kparser_namespace_lookup(conf->namespace_id, newkey)) {
+		rsp->op_ret_code = EEXIST;
+		(void) snprintf(rsp->err_str_buf,
+				sizeof(rsp->err_str_buf),
+				"%s:Duplicate object HKey:{%s:%u}",
+				op, newkey->name, newkey->id);
+		return false;
+	}
+
+	*kobj = kzalloc(kobjsize, GFP_KERNEL);
+	if (!(*kobj)) {
+		rsp->op_ret_code = ENOMEM;
+		(void) snprintf(rsp->err_str_buf,
+				sizeof(rsp->err_str_buf),
+				"%s:Object allocation failed for size:%lu",
+				op, kobjsize);
+		return false;
+	}
+
+	glue = (*kobj) + glueoffset;
+	glue->key = *newkey;
+
+	rsp->op_ret_code = kparser_namespace_insert(conf->namespace_id,
+			&glue->ht_node_id, &glue->ht_node_name);
+	if (rsp->op_ret_code) {
+		(void) snprintf(rsp->err_str_buf,
+				sizeof(rsp->err_str_buf),
+				"%s:Htbl insert err:%d", op, rsp->op_ret_code);
+		return false;
+	}
+
+	glue->config = *conf;
+	kref_init(&glue->refcount);
+
+	(void) snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
+			"%s:Success", op);
+	rsp->key = *newkey;
+	rsp->object.conf_keys_bv = conf->conf_keys_bv;
+	rsp->object = *conf;
+
+	return true;
+}
+
 int kparser_create_cond_exprs(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
-	const struct kparser_conf_condexpr *arg;
 	struct kparser_glue_condexpr_expr *kobj = NULL;
+	const struct kparser_conf_condexpr *arg;
 	struct kparser_hkey key;
-	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_CONDEXPRS)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->cond_conf;
 
-	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
-		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
+	if (kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
+		(void **) &kobj, sizeof(*kobj), *rsp,
+		offsetof(struct kparser_glue_condexpr_expr, glue)) == false)
 		goto done;
-	}
-
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
-
-	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
-		(*rsp)->op_ret_code = EEXIST;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: Duplicate object key",
-				__FUNCTION__);
-		goto done;
-	}
-
-	kobj = kzalloc(sizeof(*kobj), GFP_KERNEL);
-	if (!kobj) {
-		(*rsp)->op_ret_code = ENOMEM;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
-		goto done;
-	}
-
-	kobj->glue.key = key;
-
-	rc = kparser_namespace_insert(conf->namespace_id,
-				      &kobj->glue.ht_node_id,
-				      &kobj->glue.ht_node_name);
-	if (rc) {
-		(*rsp)->op_ret_code = rc;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_namespace_insert() err",
-				__FUNCTION__);
-		goto done;
-	}
-
-	kobj->glue.config.namespace_id = conf->namespace_id;
-	kobj->glue.config.conf_keys_bv = conf->conf_keys_bv;
-	kobj->glue.config.cond_conf = *arg;
-	kobj->glue.config.cond_conf.key = key;
-	kref_init(&kobj->glue.refcount);
 
 	kobj->expr = arg->config;
 
-	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			"Operation successful");
+	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "OK");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.cond_conf = kobj->glue.config.cond_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1265,23 +1288,11 @@ done:
 
 int kparser_read_cond_exprs(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	struct kparser_glue_condexpr_expr *kobj;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -1301,10 +1312,8 @@ int kparser_read_cond_exprs(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = kobj->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = kobj->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.cond_conf = kobj->glue.config.cond_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1374,28 +1383,13 @@ static bool kparser_create_cond_table_ent(
 int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_condexpr_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
-	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_CONDEXPRS_TABLE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1409,46 +1403,10 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 		goto skip_table_create;
 	}
 
-	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
-		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
+	if (kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
+		(void **) &proto_table, sizeof(*proto_table), *rsp,
+		offsetof(struct kparser_glue_condexpr_table, glue)) == false)
 		goto done;
-	}
-
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
-
-	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
-		(*rsp)->op_ret_code = EEXIST;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: Duplicate object key",
-				__FUNCTION__);
-		goto done;
-	}
-
-	//create protocol table
-	proto_table = kzalloc(sizeof(*proto_table), GFP_KERNEL);
-	if (!proto_table) {
-		(*rsp)->op_ret_code = ENOMEM;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
-		goto done;
-	}
-
-	proto_table->glue.key = key;
-
-	rc = kparser_namespace_insert(conf->namespace_id,
-			&proto_table->glue.ht_node_id,
-			&proto_table->glue.ht_node_name);
-	if (rc) {
-		(*rsp)->op_ret_code = rc;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_namespace_insert() err",
-				__FUNCTION__);
-		goto done;
-	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
 	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
@@ -1459,14 +1417,11 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 	proto_table->table.type = arg->optional_value2;
 
 skip_table_create:
-	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			"Operation successful");
+	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "OK");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1483,7 +1438,7 @@ done:
 
 int kparser_read_cond_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_condexpr_table *proto_table;
 	const struct kparser_glue_condexpr_expr *kcondent;
@@ -1491,18 +1446,6 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -1521,7 +1464,6 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
@@ -1529,8 +1471,6 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 		proto_table->table.default_fail;
 	(*rsp)->object.table_conf.optional_value2 =
 		proto_table->table.type;
-
-	(*rsp)->objects_len = 0;
 
 	for (i = 0; i < proto_table->table.num_ents; i++) {
 		(*rsp)->objects_len++;
@@ -1629,28 +1569,13 @@ static bool kparser_create_cond_tables_ent(
 int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_condexpr_tables *proto_table = NULL;
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
-	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_CONDEXPRS_TABLES)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1664,46 +1589,10 @@ int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 		goto skip_table_create;
 	}
 
-	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
-		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
+	if (kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
+		(void **) &proto_table, sizeof(*proto_table), *rsp,
+		offsetof(struct kparser_glue_condexpr_tables, glue)) == false)
 		goto done;
-	}
-
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
-
-	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
-		(*rsp)->op_ret_code = EEXIST;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: Duplicate object key",
-				__FUNCTION__);
-		goto done;
-	}
-
-	//create protocol table
-	proto_table = kzalloc(sizeof(*proto_table), GFP_KERNEL);
-	if (!proto_table) {
-		(*rsp)->op_ret_code = ENOMEM;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
-		goto done;
-	}
-
-	proto_table->glue.key = key;
-
-	rc = kparser_namespace_insert(conf->namespace_id,
-			&proto_table->glue.ht_node_id,
-			&proto_table->glue.ht_node_name);
-	if (rc) {
-		(*rsp)->op_ret_code = rc;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_namespace_insert() err",
-				__FUNCTION__);
-		goto done;
-	}
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
 	proto_table->glue.config.conf_keys_bv = conf->conf_keys_bv;
@@ -1715,11 +1604,9 @@ skip_table_create:
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1736,7 +1623,7 @@ done:
 
 int kparser_read_cond_tables(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_condexpr_tables *proto_table;
 	const struct kparser_glue_condexpr_table *kcondent;
@@ -1744,18 +1631,6 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -1773,12 +1648,9 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-
-	(*rsp)->objects_len = 0;
 
 	for (i = 0; i < proto_table->table.num_ents; i++) {
 		(*rsp)->objects_len++;
@@ -1816,7 +1688,7 @@ done:
 int kparser_create_counter(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	const struct kparser_conf_cntr *arg;
 	struct kparser_glue_counter *kcntr = NULL;
@@ -1824,20 +1696,6 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_COUNTER)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1862,7 +1720,7 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 	}
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -1917,10 +1775,8 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.cntr_conf = kcntr->glue.config.cntr_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1936,23 +1792,11 @@ done:
 
 int kparser_read_counter(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	struct kparser_glue_counter *kcntr;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -1972,10 +1816,8 @@ int kparser_read_counter(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = kcntr->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = kcntr->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = kcntr->glue.config.conf_keys_bv;
 	(*rsp)->object.cntr_conf = kcntr->glue.config.cntr_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1986,7 +1828,7 @@ done:
 int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_counter_table *table = NULL;
 	const struct kparser_conf_table *arg;
@@ -1995,20 +1837,6 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_COUNTER_TABLE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2051,7 +1879,7 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 	}
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -2099,11 +1927,9 @@ skip_table_create:
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2119,25 +1945,13 @@ done:
 
 int kparser_read_counter_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_counter_table *table;
 	struct kparser_conf_cmd *objects = NULL;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -2155,11 +1969,9 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 
 	(*rsp)->key = table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = table->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 
 	for (i = 0; i < KPARSER_CNTR_NUM_CNTRS; i++) {
 		(*rsp)->objects_len++;
@@ -2193,7 +2005,7 @@ done:
 int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_metadata_extract *kmde = NULL;
 	const struct kparser_conf_metadata *arg;
@@ -2203,26 +2015,12 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_METADATA)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
-
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->md_conf;
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -2293,10 +2091,8 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2312,23 +2108,11 @@ done:
 
 int kparser_read_metadata(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_metadata_extract *kmde;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -2348,10 +2132,8 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = kmde->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = kmde->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2362,7 +2144,7 @@ done:
 int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	const struct kparser_conf_metadata_table *arg;
 	const struct kparser_glue_metadata_extract *kmde = NULL;
@@ -2373,27 +2155,12 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_METALIST)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
-
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->mdl_conf;
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -2534,7 +2301,6 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 	(*rsp)->object.mdl_conf.metadata_keys_count = 0;
@@ -2559,25 +2325,13 @@ done:
 
 int kparser_read_metalist(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_metadata_table *kmdl;
 	struct kparser_conf_cmd *objects = NULL;
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -2595,7 +2349,6 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 
 	(*rsp)->key = kmdl->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = kmdl->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = kmdl->glue.config.conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 
@@ -2792,7 +2545,7 @@ static inline bool kparser_conf_node_convert(
 int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_glue_parse_node *kparsenode = NULL;
 	const struct kparser_conf_node *arg;
@@ -2801,26 +2554,12 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_NODE_PARSE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
-
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->node_conf;
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -2878,11 +2617,9 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.node_conf =
 		kparsenode->glue.glue.config.node_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2899,23 +2636,11 @@ done:
 
 int kparser_read_parse_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_glue_parse_node *kparsenode;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -2935,11 +2660,9 @@ int kparser_read_parse_node(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = kparsenode->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = kparsenode->glue.glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.node_conf =
 		kparsenode->glue.glue.config.node_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2975,7 +2698,7 @@ static bool kparser_create_proto_table_ent(
 		rsp->op_ret_code = ENOENT;
 		(void) snprintf(rsp->err_str_buf,
 				sizeof(rsp->err_str_buf),
-				"%s: Object key:{%s:%u} not found",
+				"%s: parse node key:{%s:%u} not found",
 				__FUNCTION__,
 				arg->elem_key.name,
 				arg->elem_key.id);
@@ -3016,7 +2739,7 @@ static bool kparser_create_proto_table_ent(
 int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_protocol_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -3024,20 +2747,6 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_PROTO_TABLE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3052,7 +2761,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	}
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -3101,12 +2810,8 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 skip_table_create:
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
-	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
-	(*rsp)->object.table_conf =
-		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
+	(*rsp)->object.table_conf = *arg; // proto_table->glue.config.table_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3122,7 +2827,7 @@ done:
 
 int kparser_read_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_protocol_table *proto_table;
 	const struct kparser_glue_glue_parse_node *parse_node;
@@ -3130,18 +2835,6 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -3159,11 +2852,9 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 
 	for (i = 0; i < proto_table->proto_table.num_ents; i++) {
 		(*rsp)->objects_len++;
@@ -3263,7 +2954,7 @@ static inline bool kparser_conf_tlv_node_convert(
 int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	const struct kparser_conf_node_parse_tlv *arg;
 	struct kparser_glue_parse_tlv_node *node = NULL;
@@ -3272,26 +2963,12 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_TLV_NODE_PARSE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
-
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->tlv_node_conf;
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -3348,11 +3025,9 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.tlv_node_conf =
 		node->glue.glue.config.tlv_node_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3369,23 +3044,11 @@ done:
 
 int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_parse_tlv_node *node;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -3405,11 +3068,9 @@ int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = node->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = node->glue.glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.tlv_node_conf =
 		node->glue.glue.config.tlv_node_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3483,7 +3144,7 @@ static bool kparser_create_tlv_proto_table_ent(
 int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_proto_tlvs_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -3491,20 +3152,6 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_TLV_PROTO_TABLE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3519,7 +3166,7 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 	}
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -3569,11 +3216,9 @@ skip_table_create:
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3589,7 +3234,7 @@ done:
 
 int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_proto_tlvs_table *proto_table;
 	const struct kparser_glue_parse_tlv_node *parse_node;
@@ -3597,18 +3242,6 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -3626,11 +3259,9 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 
 	for (i = 0; i < proto_table->tlvs_proto_table.num_ents; i++) {
 		(*rsp)->objects_len++;
@@ -3673,7 +3304,7 @@ done:
 int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	const struct kparser_conf_flag_field *arg;
 	struct kparser_glue_flag_field *kobj = NULL;
@@ -3682,26 +3313,12 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_FLAG_FIELD)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
-
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->flag_field_conf;
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -3751,10 +3368,8 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
-	(*rsp)->objects_len = 0;
 
 done:
 	mutex_unlock(&kparser_config_lock);
@@ -3771,23 +3386,11 @@ done:
 
 int kparser_read_flag_field(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	struct kparser_glue_flag_field *kobj;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -3807,10 +3410,8 @@ int kparser_read_flag_field(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = kobj->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = kobj->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3904,7 +3505,7 @@ static bool kparser_create_flag_field_table_ent(
 int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_flag_fields *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -3912,20 +3513,6 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_FLAG_FIELD_TABLE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3940,7 +3527,7 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 	}
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -3990,11 +3577,9 @@ skip_table_create:
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -4010,7 +3595,7 @@ done:
 
 int kparser_read_flag_field_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_flag_fields *proto_table;
 	const struct kparser_glue_flag_field *kflagent;
@@ -4018,18 +3603,6 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -4048,11 +3621,9 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 
 	for (i = 0; i < proto_table->flag_fields.num_idx; i++) {
 		(*rsp)->objects_len++;
@@ -4119,7 +3690,7 @@ static inline bool kparser_create_parse_flag_field_node_convert(
 int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	const struct kparser_conf_node_parse_flag_field *arg;
 	struct kparser_glue_flag_field_node *node = NULL;
@@ -4128,27 +3699,12 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id !=
-			 KPARSER_NS_FLAG_FIELD_NODE_PARSE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
-
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->flag_field_node_conf;
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -4206,11 +3762,9 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.flag_field_node_conf =
 		node->glue.glue.config.flag_field_node_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -4227,23 +3781,11 @@ done:
 
 int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_flag_field_node *node;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -4263,11 +3805,9 @@ int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = node->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = node->glue.glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_node_conf =
 		node->glue.glue.config.flag_field_node_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -4343,7 +3883,7 @@ static bool kparser_create_flag_field_proto_table_ent(
 int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_proto_flag_fields_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -4351,21 +3891,6 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id !=
-			 KPARSER_NS_FLAG_FIELD_PROTO_TABLE)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -4380,7 +3905,7 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 	}
 
 	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
+				&key, *rsp, op)) {
 		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
 		goto done;
 	}
@@ -4430,11 +3955,9 @@ skip_table_create:
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -4450,7 +3973,7 @@ done:
 
 int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_proto_flag_fields_table *proto_table;
 	const struct kparser_glue_flag_field_node *parse_node;
@@ -4458,18 +3981,6 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 	int i;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -4488,11 +3999,9 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 
 	(*rsp)->key = proto_table->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = proto_table->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf =
 		proto_table->glue.config.table_conf;
-	(*rsp)->objects_len = 0;
 
 	for (i = 0; i < proto_table->flags_proto_table.num_ents; i++) {
 		(*rsp)->objects_len++;
@@ -4575,110 +4084,48 @@ static inline bool kparser_parser_convert(
 int kparser_create_parser(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
-	const struct kparser_conf_parser *arg;
-	struct kparser_counters *cntrs = NULL;
 	struct kparser_glue_parser *kparsr = NULL;
+	struct kparser_counters *cntrs = NULL;
+	const struct kparser_conf_parser *arg;
+	struct kparser_parser parser = {};
 	struct kparser_hkey key;
-	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id != KPARSER_NS_PARSER)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->parser_conf;
-
-	if (!kparser_conf_key_manager(conf->namespace_id, &arg->key,
-				&key, *rsp)) {
-		printk("here:%s:%d\n", __FUNCTION__, __LINE__);
-		goto done;
-	}
-
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
-
-	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
-		(*rsp)->op_ret_code = EEXIST;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: Duplicate object key",
-				__FUNCTION__);
-		goto done;
-	}
-
-	kparsr = kzalloc(sizeof(*kparsr), GFP_KERNEL);
-	if (!kparsr) {
-		(*rsp)->op_ret_code = ENOMEM;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
-		goto done;
-	}
 
 	cntrs = kzalloc(sizeof(*cntrs), GFP_KERNEL);
 	if (!cntrs) {
 		(*rsp)->op_ret_code = ENOMEM;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
+				"%s: kzalloc() failed, size:%lu",
+				op, sizeof(*cntrs));
 		goto done;
 	}
-
-	kparsr->glue.key = key;
-
-	rc = kparser_namespace_insert(conf->namespace_id,
-				      &kparsr->glue.ht_node_id,
-				      &kparsr->glue.ht_node_name);
-	if (rc) {
-		(*rsp)->op_ret_code = rc;
-		(void) snprintf((*rsp)->err_str_buf,
-				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_namespace_insert() err",
-				__FUNCTION__);
-		goto done;
-	}
-
-	kparsr->glue.config.namespace_id = conf->namespace_id;
-	kparsr->glue.config.conf_keys_bv = conf->conf_keys_bv;
-	kparsr->glue.config.parser_conf = *arg;
-	kparsr->glue.config.parser_conf.key = key;
-	kref_init(&kparsr->glue.refcount);
-	rcu_assign_pointer(kparsr->parser.cntrs, cntrs);
-	kparsr->parser.cntrs_len = sizeof(*cntrs);
-	kparsr->parser.kparser_start_signature = KPARSERSTARTSIGNATURE;
-	kparsr->parser.kparser_end_signature = KPARSERENDSIGNATURE;
-
-	if (!kparser_parser_convert(arg, &kparsr->parser)) {
+	rcu_assign_pointer(parser.cntrs, cntrs);
+	parser.cntrs_len = sizeof(*cntrs);
+	parser.kparser_start_signature = KPARSERSTARTSIGNATURE;
+	parser.kparser_end_signature = KPARSERENDSIGNATURE;
+	if (!kparser_parser_convert(arg, &parser)) {
 		(*rsp)->op_ret_code = EINVAL;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_parse_node_convert() err",
-				__FUNCTION__);
+				"%s: parser arg convert error", op);
 		goto done;
 	}
 
-	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			"Operation successful");
-	(*rsp)->key = key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
-	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
-	(*rsp)->object.parser_conf =
-		kparsr->glue.config.parser_conf;
-	(*rsp)->objects_len = 0;
+	if (kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
+		(void **) &kparsr, sizeof(*kparsr), *rsp,
+		offsetof(struct kparser_glue_parser, glue)) == false)
+		goto done;
+
+	kparsr->parser = parser;
+
 	// TODO:
 	// INIT_LIST_HEAD(&kparsr->list_node);
 	// list_add(&kparsr->list_node, &g_parser_list);
@@ -4741,7 +4188,7 @@ static __u8 pktbuf[] = {
 	0x00,0x0e,0x04,0x69,0x78,0x69,0x61,0x04,0x69,0x78,0x69,0x61
 };
 #endif
-#if 1
+#if 0
 /* From sipada/data/pcaps/tcp_sack.pcap
  * packet no: 33
  */
@@ -4873,6 +4320,20 @@ static __u8 pktbuf[] = {
 	gre_seqno[0]:{doff:44 value:430001}
 	vlantcis[0][0]:{doff:52 value:0x6400}
 */
+#endif
+#if 1
+	/* UDP packet
+	 * stun2.cap
+	 */
+static __u8 pktbuf[] = {
+	0x00,0x90,0xd0,0x23,0xed,0x2a,0x00,0x1c,0xbf,0xca,
+	0xa3,0xd5,0x08,0x00,0x45,0x00,0x00,0x30,0x00,0x00,
+	0x40,0x00,0x40,0x11,0x30,0x5a,0x0a,0x00,0x00,0xa5,
+	0x84,0xb1,0x7b,0x0d,0xeb,0x11,0x0d,0x96,0x00,0x1c,
+	0x42,0x7f,0x00,0x01,0x00,0x00,0x21,0x12,0xa4,0x42,
+	0xfd,0x95,0xe8,0x83,0x8a,0x05,0x28,0x45,0x6a,0x8e,
+	0xf1,0xe2
+};
 #endif
 
 #if 0
@@ -5044,11 +4505,14 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 }
 #else
 struct user_frame {
+	__u16 ipv4_ttl;
 	__u16 ipproto_offset;
 	__u16 src_ip_offset;
 	__u16 dst_ip_offset;
 	__u16 src_port_offset;
 	__u16 dst_port_offset;
+	__u16 udp_src_port;
+	__u16 udp_dst_port;
 } __packed;
 
 struct user_metadata {
@@ -5098,6 +4562,24 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 				offsetof(struct user_metadata,
 					frame.dst_port_offset),
 				buf->frame.dst_port_offset);
+
+	if (buf->frame.ipv4_ttl != 0xffff)
+		pr_debug("ipv4_ttl:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.ipv4_ttl),
+				buf->frame.ipv4_ttl);
+
+	if (buf->frame.udp_src_port != 0xffff)
+		pr_debug("udp_src_port:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.udp_src_port),
+				buf->frame.udp_src_port);
+
+	if (buf->frame.udp_dst_port != 0xffff)
+		pr_debug("udp_dst_port:{doff:%lu value:%u}\n",
+				offsetof(struct user_metadata,
+					frame.udp_dst_port),
+				buf->frame.udp_dst_port);
 }
 #endif
 
@@ -5162,15 +4644,22 @@ static bool kparser_dump_metadata_table(
 	void *ptr;
 	int rc;
 
-	if (!obj || !rsp || !rsp_len)
+	if (!obj)
 		return true;
+
+	rc = alloc_first_rsp(&new_rsp, &new_rsp_len, KPARSER_NS_METALIST);
+	if (rc) {
+		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n",
+				__FUNCTION__, rc);
+		return false;
+	}
 
 	glue_obj = container_of(obj, struct kparser_glue_metadata_table,
 			metadata_table); /* TODO */
 
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_metalist(&glue_obj->glue.key,
-			&new_rsp, &new_rsp_len, false);
+			&new_rsp, &new_rsp_len, false, "read");
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_METALIST)) {
@@ -5204,15 +4693,22 @@ static bool kparser_dump_parse_node(
 	void *ptr;
 	int rc;
 
-	if (!obj || !rsp || !rsp_len)
+	if (!obj)
 		return true;
+
+	rc = alloc_first_rsp(&new_rsp, &new_rsp_len, KPARSER_NS_NODE_PARSE);
+	if (rc) {
+		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n",
+				__FUNCTION__, rc);
+		return false;
+	}
 
 	glue_obj = container_of(obj, struct kparser_glue_glue_parse_node,
 			parse_node.node); /* TODO */
 
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_parse_node(&glue_obj->glue.glue.key,
-			&new_rsp, &new_rsp_len, false);
+			&new_rsp, &new_rsp_len, false, "read");
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE)) {
@@ -5252,15 +4748,22 @@ static bool kparser_dump_protocol_table(
 	void *ptr;
 	int rc; // , i;
 
-	if (!obj || !rsp || !rsp_len)
+	if (!obj)
 		return true;
 
+	rc = alloc_first_rsp(&new_rsp, &new_rsp_len, KPARSER_NS_PROTO_TABLE);
+	if (rc) {
+		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n",
+				__FUNCTION__, rc);
+		return false;
+	}
+	
 	glue_obj = container_of(obj, struct kparser_glue_protocol_table,
 			proto_table);
 
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_proto_table(&glue_obj->glue.key,
-			&new_rsp, &new_rsp_len, false);
+			&new_rsp, &new_rsp_len, false, "read");
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE)) {
@@ -5306,23 +4809,11 @@ error:
 
 int kparser_read_parser(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_parser *kparsr;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -5343,11 +4834,9 @@ int kparser_read_parser(const struct kparser_hkey *key,
 			"Operation successful");
 	(*rsp)->key = kparsr->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
-	(*rsp)->object.namespace_id = kparsr->glue.config.namespace_id;
 	(*rsp)->object.conf_keys_bv = kparsr->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf =
 		kparsr->glue.config.parser_conf;
-	(*rsp)->objects_len = 0;
 
 	if (recursive_read &&
 			kparser_dump_parser(kparsr, rsp, rsp_len) == false)
@@ -5369,27 +4858,12 @@ done:
 int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
-		      size_t *rsp_len)
+		      size_t *rsp_len, const char *op)
 {
 	const struct kparser_parser *parser;
 	const struct kparser_hkey *key;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!conf || conf_len < sizeof(*conf) || !rsp ||
-			*rsp || !rsp_len || (*rsp_len != 0) ||
-			(conf->namespace_id !=
-			 KPARSER_NS_OP_PARSER_LOCK_UNLOCK)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -5410,10 +4884,8 @@ int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = *key;
-	(*rsp)->object.namespace_id = conf->namespace_id;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.obj_key = *key;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -5425,23 +4897,11 @@ done:
 
 int kparser_parser_unlock(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
-		    size_t *rsp_len, __u8 recursive_read)
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
 {
 	const struct kparser_glue_parser *kparsr;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	if (!key || !rsp || *rsp || !rsp_len || (*rsp_len != 0)) {
-		printk("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	*rsp = kzalloc(sizeof(struct kparser_cmd_rsp_hdr), GFP_KERNEL);
-	if (!(*rsp)) {
-		printk("%s:kzalloc failed for rsp\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-	*rsp_len = sizeof(struct kparser_cmd_rsp_hdr);
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
@@ -5470,9 +4930,7 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
 	(*rsp)->key = *key;
-	(*rsp)->object.namespace_id = KPARSER_NS_OP_PARSER_LOCK_UNLOCK;
 	(*rsp)->object.obj_key = *key;
-	(*rsp)->objects_len = 0;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -5480,11 +4938,14 @@ done:
 	return KPARSER_ATTR_RSP(KPARSER_NS_OP_PARSER_LOCK_UNLOCK);
 }
 
-int kparser_config_handler_add(const void *cmdarg, size_t cmdarglen,
-		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+static inline const struct kparser_conf_cmd *kparser_config_handler_preprocess(
+		const void *cmdarg,
+		size_t cmdarglen, struct kparser_cmd_rsp_hdr **rsp,
+		size_t *rsp_len)
 {
 	enum kparser_global_namespace_ids ns_id;
 	const struct kparser_conf_cmd *conf;
+	int rc;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -5493,118 +4954,84 @@ int kparser_config_handler_add(const void *cmdarg, size_t cmdarglen,
 			(*rsp_len != 0) ||
 			(conf->namespace_id <= KPARSER_NS_INVALID) ||
 			(conf->namespace_id >= KPARSER_NS_MAX)) {
-		pr_debug("%s:%d:[%p %lu %p %p %p %lu %d]\n",
+		pr_debug("{%s:%d}:[%p %lu %p %p %p %lu %d]\n",
 				__FUNCTION__, __LINE__,
 				conf, cmdarglen, rsp, *rsp, rsp_len,
 				*rsp_len, conf->namespace_id);
-		return KPARSER_ATTR_UNSPEC;
+		goto err_return;
 	}
 
 	ns_id = conf->namespace_id;
 	
 	if (!g_mod_namespaces[ns_id])
-		return KPARSER_ATTR_UNSPEC;
+		goto err_return;
 
 	if (!g_mod_namespaces[ns_id]->create_handler)
-		return KPARSER_ATTR_UNSPEC;
+		goto err_return;
+
+	rc = alloc_first_rsp(rsp, rsp_len, conf->namespace_id);
+	if (rc) {
+		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n",
+				__FUNCTION__, rc);
+		goto err_return;
+	} 
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+	return cmdarg;
 
-	return g_mod_namespaces[ns_id]->create_handler(
-			conf, cmdarglen, rsp, rsp_len);
+err_return:
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+	return NULL;
+}
+
+#define KPARSER_CONFIG_HANDLER_PRE					\
+do {									\
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);	\
+	conf = kparser_config_handler_preprocess(cmdarg, cmdarglen,	\
+			rsp, rsp_len);					\
+	if (!conf) {							\
+		pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__,	\
+				__LINE__);				\
+		return KPARSER_ATTR_UNSPEC;				\
+	}								\
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);	\
+}									\
+while(0)
+
+int kparser_config_handler_add(const void *cmdarg, size_t cmdarglen,
+		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+{
+	const struct kparser_conf_cmd *conf;
+	KPARSER_CONFIG_HANDLER_PRE;
+	return g_mod_namespaces[conf->namespace_id]->create_handler(
+			conf, cmdarglen, rsp, rsp_len, "create");
 }
 
 int kparser_config_handler_update(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
-	enum kparser_global_namespace_ids ns_id;
 	const struct kparser_conf_cmd *conf;
-
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	conf = cmdarg;
-	if (!conf || cmdarglen < sizeof(*conf) || !rsp || *rsp || !rsp_len ||
-			(*rsp_len != 0) ||
-			(conf->namespace_id <= KPARSER_NS_INVALID) ||
-			(conf->namespace_id >= KPARSER_NS_MAX)) {
-		pr_debug("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	ns_id = conf->namespace_id;
-	
-	if (!g_mod_namespaces[ns_id])
-		return KPARSER_ATTR_UNSPEC;
-
-	if (!g_mod_namespaces[ns_id]->update_handler)
-		return KPARSER_ATTR_UNSPEC;
-
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	return g_mod_namespaces[ns_id]->update_handler(
-			conf, cmdarglen, rsp, rsp_len);
+	KPARSER_CONFIG_HANDLER_PRE;
+	return g_mod_namespaces[conf->namespace_id]->update_handler(
+			conf, cmdarglen, rsp, rsp_len, "update");
 }
 
 int kparser_config_handler_read(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
-	enum kparser_global_namespace_ids ns_id;
 	const struct kparser_conf_cmd *conf;
-
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	conf = cmdarg;
-	if (!conf || cmdarglen < sizeof(*conf) || !rsp || *rsp || !rsp_len ||
-			(*rsp_len != 0) ||
-			(conf->namespace_id <= KPARSER_NS_INVALID) ||
-			(conf->namespace_id >= KPARSER_NS_MAX)) {
-		pr_debug("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	ns_id = conf->namespace_id;
-	
-	if (!g_mod_namespaces[ns_id])
-		return KPARSER_ATTR_UNSPEC;
-
-	if (!g_mod_namespaces[ns_id]->read_handler)
-		return KPARSER_ATTR_UNSPEC;
-
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	return g_mod_namespaces[ns_id]->read_handler(
+	KPARSER_CONFIG_HANDLER_PRE;
+	return g_mod_namespaces[conf->namespace_id]->read_handler(
 			&conf->obj_key, rsp, rsp_len,
-			conf->recursive_read_delete);
+			conf->recursive_read_delete, "read");
 }
 
 int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
-	enum kparser_global_namespace_ids ns_id;
 	const struct kparser_conf_cmd *conf;
-
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	conf = cmdarg;
-	if (!conf || cmdarglen < sizeof(*conf) || !rsp || *rsp || !rsp_len ||
-			(*rsp_len != 0) ||
-			(conf->namespace_id <= KPARSER_NS_INVALID) ||
-			(conf->namespace_id >= KPARSER_NS_MAX)) {
-		pr_debug("%s: invalid args\n", __FUNCTION__);
-		return KPARSER_ATTR_UNSPEC;
-	}
-
-	ns_id = conf->namespace_id;
-	
-	if (!g_mod_namespaces[ns_id])
-		return KPARSER_ATTR_UNSPEC;
-
-	if (!g_mod_namespaces[ns_id]->del_handler)
-		return KPARSER_ATTR_UNSPEC;
-
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
-
-	return g_mod_namespaces[ns_id]->del_handler(
+	KPARSER_CONFIG_HANDLER_PRE;
+	return g_mod_namespaces[conf->namespace_id]->del_handler(
 			&conf->obj_key, rsp, rsp_len,
-			conf->recursive_read_delete);
+			conf->recursive_read_delete, "delete");
 }
