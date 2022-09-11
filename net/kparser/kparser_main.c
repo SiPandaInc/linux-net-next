@@ -260,7 +260,7 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	for (attr_idx = KPARSER_ATTR_UNSPEC + 1; attr_idx <= KPARSER_ATTR_MAX;
+	for (attr_idx = KPARSER_ATTR_UNSPEC + 1; attr_idx < KPARSER_ATTR_MAX;
 			attr_idx++) {
 
 		if (!info->attrs[attr_idx] || !kparser_ns_op_handler[attr_idx])
@@ -272,7 +272,7 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 				&rsp_len);
 
 		if (ret_attr_id <= KPARSER_ATTR_UNSPEC ||
-				ret_attr_id > KPARSER_ATTR_MAX) {
+				ret_attr_id >= KPARSER_ATTR_MAX) {
 			pr_debug("%s: attr %d handler failed\n",
 					__FUNCTION__, attr_idx);
 			rc = EIO;

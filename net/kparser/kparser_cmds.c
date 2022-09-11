@@ -486,7 +486,7 @@ void * kparser_namespace_lookup(
 {
 	void *ret;
 
-	if (ns_id == KPARSER_NS_INVALID || ns_id >= KPARSER_NS_MAX)
+	if (ns_id <= KPARSER_NS_INVALID || ns_id >= KPARSER_NS_MAX)
 		return NULL;
 
 	if (!g_mod_namespaces[ns_id])
@@ -513,7 +513,7 @@ static inline int kparser_namespace_insert(
 {
 	int rc;
 
-	if (ns_id == KPARSER_NS_INVALID || ns_id >= KPARSER_NS_MAX)
+	if (ns_id <= KPARSER_NS_INVALID || ns_id >= KPARSER_NS_MAX)
 		return EINVAL;
 
 	if (!g_mod_namespaces[ns_id])
