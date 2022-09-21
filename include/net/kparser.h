@@ -1,0 +1,61 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* Copyright (c) 2022, SiPanda Inc.
+ *
+ * kparser.h - kParser global net header file
+ *
+ * Authors:     Pratyush Kumar Khan <pratyush@sipanda.io>
+ */
+
+#ifndef _NET_KPARSER_H
+#define _NET_KPARSER_H
+
+#include <linux/kparser.h>
+
+/* kParser datapath API 1: parse a skb using a parser instance key.
+ * skb: input packet skb
+ * kparser_key: key of the associated kParser parser object which must be
+ *              already created via CLI.
+ * _metadata: User provided metadata buffer. It must be same as configured
+ *            metadata objects in CLI.
+ * metadata_len: Total length of the user provided metadata buffer.
+ * return: kParser error code as defined in include/uapi/linux/kparser.h
+ */
+
+extern int kparser_parse(struct sk_buff *skb,
+			 const struct kparser_hkey *kparser_key,
+			 void *_metadata, size_t metadata_len);
+
+/* kParser datapath API 2: get/freeze a parser instance using a key.
+ * kparser_key: key of the associated kParser parser object which must be
+ * already created via CLI.
+ * return: NULL if key not found, else an opaque parser instance pointer which
+ * can be used in the following APIs 3 and 4.
+ * NOTE: This call makes the whole parser tree immutable. If caller calls this
+ * more than once, later caller will need to release the same parser exactly that
+ * many times using the API kparser_put_parser().
+ */
+extern const void *kparser_get_parser(const struct kparser_hkey *kparser_key);
+
+/* kParser datapath API 3: parse a void * packet buffer using a parser instance key.
+ * parser: Non NULL kparser_get_parser() returned and cached opaque pointer
+ * referencing a valid parser instance.
+ * _hdr: input packet buffer
+ * parse_len: length of input packet buffer
+ * _metadata: User provided metadata buffer. It must be same as configured
+ * metadata objects in CLI.
+ * metadata_len: Total length of the user provided metadata buffer.
+ * return: kParser error code as defined in include/uapi/linux/kparser.h
+ */
+extern int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
+			   size_t parse_len, void *_metadata, size_t metadata_len);
+
+/* kParser datapath API 4: put/un-freeze a parser instance using a previously
+ * obtained opaque parser pointer via API kparser_get_parser().
+ * parser: Non NULL kparser_get_parser() returned and cached opaque pointer
+ * referencing a valid parser instance.
+ * return: true if put operation is success, else false.
+ * NOTE: This call makes the whole parser tree deletable for the very last call.
+ */
+extern bool kparser_put_parser(const void *prsr);
+
+#endif /* _NET_KPARSER_H */
