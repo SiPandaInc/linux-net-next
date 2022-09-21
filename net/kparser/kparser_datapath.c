@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: BSD-2-Clause-FreeBSD
-/*
- * Copyright (c) 2020, 2021, 2022 SiPanda Inc.
+/* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
+/* Copyright (c) 2022, SiPanda Inc.
+ *
+ * kparser_datapath.c - kParser main datapath source file
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,6 +23,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * Authors:     Tom Herbert <tom@sipanda.io>
+ *              Pratyush Kumar Khan <pratyush@sipanda.io>
  */
 
 /* kparser main parsing logic - data path */
@@ -32,6 +36,9 @@
 
 #include <linux/rhashtable.h>
 #include <linux/skbuff.h>
+
+extern void kparser_locked_ref_get(struct kref *refcount);
+extern void kparser_locked_ref_put(struct kref *refcount);
 
 /* Lookup a type in a node table*/
 static const struct kparser_parse_node *lookup_node(int type,
@@ -1043,10 +1050,6 @@ parser_out:
 	return ctrl.ret;
 }
 
-static void kparser_release_parser(struct kref *kref)
-{
-}
-
 static inline void *
 kparser_get_parser_ctx(const struct kparser_hkey *kparser_key)
 {
@@ -1091,18 +1094,20 @@ int kparser_parse(struct sk_buff *skb,
 		return EINVAL;
 	}
 
-	kref_get(&k_prsr->glue.refcount);
+	kparser_locked_ref_get(&k_prsr->glue.refcount);
 	parser = &k_prsr->parser;
 
 	rcu_read_lock();
 
 	ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
-	parser = rcu_dereference(ptr);
+	k_prsr = rcu_dereference(ptr);
+	parser = &k_prsr->parser;
 	if (parser == NULL) {
 		pr_debug("{%s:%d}:parser htbl lookup failure for key:{%s:%u}\n",
 				__FUNCTION__, __LINE__,
 				kparser_key->name, kparser_key->id);
 		rcu_read_unlock();
+		kparser_locked_ref_put(&k_prsr->glue.refcount);
 		return ENOENT;
 	}
 
@@ -1110,7 +1115,7 @@ int kparser_parse(struct sk_buff *skb,
 
 	rcu_read_unlock();
 
-	kref_put(&k_prsr->glue.refcount, kparser_release_parser);
+	kparser_locked_ref_put(&k_prsr->glue.refcount);
 
 	return err;
 }
@@ -1122,7 +1127,7 @@ const void * kparser_get_parser(const struct kparser_hkey *kparser_key)
 	k_prsr = kparser_get_parser_ctx(kparser_key);
 	if (!k_prsr)
 		return NULL;
-	kref_get(&k_prsr->glue.refcount);
+	kparser_locked_ref_get(&k_prsr->glue.refcount);
 	return &k_prsr->parser;	
 }
 
@@ -1135,7 +1140,7 @@ bool kparser_put_parser(const void *prsr)
 		return false;
 	parser = prsr;
 	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
-	kref_put(&k_prsr->glue.refcount, kparser_release_parser);
+	kparser_locked_ref_put(&k_prsr->glue.refcount);
 	return true;
 }
 

@@ -1,20 +1,45 @@
-/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-/* kparser.h - kParser Interface */
+/* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
+/* Copyright (c) 2022, SiPanda Inc.
+ *
+ * kparser.h - kParser global Linux header file
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * Authors:     Tom Herbert <tom@sipanda.io>
+ *              Pratyush Kumar Khan <pratyush@sipanda.io>
+ */
 
 #ifndef _LINUX_KPARSER_H
 #define _LINUX_KPARSER_H
 
-#include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/types.h>
 
 #define BITS_IN_BYTE	8
 #define BITS_IN_U32	(sizeof(__u32) * BITS_IN_BYTE)
 
-/* TODO: find these from linux header file, maybe bitmasks.h */
-#define kparsersetbit(A,k) (A[(k)/BITS_IN_U32] |= (1 << ((k) % BITS_IN_U32)))
-#define kparserclearbit(A,k) (A[(k)/BITS_IN_U32] &= ~(1 << ((k) % BITS_IN_U32)))
-#define kparsertestbit(A,k) (1 & (A[(k)/BITS_IN_U32] >> ((k) % BITS_IN_U32)))
+#define kparsersetbit(A, k) (A[(k)/BITS_IN_U32] |= (1 << ((k) % BITS_IN_U32)))
+#define kparserclearbit(A, k) (A[(k)/BITS_IN_U32] &= ~(1 << ((k) % BITS_IN_U32)))
+#define kparsertestbit(A, k) (1 & (A[(k)/BITS_IN_U32] >> ((k) % BITS_IN_U32)))
 
 /* *********************** NETLINK_GENERIC *********************** */
 #define KPARSER_GENL_NAME		"kParser"
@@ -169,14 +194,14 @@ struct kparser_conf_condexpr_tables {
 #define KPARSER_CNTR_NUM_CNTRS		7
 
 struct kparser_cntr_conf {
-        bool valid_entry;
+	bool valid_entry;
 	__u8 index;
 	__u32 max_value;
 	__u32 array_limit;
-        size_t el_size;
-        bool reset_on_encap;
-        bool overwrite_last;
-        bool error_on_exceeded;
+	size_t el_size;
+	bool reset_on_encap;
+	bool overwrite_last;
+	bool error_on_exceeded;
 };
 
 struct kparser_conf_cntr {
@@ -252,27 +277,27 @@ enum kparser_node_type {
 
 /* Types for parameterized functions */
 struct kparser_parameterized_len {
-        __u16 src_off;
-        __u8 size;
-        bool endian;
-        __u32 mask;
-        __u8 right_shift;
-        __u8 multiplier;
-        __u8 add_value;
+	__u16 src_off;
+	__u8 size;
+	bool endian;
+	__u32 mask;
+	__u8 right_shift;
+	__u8 multiplier;
+	__u8 add_value;
 };
 
 struct kparser_parameterized_next_proto {
-        __u16 src_off;
-        __u16 mask;
-        __u8 size;
-        __u8 right_shift;
+	__u16 src_off;
+	__u16 mask;
+	__u8 size;
+	__u8 right_shift;
 };
 
 struct kparser_conf_parse_ops {
 	// bool flag_fields_length; // TODO
 	bool len_parameterized;
-        struct kparser_parameterized_len pflen;
-        struct kparser_parameterized_next_proto pfnext_proto;
+	struct kparser_parameterized_len pflen;
+	struct kparser_parameterized_next_proto pfnext_proto;
 	bool cond_exprs_parameterized;
 	struct kparser_hkey cond_exprs_table;
 };
@@ -295,10 +320,10 @@ struct kparser_conf_node_parse {
 
 /* TLVS */
 struct kparser_proto_tlvs_opts {
-        struct kparser_parameterized_len pfstart_offset;
-        bool len_parameterized;
-        struct kparser_parameterized_len pflen;
-        struct kparser_parameterized_next_proto pftype;
+	struct kparser_parameterized_len pfstart_offset;
+	bool len_parameterized;
+	struct kparser_parameterized_len pflen;
+	struct kparser_parameterized_next_proto pftype;
 };
 
 struct kparser_conf_proto_tlvs_node {
@@ -343,12 +368,12 @@ enum {
  * exceed_loop_cnt_is_err: True is exceeding maximum number of TLVS is an error
  */
 struct kparser_loop_node_config {
-        __u16 max_loop;
-        __u16 max_non;
-        __u8 max_plen;
-        __u8 max_c_pad;
-        __u8 disp_limit_exceed;
-        bool exceed_loop_cnt_is_err;
+	__u16 max_loop;
+	__u16 max_non;
+	__u8 max_plen;
+	__u8 max_c_pad;
+	__u8 disp_limit_exceed;
+	bool exceed_loop_cnt_is_err;
 };
 
 /* TODO:
@@ -400,7 +425,7 @@ struct kparser_conf_node {
 /* *********************** tlv parse node *********************** */
 struct kparser_conf_proto_tlv_node_ops {
 	bool overlay_type_parameterized;
-        struct kparser_parameterized_next_proto pfoverlay_type;
+	struct kparser_parameterized_next_proto pfoverlay_type;
 	bool cond_exprs_parameterized;
 	struct kparser_hkey cond_exprs_table;
 };
@@ -468,7 +493,7 @@ struct kparser_conf_table {
 
 #define KPARSER_MAX_NODES	10
 #define KPARSER_MAX_ENCAPS	1
-#define KPARSER_MAX_FRAMES	255 
+#define KPARSER_MAX_FRAMES	255
 
 /* Configuration for a KPARSER parser
  *
@@ -482,12 +507,12 @@ struct kparser_conf_table {
  * frame_size: Size of one metadata frame
  */
 struct kparser_config {
-        __u16 flags;
-        __u16 max_nodes;
-        __u16 max_encaps;
-        __u16 max_frames;
-        size_t metameta_size;
-        size_t frame_size;
+	__u16 flags;
+	__u16 max_nodes;
+	__u16 max_encaps;
+	__u16 max_frames;
+	size_t metameta_size;
+	size_t frame_size;
 };
 
 struct kparser_conf_parser {
@@ -500,7 +525,7 @@ struct kparser_conf_parser {
 };
 
 /* *********************** CLI config interface *********************** */
-#define KPARSER_CONFIG_MAX_KEYS				128 
+#define KPARSER_CONFIG_MAX_KEYS				128
 #define KPARSER_CONFIG_MAX_KEYS_BV_LEN ((KPARSER_CONFIG_MAX_KEYS / BITS_IN_U32) + 1)
 struct kparser_config_set_keys_bv {
 	__u32 ns_keys_bvs[KPARSER_CONFIG_MAX_KEYS_BV_LEN];
@@ -559,7 +584,7 @@ struct kparser_cmd_rsp_hdr {
 	struct kparser_hkey key;
 	struct kparser_conf_cmd object;
 	size_t objects_len;
-	 /* array of fixed size kparser_conf_cmd objects */
+	/* array of fixed size kparser_conf_cmd objects */
 	struct kparser_conf_cmd objects[0];
 };
 
@@ -597,8 +622,8 @@ enum {
 	KPARSER_STOP_OPTION_LIMIT = -22,
 	KPARSER_STOP_MAX_NODES = -23,
 	KPARSER_STOP_COMPARE = -24,
-        KPARSER_STOP_BAD_EXTRACT = -25,
-        KPARSER_STOP_BAD_CNTR = -26,
+	KPARSER_STOP_BAD_EXTRACT = -25,
+	KPARSER_STOP_BAD_CNTR = -26,
 	KPARSER_STOP_CNTR1 = -27,
 	KPARSER_STOP_CNTR2 = -28,
 	KPARSER_STOP_CNTR3 = -29,
@@ -688,4 +713,6 @@ static inline bool kparser_hkey_user_id_invalid(const struct kparser_hkey *key)
 	return ((key->id == KPARSER_INVALID_ID) ||
 			(key->id > KPARSER_USER_ID_MAX));
 }
+
+
 #endif /* _LINUX_KPARSER_H */

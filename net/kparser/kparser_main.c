@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: BSD-2-Clause-FreeBSD
-/*
- * Copyright (c) 2020, 2021, 2022 SiPanda Inc.
+/* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
+/* Copyright (c) 2022, SiPanda Inc.
+ *
+ * kparser_main.c - kParser KMOD main module source file with netlink handlers
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,6 +23,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * Author:      Pratyush Kumar Khan <pratyush@sipanda.io>
  */
 
 #include "kparser.h"

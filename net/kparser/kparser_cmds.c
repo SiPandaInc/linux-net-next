@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: BSD-2-Clause-FreeBSD
-/* Copyright (c) 2020, 2021, 2022 SiPanda Inc.
+/* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
+/* Copyright (c) 2022, SiPanda Inc.
+ *
+ * kparser_cmds.c - kParser KMOD-CLI management API layer
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -21,6 +23,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * Author:      Pratyush Kumar Khan <pratyush@sipanda.io>
  */
 
 #include "kparser.h"
@@ -30,44 +34,200 @@
 
 static DEFINE_MUTEX(kparser_config_lock);
 
-/* Layout for important config and data path data structures:
- *
- * metadata (md): Each metadata node specifies:
- *	soff: copy offset
- *	doff: write offset
- *	len:  write len
- *
- * metalist (mdl): All meta data nodes are referenced by zero or
- * more metalist nodes. Each metadata list node contains a hash
- * table of all the associated linear
- * link list which contains references to all the associated md
- * nodes.
- * 
- * Hence metalist contains a list of meta data nodes.  
- * Each protocol table contains a fixed number of protocol entries.
- * Each protocol entry will contain a reference to a protocol node.
- * Each proto node can belong to more than one protocol entry.
- * Hence each proto node maintains a list of owner protocol entries.
- */
-
-static void kparser_free_proto_tbl(void *ptr, void *arg)
+static void kparser_release_ref(struct kref *kref)
 {
 }
 
-static void kparser_free_node(void *ptr, void *arg)
+void kparser_locked_ref_get(struct kref *refcount)
 {
+	mutex_lock(&kparser_config_lock);
+	kref_get(refcount);
+	mutex_unlock(&kparser_config_lock);
 }
 
-static void kparser_free_metalist(void *ptr, void *arg)
+void kparser_locked_ref_put(struct kref *refcount)
 {
+	mutex_lock(&kparser_config_lock);
+	kref_put(refcount, kparser_release_ref);
+	mutex_unlock(&kparser_config_lock);
 }
 
-static void kparser_free_metadata(void *ptr, void *arg)
+static inline bool kparser_link_attach(const void *owner_obj,
+		int owner_nsid,
+		const void **owner_obj_link_ptr,
+		struct kref *owner_obj_refcount,
+		struct list_head *owner_list,
+		const void *owned_obj,
+		int owned_nsid,
+		struct kref *owned_obj_refcount,
+		struct list_head *owned_list,
+		struct kparser_cmd_rsp_hdr *rsp,
+		const char *op)
 {
+	struct kparser_obj_link_ctx *reflist = kzalloc(
+			sizeof(*reflist), GFP_KERNEL);
+
+	if (!reflist) {
+		rsp->op_ret_code = ENOMEM;
+		(void) snprintf(rsp->err_str_buf,
+				sizeof(rsp->err_str_buf),
+				"%s: kzalloc failed", op);
+		return false;
+	}
+
+	reflist->sig = KPARSER_LINK_OBJ_SIGNATURE;
+	reflist->owner_obj.nsid = owner_nsid;
+	reflist->owner_obj.obj = owner_obj;
+	reflist->owner_obj.link_ptr = owner_obj_link_ptr;
+	reflist->owner_obj.list = owner_list;
+	reflist->owner_obj.refcount = owner_obj_refcount;
+
+	reflist->owned_obj.nsid = owned_nsid;
+	reflist->owned_obj.obj = owned_obj;
+	reflist->owned_obj.list = owned_list;
+	reflist->owned_obj.refcount = owned_obj_refcount;
+
+	list_add_tail(&reflist->owner_obj.list_node, reflist->owner_obj.list);
+	list_add_tail(&reflist->owned_obj.list_node, reflist->owned_obj.list);
+
+	if (reflist->owned_obj.refcount)
+		kref_get(reflist->owned_obj.refcount);
+
+	printk("PKPK:{%s:%d}:owner:%p owned:%p ref:%p\n",
+			__func__, __LINE__, owner_obj, owned_obj, reflist);
+
+	synchronize_rcu();
+
+	return true;
 }
 
-static void kparser_free_parser(void *ptr, void *arg)
+static inline bool kparser_link_break(const void *owner, const void *owned,
+		struct kparser_obj_link_ctx *ref,
+		struct kparser_cmd_rsp_hdr *rsp)
 {
+	if (!ref) {
+		if (rsp) {
+			rsp->op_ret_code = EFAULT;
+			(void) snprintf(rsp->err_str_buf,
+					sizeof(rsp->err_str_buf),
+					"link is NULL!");
+		}
+		return false;
+
+	}
+
+	if (ref->sig != KPARSER_LINK_OBJ_SIGNATURE) {
+		if (rsp) {
+			rsp->op_ret_code = EFAULT;
+			(void) snprintf(rsp->err_str_buf,
+					sizeof(rsp->err_str_buf),
+					"link is corrupt!");
+		}
+		return false;
+	}
+
+	if (owner && ref->owner_obj.obj != owner) {
+		if (rsp) {
+			rsp->op_ret_code = EFAULT;
+			(void) snprintf(rsp->err_str_buf,
+					sizeof(rsp->err_str_buf),
+					"link owner corrupt!");
+		}
+		return false;
+	}
+
+	if (owned && ref->owned_obj.obj != owned) {
+		if (rsp) {
+			rsp->op_ret_code = EFAULT;
+			(void) snprintf(rsp->err_str_buf,
+					sizeof(rsp->err_str_buf),
+					"link owned corrupt!");
+		}
+		return false;
+	}
+
+	if (ref->owned_obj.refcount)
+		kref_put(ref->owned_obj.refcount, kparser_release_ref);
+
+	if (ref->owner_obj.link_ptr)
+		rcu_assign_pointer(*ref->owner_obj.link_ptr, NULL);
+
+	list_del_init_careful(&ref->owner_obj.list_node);
+	list_del_init_careful(&ref->owned_obj.list_node);
+
+	synchronize_rcu();
+
+	return true;
+}
+
+static inline bool kparser_link_detach_owner(const void *obj,
+		struct list_head *list, struct kparser_cmd_rsp_hdr *rsp)
+{
+	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
+
+	list_for_each_entry_safe(curr_ref, tmp_list_ref, list,
+			owner_obj.list_node) {
+		if (kparser_link_break(obj, NULL, curr_ref, rsp) == false)
+			return false;
+		kfree(curr_ref);
+	}
+
+	return true;
+}
+
+static inline bool kparser_link_detach_owned(const void *obj,
+		struct list_head *list, struct kparser_cmd_rsp_hdr *rsp)
+{
+	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
+	const struct kparser_glue_glue_parse_node *kparsenode;
+	const struct kparser_glue_protocol_table *proto_table;
+	int i;
+
+	list_for_each_entry_safe(curr_ref, tmp_list_ref, list,
+			owned_obj.list_node) {
+		/* Special case handling:
+		 * if this is parse node and owned by a prototable, make sure
+		 * to remove that table's entry from array separately
+		 */
+		if ((curr_ref->owner_obj.nsid == KPARSER_NS_PROTO_TABLE) &&
+			(curr_ref->owned_obj.nsid == KPARSER_NS_NODE_PARSE)) {
+			proto_table = curr_ref->owner_obj.obj;
+			kparsenode = curr_ref->owned_obj.obj;
+			for (i = 0; i < proto_table->proto_table.num_ents;
+					i++) {
+				if (proto_table->proto_table.entries[i].node !=
+						&kparsenode->parse_node.node)
+					continue;
+				rcu_assign_pointer(proto_table->proto_table.
+						entries[i].node, NULL);
+				memset(&proto_table->proto_table.entries[i], 0,
+						sizeof(proto_table->proto_table.
+							entries[i]));
+				synchronize_rcu();
+				break;
+			}
+		}
+
+		if (kparser_link_break(NULL, obj, curr_ref, rsp) == false)
+			return false;
+		kfree(curr_ref);
+	}
+
+	return true;
+}
+
+static inline bool kparser_link_detach(const void *obj,
+		struct list_head *owner_list,
+		struct list_head *owned_list,
+		struct kparser_cmd_rsp_hdr *rsp)
+{
+	if (kparser_link_detach_owner(obj, owner_list, rsp) == false)
+		return false;
+
+	if (kparser_link_detach_owned(obj, owned_list, rsp) == false)
+		return false;
+
+	return true;
 }
 
 typedef int kparser_obj_create_update(const struct kparser_conf_cmd *conf,
@@ -122,9 +282,13 @@ kparser_obj_read_del
 	kparser_read_counter,
 	kparser_read_counter_table,
 	kparser_read_metadata,
+	kparser_del_metadata,
 	kparser_read_metalist,
+	kparser_del_metalist,
 	kparser_read_parse_node,
+	kparser_del_parse_node,
 	kparser_read_proto_table,
+	kparser_del_proto_table,
 	kparser_read_parse_tlv_node,
 	kparser_read_tlv_proto_table,
 	kparser_read_flag_field,
@@ -132,7 +296,15 @@ kparser_obj_read_del
 	kparser_read_parse_flag_field_node,
 	kparser_read_flag_field_proto_table,
 	kparser_read_parser,
+	kparser_del_parser,
 	kparser_parser_unlock;
+
+kparser_free_obj
+	kparser_free_metadata,
+	kparser_free_metalist,
+	kparser_free_node,
+	kparser_free_proto_tbl,
+	kparser_free_parser;
 
 #define KPARSER_DEFINE_MOD_NAMESPACE(g_ns_obj, nsid, obj_name, field, create,\
 		read, update, delete, free)				     \
@@ -234,7 +406,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_metadata,
 			     kparser_create_metadata,
 			     kparser_read_metadata,
 			     NULL,
-			     NULL,
+			     kparser_del_metadata,
 			     kparser_free_metadata);
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_metalist,
@@ -244,7 +416,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_metalist,
 			     kparser_create_metalist,
 			     kparser_read_metalist,
 			     NULL,
-			     NULL,
+			     kparser_del_metalist,
 			     kparser_free_metalist);
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_node_parse,
@@ -254,7 +426,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_node_parse,
 			     kparser_create_parse_node,
 			     kparser_read_parse_node,
 			     NULL,
-			     NULL,
+			     kparser_del_parse_node,
 			     kparser_free_node);
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_proto_table,
@@ -264,7 +436,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_proto_table,
 			     kparser_create_proto_table,
 			     kparser_read_proto_table,
 			     NULL,
-			     NULL,
+			     kparser_del_proto_table,
 			     kparser_free_proto_tbl);
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_tlv_node_parse,
@@ -334,7 +506,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_parser,
 			     kparser_create_parser,
 			     kparser_read_parser,
 			     NULL,
-			     NULL,
+			     kparser_del_parser,
 			     kparser_free_parser);
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_parser_lock_unlock,
@@ -345,7 +517,7 @@ KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_parser_lock_unlock,
 			     NULL,
 			     NULL,
 			     kparser_parser_unlock,
-			     kparser_free_parser);
+			     NULL);
 
 static struct kparser_mod_namespaces *g_mod_namespaces[] = 
 {
@@ -478,6 +650,33 @@ static inline bool kparser_conf_key_manager(
 		*new_key = *key;
 
 	return true;
+}
+
+static inline int kparser_namespace_remove(
+		enum kparser_global_namespace_ids ns_id,
+		struct rhash_head *obj_id,
+		struct rhash_head *obj_name)
+{
+	int rc;
+
+	if (ns_id <= KPARSER_NS_INVALID || ns_id >= KPARSER_NS_MAX)
+		return EINVAL;
+
+	if (!g_mod_namespaces[ns_id])
+		return ENOENT;
+
+	rc = rhashtable_remove_fast(
+			&g_mod_namespaces[ns_id]->htbl_id.tbl, obj_id,
+			g_mod_namespaces[ns_id]->htbl_id.tbl_params);
+
+	if (rc)
+		return rc;
+
+	rc = rhashtable_remove_fast(
+			&g_mod_namespaces[ns_id]->htbl_name.tbl, obj_name,
+			g_mod_namespaces[ns_id]->htbl_name.tbl_params);
+
+	return rc;
 }
 
 void * kparser_namespace_lookup(
@@ -2031,8 +2230,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = EEXIST;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: Duplicate object key",
-				__FUNCTION__);
+				"%s: Duplicate object key", op);
 		goto done;
 	}
 
@@ -2043,8 +2241,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 			(*rsp)->op_ret_code = ENOENT;
 			(void) snprintf((*rsp)->err_str_buf,
 					sizeof((*rsp)->err_str_buf),
-					"%s: Counter object key not found",
-					__FUNCTION__);
+					"%s: Counter object key not found", op);
 			goto done;
 		}
 		cntridx = kcntr->counter_cnf.index + 1;
@@ -2055,7 +2252,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = ENOMEM;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
+				"%s: kzalloc() failed", op);
 		goto done;
 	}
 
@@ -2068,8 +2265,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = rc;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_namespace_insert() err",
-				__FUNCTION__);
+				"%s: kparser_namespace_insert() err", op);
 		goto done;
 	}
 
@@ -2078,13 +2274,14 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 	kmde->glue.config.md_conf = *arg;
 	kmde->glue.config.md_conf.key = key;
 	kref_init(&kmde->glue.refcount);
+	INIT_LIST_HEAD(&kmde->glue.owner_list);
+	INIT_LIST_HEAD(&kmde->glue.owned_list);
 
 	if (!kparser_metadata_convert(arg, &kmde->mde, cntridx)) {
 		(*rsp)->op_ret_code = EINVAL;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_metadata_convert() err",
-				__FUNCTION__);
+				"%s: kparser_metadata_convert() err", op);
 		goto done;
 	}
 
@@ -2123,8 +2320,7 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 		(*rsp)->op_ret_code = ENOENT;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: Object key not found",
-				__FUNCTION__);
+				"%s: Object key not found", op);
 		goto done;
 	}
 
@@ -2141,14 +2337,75 @@ done:
 	return KPARSER_ATTR_RSP(KPARSER_NS_METADATA);
 }
 
+int kparser_del_metadata(const struct kparser_hkey *key,
+		    struct kparser_cmd_rsp_hdr **rsp,
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
+{
+	struct kparser_glue_metadata_extract *kmde;
+	int rc;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+
+	mutex_lock(&kparser_config_lock);
+
+	kmde = kparser_namespace_lookup(KPARSER_NS_METADATA, key);
+	if (!kmde) {
+		(*rsp)->op_ret_code = ENOENT;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: Object key not found", op);
+		goto done;
+	}
+
+	if (kref_read(&kmde->glue.refcount) != 0) {
+		(*rsp)->op_ret_code = EBUSY;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: Metadata object is associated with a "
+				"metalist, delete that metalist instead", op);
+		goto done;
+	}
+
+	rc = kparser_namespace_remove(KPARSER_NS_METADATA,
+			&kmde->glue.ht_node_id, &kmde->glue.ht_node_name);
+	if (rc) {
+		(*rsp)->op_ret_code = rc;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: namespace remove error", op);
+		goto done;
+	}
+
+	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
+			"Operation successful");
+	(*rsp)->key = kmde->glue.key;
+	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
+	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
+
+	kfree(kmde);
+done:
+	mutex_unlock(&kparser_config_lock);
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+	return KPARSER_ATTR_RSP(KPARSER_NS_METADATA);
+}
+
+void kparser_free_metadata(void *ptr, void *arg)
+{
+	kfree(ptr);
+}
+
 int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		      size_t conf_len,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len, const char *op)
 {
-	const struct kparser_conf_metadata_table *arg;
-	const struct kparser_glue_metadata_extract *kmde = NULL;
+	struct kparser_glue_metadata_extract *kmde = NULL;
 	struct kparser_glue_metadata_table *kmdl = NULL;
+	const struct kparser_conf_metadata_table *arg;
 	struct kparser_conf_cmd *objects = NULL;
 	struct kparser_hkey key;
 	int rc, i;
@@ -2171,8 +2428,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = EEXIST;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: Duplicate object key",
-				__FUNCTION__);
+				"%s: Duplicate object key", op);
 		goto done;
 	}
 
@@ -2181,7 +2437,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = ENOMEM;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
+				"%s: kzalloc() failed", op);
 		goto done;
 	}
 
@@ -2192,6 +2448,8 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 	kmdl->glue.config.mdl_conf.key = key;
 	kmdl->glue.config.mdl_conf.metadata_keys_count = 0;
 	kref_init(&kmdl->glue.refcount);
+	INIT_LIST_HEAD(&kmdl->glue.owner_list);
+	INIT_LIST_HEAD(&kmdl->glue.owned_list);
 
 	conf_len -= sizeof(*conf);
 
@@ -2202,7 +2460,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 			(void) snprintf((*rsp)->err_str_buf,
 					sizeof((*rsp)->err_str_buf),
 					"%s: conf len/buffer incomplete",
-					__FUNCTION__);
+					op);
 			goto done;
 		}
 
@@ -2219,7 +2477,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 			(void) snprintf((*rsp)->err_str_buf,
 					sizeof((*rsp)->err_str_buf),
 					"%s: Object key {%s:%u} not found",
-					__FUNCTION__,
+					op,
 					arg->metadata_keys[i].name,
 					arg->metadata_keys[i].id);
 			goto done;
@@ -2234,12 +2492,13 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 			(void) snprintf((*rsp)->err_str_buf,
 					sizeof((*rsp)->err_str_buf),
 					"%s: krealloc() err, ents:%d, size:%lu",
-					__FUNCTION__,
+					op,
 					kmdl->metadata_table.num_ents,
 					sizeof(*kmde));
 			goto done;
 		}
 		kmdl->metadata_table.entries[i] = kmde->mde;
+		kref_get(&kmde->glue.refcount);
 
 		(*rsp)->objects_len++;
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
@@ -2274,7 +2533,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 			(void) snprintf((*rsp)->err_str_buf,
 					sizeof((*rsp)->err_str_buf),
 					"%s: krealloc() err,ents:%lu, size:%lu",
-					__FUNCTION__,
+					op,
 					kmdl->md_configs_len,
 					sizeof(struct kparser_conf_cmd));
 			goto done;
@@ -2294,7 +2553,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
 				"%s: kparser_namespace_insert() err",
-				__FUNCTION__);
+				op);
 		goto done;
 	}
 
@@ -2342,10 +2601,103 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		(*rsp)->op_ret_code = ENOENT;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: Object key not found",
-				__FUNCTION__);
+				"%s: Object key not found", op);
 		goto done;
 	}
+
+	(*rsp)->key = kmdl->glue.key;
+	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	(*rsp)->object.conf_keys_bv = kmdl->glue.config.conf_keys_bv;
+	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
+
+	for (i = 0; i < kmdl->md_configs_len; i++) {
+		(*rsp)->objects_len++;
+		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
+		*rsp = krealloc(*rsp, *rsp_len,
+				GFP_KERNEL | ___GFP_ZERO);
+		if (!(*rsp)) {
+			printk("%s:krealloc failed for rsp, len:%lu\n",
+				op, *rsp_len);
+			*rsp_len = 0;
+			mutex_unlock(&kparser_config_lock);
+			return KPARSER_ATTR_UNSPEC;
+		}
+		objects = (struct kparser_conf_cmd *) (*rsp)->objects;
+		objects[i].namespace_id =
+			kmdl->md_configs[i].namespace_id;
+		objects[i].conf_keys_bv = kmdl->md_configs[i].conf_keys_bv;
+		objects[i].md_conf = kmdl->md_configs[i].md_conf;
+	}
+
+	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
+			"Operation successful");
+done:
+	mutex_unlock(&kparser_config_lock);
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+	return KPARSER_ATTR_RSP(KPARSER_NS_METALIST);
+}
+
+int kparser_del_metalist(const struct kparser_hkey *key,
+		    struct kparser_cmd_rsp_hdr **rsp,
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
+{
+	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
+	struct kparser_obj_link_ctx *node_tmp_list_ref = NULL;
+	struct kparser_obj_link_ctx *node_curr_ref = NULL;
+	struct kparser_glue_glue_parse_node *kparsenode;
+	struct kparser_glue_metadata_extract *kmde;
+	struct kparser_glue_metadata_table *kmdl;
+	struct kparser_conf_cmd *objects = NULL;
+	int i, rc;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+
+	mutex_lock(&kparser_config_lock);
+
+	kmdl = kparser_namespace_lookup(KPARSER_NS_METALIST, key);
+	if (!kmdl) {
+		(*rsp)->op_ret_code = ENOENT;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: Object key not found", op);
+		goto done;
+	}
+
+        // verify if there is any associated immutable parser
+	list_for_each_entry_safe(curr_ref, tmp_list_ref,
+			&kmdl->glue.owned_list, owned_obj.list_node) {
+		if (curr_ref->owner_obj.nsid != KPARSER_NS_NODE_PARSE)
+			continue;
+		if (kref_read(curr_ref->owner_obj.refcount) == 0)
+			continue;
+		kparsenode = (struct kparser_glue_glue_parse_node *)
+			curr_ref->owner_obj.obj;
+		list_for_each_entry_safe(node_curr_ref, node_tmp_list_ref,
+				&kparsenode->glue.glue.owned_list,
+				owned_obj.list_node) {
+			if (node_curr_ref->owner_obj.nsid != KPARSER_NS_PARSER)
+				continue;
+			if (kref_read(node_curr_ref->owner_obj.refcount) != 0) {
+				(*rsp)->op_ret_code = EBUSY;
+				(void) snprintf((*rsp)->err_str_buf,
+						sizeof((*rsp)->err_str_buf),
+						"%s:attached parser `%s` is "
+						"immutable",
+						op,
+						((struct kparser_glue_parser *)
+						 node_curr_ref->owner_obj.obj)
+						->glue.key.name);
+				goto done;
+			}
+		}
+	}
+
+        if (kparser_link_detach(kmdl, &kmdl->glue.owner_list,
+                                &kmdl->glue.owned_list, *rsp) != true)
+                goto done;
 
 	(*rsp)->key = kmdl->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
@@ -2369,7 +2721,46 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 			kmdl->md_configs[i].namespace_id;
 		objects[i].conf_keys_bv = kmdl->md_configs[i].conf_keys_bv;
 		objects[i].md_conf = kmdl->md_configs[i].md_conf;
+
+		kmde = kparser_namespace_lookup(KPARSER_NS_METADATA,
+				&objects[i].md_conf.key);
+		if (!kmde) {
+			(*rsp)->op_ret_code = ENOENT;
+			(void) snprintf((*rsp)->err_str_buf,
+					sizeof((*rsp)->err_str_buf),
+					"%s: Object key not found", op);
+			goto done;
+		}
+
+		rc = kparser_namespace_remove(KPARSER_NS_METADATA,
+				&kmde->glue.ht_node_id,
+				&kmde->glue.ht_node_name);
+		if (rc) {
+			(*rsp)->op_ret_code = rc;
+			(void) snprintf((*rsp)->err_str_buf,
+					sizeof((*rsp)->err_str_buf),
+					"%s: namespace remove error", op);
+			goto done;
+		}
+
+		kfree(kmde);
 	}
+
+	rc = kparser_namespace_remove(KPARSER_NS_METALIST,
+			&kmdl->glue.ht_node_id,
+			&kmdl->glue.ht_node_name);
+	if (rc) {
+		(*rsp)->op_ret_code = rc;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: namespace remove error", op);
+		goto done;
+	}
+
+	kfree(kmdl->metadata_table.entries);
+	kmdl->metadata_table.num_ents = 0;
+	kfree(kmdl->md_configs);
+	kfree(kmdl);
 
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
 			"Operation successful");
@@ -2380,20 +2771,43 @@ done:
 	return KPARSER_ATTR_RSP(KPARSER_NS_METALIST);
 }
 
+void kparser_free_metalist(void *ptr, void *arg)
+{
+	struct kparser_glue_metadata_table *kmdl = ptr;
+	struct kparser_glue_metadata_extract *kmde;
+	int i;
+
+	for (i = 0; i < kmdl->md_configs_len; i++) {
+		kmde = kparser_namespace_lookup(KPARSER_NS_METADATA,
+				&kmdl->md_configs[i].md_conf.key);
+		if (!kmde)
+			continue;
+
+		(void) kparser_namespace_remove(KPARSER_NS_METADATA,
+				&kmde->glue.ht_node_id,
+				&kmde->glue.ht_node_name);
+		kfree(kmde);
+	}
+
+	kfree(kmdl->md_configs);
+	kfree(kmdl->metadata_table.entries);
+	kfree(kmdl);
+}
+
 static inline bool kparser_conf_node_convert(
 		const struct kparser_conf_node *conf,
 		void *node, size_t node_len)
 {
-	struct kparser_parse_flag_fields_node *flag_fields_parse_node;
 	struct kparser_glue_proto_flag_fields_table *kflag_fields_proto_table;
-	struct kparser_parse_tlvs_node *tlvs_parse_node;
+	struct kparser_parse_flag_fields_node *flag_fields_parse_node;
 	struct kparser_glue_parse_tlv_node *kparsetlvwildcardnode;
-	struct kparser_parse_node *plain_parse_node;
 	struct kparser_glue_glue_parse_node *kparsewildcardnode;
+	struct kparser_glue_proto_tlvs_table *kprototlvstbl;
 	struct kparser_glue_condexpr_tables *kcond_tables;
+	struct kparser_parse_tlvs_node *tlvs_parse_node;
 	struct kparser_glue_flag_fields *kflag_fields;
 	struct kparser_glue_protocol_table *kprototbl;
-	struct kparser_glue_proto_tlvs_table *kprototlvstbl;
+	struct kparser_parse_node *plain_parse_node;
 	struct kparser_glue_metadata_table *kmdl;
 
 	if (!conf || !node || (node_len < sizeof(*plain_parse_node)))
@@ -2548,6 +2962,8 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 		      size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_glue_parse_node *kparsenode = NULL;
+	struct kparser_glue_protocol_table *proto_table;
+	struct kparser_glue_metadata_table *mdl;
 	const struct kparser_conf_node *arg;
 	struct kparser_hkey key;
 	int rc;
@@ -2585,6 +3001,8 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 	}
 
 	kparsenode->glue.glue.key = key;
+	INIT_LIST_HEAD(&kparsenode->glue.glue.owner_list);
+	INIT_LIST_HEAD(&kparsenode->glue.glue.owned_list);
 
 	rc = kparser_namespace_insert(conf->namespace_id,
 				      &kparsenode->glue.glue.ht_node_id,
@@ -2612,6 +3030,43 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 				"%s: kparser_conf_node_convert() err",
 				__FUNCTION__);
 		goto done;
+	}
+
+	if (kparsenode->parse_node.node.proto_table) {
+		proto_table = container_of(
+				kparsenode->parse_node.node.proto_table,
+				struct kparser_glue_protocol_table,
+				proto_table);
+		if (kparser_link_attach(kparsenode,
+					KPARSER_NS_NODE_PARSE,
+					(const void**)&kparsenode->parse_node.
+					node.proto_table,
+					&kparsenode->glue.glue.refcount,
+					&kparsenode->glue.glue.owner_list,
+					proto_table,
+					KPARSER_NS_PROTO_TABLE,
+					&proto_table->glue.refcount,
+					&proto_table->glue.owned_list,
+					*rsp, op) == false)
+			goto done;
+	}
+
+	if (kparsenode->parse_node.node.metadata_table) {
+		mdl = container_of(kparsenode->parse_node.node.metadata_table,
+				struct kparser_glue_metadata_table,
+				metadata_table);
+		if (kparser_link_attach(kparsenode,
+					KPARSER_NS_NODE_PARSE,
+					(const void**)&kparsenode->parse_node.
+					node.metadata_table,
+					&kparsenode->glue.glue.refcount,
+					&kparsenode->glue.glue.owner_list,
+					mdl,
+					KPARSER_NS_METALIST,
+					&mdl->glue.refcount,
+					&mdl->glue.owned_list,
+					*rsp, op) == false)
+			goto done;
 	}
 
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
@@ -2670,12 +3125,88 @@ done:
 	return KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE);
 }
 
+int kparser_del_parse_node(const struct kparser_hkey *key,
+		    struct kparser_cmd_rsp_hdr **rsp,
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
+{
+	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
+	struct kparser_glue_glue_parse_node *kparsenode;
+	int rc;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+
+	mutex_lock(&kparser_config_lock);
+
+	kparsenode = kparser_namespace_lookup(KPARSER_NS_NODE_PARSE, key);
+	if (!kparsenode) {
+		(*rsp)->op_ret_code = ENOENT;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: Object key not found", op);
+		goto done;
+	}
+
+	// verify if there is any associated immutable parser
+	list_for_each_entry_safe(curr_ref, tmp_list_ref,
+			&kparsenode->glue.glue.owned_list,
+			owned_obj.list_node) {
+		if (curr_ref->owner_obj.nsid != KPARSER_NS_PARSER)
+			continue;
+		if (kref_read(curr_ref->owner_obj.refcount) != 0) {
+			(*rsp)->op_ret_code = EBUSY;
+			(void) snprintf((*rsp)->err_str_buf,
+					sizeof((*rsp)->err_str_buf),
+					"%s:attached parser `%s` is immutable",
+					op, ((struct kparser_glue_parser *)
+					curr_ref->owner_obj.obj)->glue.key.name);
+			goto done;
+		}
+	}
+
+	if (kparser_link_detach(kparsenode, &kparsenode->glue.glue.owner_list,
+				&kparsenode->glue.glue.owned_list,
+				*rsp) != true)
+		goto done;
+
+	rc = kparser_namespace_remove(KPARSER_NS_NODE_PARSE,
+			&kparsenode->glue.glue.ht_node_id,
+			&kparsenode->glue.glue.ht_node_name);
+	if (rc) {
+		(*rsp)->op_ret_code = rc;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: namespace remove error", op);
+		goto done;
+	}
+
+	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
+			"Operation successful");
+	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
+	(*rsp)->object.node_conf =
+		kparsenode->glue.glue.config.node_conf;
+
+	kfree(kparsenode);
+done:
+	mutex_unlock(&kparser_config_lock);
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+	return KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE);
+}
+
+void kparser_free_node(void *ptr, void *arg)
+{
+	kfree(ptr);
+}
+
 static bool kparser_create_proto_table_ent(
 		const struct kparser_conf_table *arg,
 		struct kparser_glue_protocol_table **proto_table,
-		struct kparser_cmd_rsp_hdr *rsp)
+		struct kparser_cmd_rsp_hdr *rsp, const char *op)
 {
-	const struct kparser_glue_glue_parse_node *kparsenode;
+	struct kparser_glue_glue_parse_node *kparsenode;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
@@ -2687,8 +3218,7 @@ static bool kparser_create_proto_table_ent(
 		rsp->op_ret_code = ENOENT;
 		(void) snprintf(rsp->err_str_buf,
 				sizeof(rsp->err_str_buf),
-				"%s: Object key not found",
-				__FUNCTION__);
+				"%s: Object key not found", op);
 		return false;
 	}
 
@@ -2699,8 +3229,7 @@ static bool kparser_create_proto_table_ent(
 		(void) snprintf(rsp->err_str_buf,
 				sizeof(rsp->err_str_buf),
 				"%s: parse node key:{%s:%u} not found",
-				__FUNCTION__,
-				arg->elem_key.name,
+				op, arg->elem_key.name,
 				arg->elem_key.id);
 		return false;
 	}
@@ -2716,11 +3245,23 @@ static bool kparser_create_proto_table_ent(
 		(void) snprintf(rsp->err_str_buf,
 				sizeof(rsp->err_str_buf),
 				"%s: krealloc() err, ents:%d, size:%lu",
-				__FUNCTION__,
+				op,
 				(*proto_table)->proto_table.num_ents,
 				sizeof(struct kparser_proto_table_entry));
 		return false;
 	}
+
+	if (kparser_link_attach(*proto_table,
+				KPARSER_NS_PROTO_TABLE,
+				NULL, // due to realloc, cant cache pointer here
+				&(*proto_table)->glue.refcount,
+				&(*proto_table)->glue.owner_list,
+				kparsenode,
+				KPARSER_NS_NODE_PARSE,
+				&kparsenode->glue.glue.refcount,
+				&kparsenode->glue.glue.owned_list,
+				rsp, op) == false)
+		return false;
 
 	(*proto_table)->proto_table.entries[
 		(*proto_table)->proto_table.num_ents - 1].value =
@@ -2755,7 +3296,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	//create a table entry
 	if (arg->add_entry) {
 		if(kparser_create_proto_table_ent(arg,
-					&proto_table, *rsp) == false)
+					&proto_table, *rsp, op) == false)
 			goto done;
 		goto skip_table_create;
 	}
@@ -2772,8 +3313,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = EEXIST;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: Duplicate object key",
-				__FUNCTION__);
+				"%s: Duplicate object key", op);
 		goto done;
 	}
 
@@ -2783,7 +3323,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = ENOMEM;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kzalloc() failed", __FUNCTION__);
+				"%s: kzalloc() failed", op);
 		goto done;
 	}
 
@@ -2796,8 +3336,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 		(*rsp)->op_ret_code = rc;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: kparser_namespace_insert() err",
-				__FUNCTION__);
+				"%s: kparser_namespace_insert() err", op);
 		goto done;
 	}
 
@@ -2806,6 +3345,8 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	proto_table->glue.config.table_conf = *arg;
 	proto_table->glue.config.table_conf.key = key;
 	kref_init(&proto_table->glue.refcount);
+	INIT_LIST_HEAD(&proto_table->glue.owner_list);
+	INIT_LIST_HEAD(&proto_table->glue.owned_list);
 
 skip_table_create:
 	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
@@ -2845,8 +3386,7 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 		(*rsp)->op_ret_code = ENOENT;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: Object key not found",
-				__FUNCTION__);
+				"%s: Object key not found", op);
 		goto done;
 	}
 
@@ -2892,6 +3432,132 @@ done:
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 	return KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE);
+}
+
+int kparser_del_proto_table(const struct kparser_hkey *key,
+		    struct kparser_cmd_rsp_hdr **rsp,
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
+{
+	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
+	struct kparser_obj_link_ctx *node_tmp_list_ref = NULL;
+	struct kparser_obj_link_ctx *node_curr_ref = NULL;
+	struct kparser_glue_protocol_table *proto_table;
+	struct kparser_glue_glue_parse_node *kparsenode;
+	struct kparser_glue_glue_parse_node *parse_node;
+	struct kparser_conf_cmd *objects = NULL;
+	int i, rc;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+
+	mutex_lock(&kparser_config_lock);
+
+	proto_table = kparser_namespace_lookup(KPARSER_NS_PROTO_TABLE, key);
+	if (!proto_table) {
+		(*rsp)->op_ret_code = ENOENT;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: Object key not found", op);
+		goto done;
+	}
+
+        // verify if there is any associated immutable parser
+	list_for_each_entry_safe(curr_ref, tmp_list_ref,
+			&proto_table->glue.owned_list, owned_obj.list_node) {
+		if (curr_ref->owner_obj.nsid != KPARSER_NS_NODE_PARSE)
+			continue;
+		if (kref_read(curr_ref->owner_obj.refcount) == 0)
+			continue;
+		kparsenode = (struct kparser_glue_glue_parse_node *)
+			curr_ref->owner_obj.obj;
+		list_for_each_entry_safe(node_curr_ref, node_tmp_list_ref,
+				&kparsenode->glue.glue.owned_list,
+				owned_obj.list_node) {
+			if (node_curr_ref->owner_obj.nsid != KPARSER_NS_PARSER)
+				continue;
+			if (kref_read(node_curr_ref->owner_obj.refcount) != 0) {
+				(*rsp)->op_ret_code = EBUSY;
+				(void) snprintf((*rsp)->err_str_buf,
+						sizeof((*rsp)->err_str_buf),
+						"%s:attached parser `%s` is "
+						"immutable",
+						op,
+						((struct kparser_glue_parser *)
+						 node_curr_ref->owner_obj.obj)
+						->glue.key.name);
+				goto done;
+			}
+		}
+	}
+
+	(*rsp)->key = proto_table->glue.key;
+	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
+	(*rsp)->object.table_conf =
+		proto_table->glue.config.table_conf;
+
+	for (i = 0; i < proto_table->proto_table.num_ents; i++) {
+		(*rsp)->objects_len++;
+		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
+		*rsp = krealloc(*rsp, *rsp_len,
+				GFP_KERNEL | ___GFP_ZERO);
+		if (!(*rsp)) {
+			printk("%s:krealloc failed for rsp, len:%lu\n",
+					__FUNCTION__, *rsp_len);
+			*rsp_len = 0;
+			mutex_unlock(&kparser_config_lock);
+			return KPARSER_ATTR_UNSPEC;
+		}
+		objects = (struct kparser_conf_cmd *) (*rsp)->objects;
+		objects[i].namespace_id =
+			proto_table->glue.config.namespace_id;
+		objects[i].table_conf =
+			proto_table->glue.config.table_conf;
+		objects[i].table_conf.optional_value1 =
+			proto_table->proto_table.entries[i].value;
+		if (!proto_table->proto_table.entries[i].node)
+			continue;
+		parse_node = container_of(
+				proto_table->proto_table.entries[i].node,
+				struct kparser_glue_glue_parse_node,
+				parse_node.node); /* TODO */
+		objects[i].table_conf.elem_key =
+			parse_node->glue.glue.key;
+	}
+
+	if (kparser_link_detach(proto_table, &proto_table->glue.owner_list,
+		&proto_table->glue.owned_list, *rsp) != true)
+		goto done;
+
+	rc = kparser_namespace_remove(KPARSER_NS_PROTO_TABLE,
+			&proto_table->glue.ht_node_id,
+			&proto_table->glue.ht_node_name);
+	if (rc) {
+		(*rsp)->op_ret_code = rc;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: namespace remove error", op);
+		goto done;
+	}
+
+	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
+			"Operation successful");
+
+	kfree(proto_table->proto_table.entries);
+	kfree(proto_table);
+done:
+	mutex_unlock(&kparser_config_lock);
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+	return KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE);
+}
+
+void kparser_free_proto_tbl(void *ptr, void *arg)
+{
+	struct kparser_glue_protocol_table *proto_table = ptr;
+	kfree(proto_table->proto_table.entries);
+	kfree(proto_table);
 }
 
 static inline bool kparser_conf_tlv_node_convert(
@@ -4086,6 +4752,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 		      struct kparser_cmd_rsp_hdr **rsp,
 		      size_t *rsp_len, const char *op)
 {
+	struct kparser_glue_glue_parse_node *parse_node;
 	struct kparser_glue_parser *kparsr = NULL;
 	struct kparser_counters *cntrs = NULL;
 	const struct kparser_conf_parser *arg;
@@ -4126,9 +4793,60 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 
 	kparsr->parser = parser;
 
-	// TODO:
-	// INIT_LIST_HEAD(&kparsr->list_node);
-	// list_add(&kparsr->list_node, &g_parser_list);
+	INIT_LIST_HEAD(&kparsr->glue.owner_list);
+	INIT_LIST_HEAD(&kparsr->glue.owned_list);
+
+	if (kparsr->parser.root_node) {
+		parse_node = container_of(kparsr->parser.root_node,
+				struct kparser_glue_glue_parse_node,
+				parse_node.node);
+		if (kparser_link_attach(kparsr,
+					KPARSER_NS_PARSER,
+					(const void**)&kparsr->parser.root_node,
+					&kparsr->glue.refcount,
+					&kparsr->glue.owner_list,
+					parse_node,
+					KPARSER_NS_NODE_PARSE,
+					&parse_node->glue.glue.refcount,
+					&parse_node->glue.glue.owned_list,
+					*rsp, op) == false)
+			goto done;
+	}
+
+	if (kparsr->parser.okay_node) {
+		parse_node = container_of(kparsr->parser.okay_node,
+				struct kparser_glue_glue_parse_node,
+				parse_node.node);
+		if (kparser_link_attach(kparsr,
+					KPARSER_NS_PARSER,
+					(const void**)&kparsr->parser.okay_node,
+					&kparsr->glue.refcount,
+					&kparsr->glue.owner_list,
+					parse_node,
+					KPARSER_NS_NODE_PARSE,
+					&parse_node->glue.glue.refcount,
+					&parse_node->glue.glue.owned_list,
+					*rsp, op) == false)
+			goto done;
+	}
+
+	if (kparsr->parser.fail_node) {
+		parse_node = container_of(kparsr->parser.fail_node,
+				struct kparser_glue_glue_parse_node,
+				parse_node.node);
+		if (kparser_link_attach(kparsr,
+					KPARSER_NS_PARSER,
+					(const void**)&kparsr->parser.fail_node,
+					&kparsr->glue.refcount,
+					&kparsr->glue.owner_list,
+					parse_node,
+					KPARSER_NS_NODE_PARSE,
+					&parse_node->glue.glue.refcount,
+					&parse_node->glue.glue.owned_list,
+					*rsp, op) == false)
+			goto done;
+	}
+
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -4825,8 +5543,7 @@ int kparser_read_parser(const struct kparser_hkey *key,
 		(*rsp)->op_ret_code = ENOENT;
 		(void) snprintf((*rsp)->err_str_buf,
 				sizeof((*rsp)->err_str_buf),
-				"%s: Object key not found",
-				__FUNCTION__);
+				"%s: Object key not found", op);
 		goto done;
 	}
 
@@ -4853,6 +5570,67 @@ done:
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
+}
+
+int kparser_del_parser(const struct kparser_hkey *key,
+		    struct kparser_cmd_rsp_hdr **rsp,
+		    size_t *rsp_len, __u8 recursive_read, const char *op)
+{
+	struct kparser_glue_parser *kparsr;
+	int rc;
+
+	pr_debug("IN: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+
+	mutex_lock(&kparser_config_lock);
+
+	kparsr = kparser_namespace_lookup(KPARSER_NS_PARSER, key);
+	if (!kparsr) {
+		(*rsp)->op_ret_code = ENOENT;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: Object key not found", op);
+		goto done;
+	}
+
+	if (kparser_link_detach(kparsr, &kparsr->glue.owner_list,
+				&kparsr->glue.owned_list, *rsp) != true)
+		goto done;
+
+	rc = kparser_namespace_remove(KPARSER_NS_PARSER,
+			&kparsr->glue.ht_node_id, &kparsr->glue.ht_node_name);
+	if (rc) {
+		(*rsp)->op_ret_code = rc;
+		(void) snprintf((*rsp)->err_str_buf,
+				sizeof((*rsp)->err_str_buf),
+				"%s: namespace remove error", op);
+		goto done;
+	}
+
+	(void) snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
+			"Operation successful");
+	(*rsp)->key = kparsr->glue.key;
+	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	(*rsp)->object.conf_keys_bv = kparsr->glue.config.conf_keys_bv;
+	(*rsp)->object.parser_conf = kparsr->glue.config.parser_conf;
+
+	kfree(kparsr->parser.cntrs);
+	kfree(kparsr);
+done:
+	mutex_unlock(&kparser_config_lock);
+
+
+	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
+}
+
+void kparser_free_parser(void *ptr, void *arg)
+{
+	struct kparser_glue_parser *kparsr = ptr;
+
+	kfree(kparsr->parser.cntrs);
+	kfree(kparsr);
 }
 
 int kparser_parser_lock(const struct kparser_conf_cmd *conf,
@@ -5002,7 +5780,12 @@ int kparser_config_handler_add(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
 	const struct kparser_conf_cmd *conf;
+
 	KPARSER_CONFIG_HANDLER_PRE;
+
+	if (!g_mod_namespaces[conf->namespace_id]->create_handler)
+		return KPARSER_ATTR_UNSPEC;
+		
 	return g_mod_namespaces[conf->namespace_id]->create_handler(
 			conf, cmdarglen, rsp, rsp_len, "create");
 }
@@ -5011,7 +5794,12 @@ int kparser_config_handler_update(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
 	const struct kparser_conf_cmd *conf;
+
 	KPARSER_CONFIG_HANDLER_PRE;
+
+	if (!g_mod_namespaces[conf->namespace_id]->update_handler)
+		return KPARSER_ATTR_UNSPEC;
+
 	return g_mod_namespaces[conf->namespace_id]->update_handler(
 			conf, cmdarglen, rsp, rsp_len, "update");
 }
@@ -5020,7 +5808,12 @@ int kparser_config_handler_read(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
 	const struct kparser_conf_cmd *conf;
+
 	KPARSER_CONFIG_HANDLER_PRE;
+
+	if (!g_mod_namespaces[conf->namespace_id]->read_handler)
+		return KPARSER_ATTR_UNSPEC;
+
 	return g_mod_namespaces[conf->namespace_id]->read_handler(
 			&conf->obj_key, rsp, rsp_len,
 			conf->recursive_read_delete, "read");
@@ -5030,7 +5823,12 @@ int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
 		struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
 	const struct kparser_conf_cmd *conf;
+
 	KPARSER_CONFIG_HANDLER_PRE;
+
+	if (!g_mod_namespaces[conf->namespace_id]->del_handler)
+		return KPARSER_ATTR_UNSPEC;
+
 	return g_mod_namespaces[conf->namespace_id]->del_handler(
 			&conf->obj_key, rsp, rsp_len,
 			conf->recursive_read_delete, "delete");

@@ -1,4 +1,32 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
+/* Copyright (c) 2022, SiPanda Inc.
+ *
+ * kparser.h - kParser local header file
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * Author:      Pratyush Kumar Khan <pratyush@sipanda.io>
+ */
+
 #ifndef __KPARSER_H
 #define __KPARSER_H
 
@@ -17,61 +45,23 @@
 #include "kparser_metaextract.h"
 #include "kparser_types.h"
 
-#if 0
-
-Data structures:
-
-The global kparser rhashtable contains all the kparsers.
-Each kparser instance is identified by name and id (keys).
-
-Any kparser instance is defined by atleast one root node.
-
-The global node rhashtable contains all the proto nodes. Nodes can be shared
-accross different kparsers (as roots). Each node is identified by name and
-id (keys). Each node instance refers to a protocol table and a metadata_list
-(id and name as keys).
-
-The global prototable rhashtable contains all the prototables. Each protocol
-table contains atleast one parse node entry. Parser nodes are same as
-proto nodes but distinguished by the type field. Similar to proto nodes, parse
-nodes can also be shared but among different proto tables. These nodes are also
-identified by name and id (keys). prototable contains nodes both as an array
-whose indexes are mapped with nodes map key and hashtbl.
-
-Next the metadata_list is identified by name and id (keys). The global
-metadata_list rhashtable contains all the metadata_list entries.
-Each metadata_list entry can be also shared among different proto nodes.
-Each metadata_list entry contains a list of meta data entries.
-
-The global metadata rhashtable contains all the metadata entries. Metadata
-entries are identified by name and id (keys). Each metadata entry can be shared
-among different metadata_lists.
-
-e.g. a simple ethernet header parser:
-
-tc parser create metadata name ether.metadata.proto id 0x3001 soff 0 \
-	   doff 12 length 2
-
-tc parser create metalist name ether.metadata id 0x3000 metadata 0x3001
-
-tc parser create node name ipv4-chk id 0x1 minlen 1
-tc parser create node name ipv6-chk id 0x3 minlen 1
-
-tc parser create table name ether id 0x402 default stop-okay size 2
-tc parser create table/ether/0 name ether.tabent.IPv4 key 0x0800 node ipv4-chk
-tc parser create table/ether/1 name ether.tabent.IPv6 key 0x0806 node ipv6-chk
-
-tc parser create node name ether id 0x0 minlen 14 nxtoffset 12 nxtlength 2 \
-	   prottable 0x402 metadata 0x3000
-tc parser create parser name big_parser id 0x1000 root_node_name ether root_node_id 0x0
-
-#endif
-
 /* TODO: add comments on every member of DSs */
 
-struct kparser_list {
-	void *ptr;
+struct kparser_ref_ctx {
+	int nsid;
+	const void *obj;
+	const void __rcu **link_ptr;
+	struct kref *refcount;
+	struct list_head *list;
 	struct list_head list_node;
+};
+
+#define KPARSER_LINK_OBJ_SIGNATURE 0xffaabbff
+
+struct kparser_obj_link_ctx {
+	int sig;
+	struct kparser_ref_ctx owner_obj;
+	struct kparser_ref_ctx owned_obj;
 };
 
 struct kparser_htbl {
@@ -90,8 +80,9 @@ struct kparser_glue {
 	struct rhash_head ht_node_id;
 	struct rhash_head ht_node_name;
 	struct kref refcount;
-	struct kparser_list bookkeeperctx;
 	struct kparser_conf_cmd config;
+	struct list_head owner_list;
+	struct list_head owned_list;
 };
 
 struct kparser_glue_condexpr_expr {
@@ -134,8 +125,6 @@ struct kparser_glue_metadata_table {
 
 struct kparser_glue_node {
 	struct kparser_glue glue;
-	struct list_head parser_rev_ref_list;
-	struct list_head ptblent_rev_ref_list;
 };
 
 struct kparser_glue_glue_parse_node {
