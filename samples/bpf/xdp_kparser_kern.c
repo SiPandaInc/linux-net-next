@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (c) 2022-23 Aravind Kumar Buduri <aravind.buduri@gmail.com>
+/* Copyright (c) 2017-18 David Ahern <dsahern@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  */
+#define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
@@ -20,6 +21,7 @@
 
 #include <bpf/bpf_helpers.h>
 
+#define IPV6_FLOWINFO_MASK              cpu_to_be32(0x0FFFFFFF)
 
 struct {
 	__uint(type, BPF_MAP_TYPE_DEVMAP);
@@ -27,6 +29,14 @@ struct {
 	__uint(value_size, sizeof(int));
 	__uint(max_entries, 64);
 } xdp_tx_ports SEC(".maps");
+
+struct k_struct {
+
+	 	unsigned int src_ip;
+		unsigned int dest_ip;
+		unsigned short proto_id;
+};
+
 
 
 #define MAX_ENCAP 3
@@ -219,6 +229,7 @@ static inline void dump_parsed_user_buf(const void *buffer, size_t len)
 }
 
 #define KPARSER_MAX_NAME                128
+//#define KPARSER_MAX_NAME                20
 
 
 struct kparser_hkey {
@@ -244,13 +255,15 @@ void key_config(char *arr)
 
 }
 
+//SEC("xdp_fwd")
 SEC("prog")
 int xdp_parser_prog(struct xdp_md *ctx)
 {
 	char arr[130] = {0};
 	struct kparser_hkey *keyptr;
 
- 
+	/* code for Kparser */
+#if 1 
 	key_config(arr);
 	keyptr= (struct kparser_hkey *)arr;
 
@@ -262,11 +275,27 @@ int xdp_parser_prog(struct xdp_md *ctx)
 
 	
 	bpf_xdp_kparser(ctx,arr,sizeof(arr),arr1,256);
-	/* To print metadata using bpftool */
-        //dump_parsed_user_buf(arr1,sizeof(arr1));A
-	/* updating metadata into maps */
+        //dump_parsed_user_buf(arr1,sizeof(arr1));	
         xdp_update_ctx(arr1,sizeof(arr1));	
+#endif
 
+	/* 
+	 * code for flow dissector 
+	 * 2nd parameter differenciate flow dissector selection 
+	 * 0 - basic key flow dissector
+	 * 1 - big key flow dissector
+	 */
+
+#if 0
+	bpf_xdp_kparser_test(ctx,0,arr1,256);
+//	bpf_xdp_kparser_test(ctx,1,arr1,512);
+//	bpf_xdp_kparser_test(ctx,2,arr1,256);
+	bpf_printk("\n STRING = %s  \n",arr1);
+
+#endif
+
+
+	
        // return XDP_DROP;
         return XDP_PASS;
 

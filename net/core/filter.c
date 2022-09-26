@@ -80,6 +80,28 @@
 #include <net/xdp.h>
 #include <net/mptcp.h>
 
+#if 1
+#include "../../include/uapi/linux/kparser.h"
+#include "../kparser/kparser.h"
+#include "../kparser/kparser_condexpr.h"
+#include "../kparser/kparser_metaextract.h"
+#include "../kparser/kparser_types.h"
+
+#include <linux/rhashtable.h>
+
+#include <linux/ktime.h>
+#define DEBUG 1
+extern struct flow_dissector flow_basic_dissector;
+
+extern const void * kparser_get_parser(const struct kparser_hkey *kparser_key);
+
+extern int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
+                size_t parse_len, void *_metadata, size_t metadata_len);
+extern bool kparser_put_parser(const void *prsr);
+
+
+
+#endif
 static const struct bpf_func_proto *
 bpf_sk_base_func_proto(enum bpf_func_id func_id);
 
@@ -3975,6 +3997,531 @@ static const struct bpf_func_proto bpf_xdp_store_bytes_proto = {
 	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
 	.arg4_type	= ARG_CONST_SIZE,
 };
+
+#if 1
+
+static void *bpf_xdp_kparse_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
+{
+	struct skb_shared_info *sinfo = xdp_get_shared_info_from_buff(xdp);
+	u32 size = xdp->data_end - xdp->data;
+	void *addr = xdp->data;
+	int i;
+
+        pr_err("\n ::0 %s   \n ",__func__);
+	if (unlikely(offset > 0xffff || len > 0xffff))
+		return ERR_PTR(-EFAULT);
+        pr_err("\n  ::2 %s   \n ",__func__);
+	if (offset < size) /* linear area */
+		goto out;
+
+	offset -= size;
+	for (i = 0; i < sinfo->nr_frags; i++) { /* paged area */
+		u32 frag_size = skb_frag_size(&sinfo->frags[i]);
+
+		if  (offset < frag_size) {
+			addr = skb_frag_address(&sinfo->frags[i]);
+			size = frag_size;
+			break;
+		}
+		offset -= frag_size;
+	}
+        pr_err("\n   ::3 %s   \n ",__func__);
+out:
+	return offset + len <= size ? addr + offset : NULL;
+}
+
+#endif
+
+#if 1
+
+
+static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, u32 len)
+{
+
+	void *data = (void *)xdp->data;
+	struct ethhdr *eth = (struct ethhdr *)data;
+	struct iphdr *ip = data + sizeof(*eth);
+	struct tcphdr *tcp = (void *)ip + sizeof(*ip);
+	struct ipv6hdr *ip6h;
+	struct arphdr  *arph;
+	struct vlan_hdr *vlan_hdr;
+        void *ptr;
+	struct flow_keys flow;
+	struct flow_keys *flowptr = &flow;
+
+	struct flow_keys_basic keys;
+	int nh_off;
+	int hlen;
+	ktime_t start_time, stop_time, elapsed_time;
+	unsigned short  proto;
+	proto =  eth->h_proto;
+
+	bool ret;
+
+	if (!buf || flowd_sel > 0xFFFF || len > 0xFFFF)
+	{
+               pr_err("\n  %s %d len = \n ",
+				__func__,__LINE__);
+                return -1;
+	}
+
+	if (flowd_sel == 0)
+	{
+		if ( len < sizeof(struct flow_keys_basic))
+		{
+			pr_err("\n  %s %d len = %d size flow_keys_basic= %d len error \n ",
+				__func__,__LINE__,sizeof(struct flow_keys_basic));
+			return -1;
+		}
+
+	} else if (flowd_sel == 1) {
+
+		if ( len < sizeof(struct flow_keys))
+		{
+			pr_err("\n  %s %d len = %d size flow_keys= %d len error \n ",
+				__func__,__LINE__,sizeof(struct flow_keys));
+			return -1;
+		}
+	}
+
+
+	nh_off = sizeof(*eth);
+
+#if DEBUG
+        pr_err("\n %s nh_off = %d hlen= %d  \n ",
+			__func__, nh_off, hlen);
+        pr_err(" %s proto = %d htons(ETH_P_IP)= %d  \n ",
+			__func__, proto, htons(ETH_P_IP));
+#endif
+        pr_err(" %s eth->h_proto = %d ETH_P_IP= %d  \n ",
+			__func__, eth->h_proto, ETH_P_IP);
+
+	/* Extract L3 protocol */
+        switch (proto) {
+	 case htons(ETH_P_8021Q):
+		hlen = sizeof(*eth)+sizeof(*vlan_hdr);
+                break;
+	 case htons(ETH_P_IP):
+		hlen = sizeof(*eth)+sizeof(*ip);
+                break;
+        case htons(ETH_P_IPV6):
+		hlen = sizeof(*eth)+sizeof(*ip6h);
+                break;
+        case htons(ETH_P_ARP):
+		hlen = sizeof(*eth)+sizeof(*arph);
+                break;
+	default:
+		break;
+	}
+        pr_err("\n kaprser_handler called  ::1 %s   \n ",__func__);
+
+	if (flowd_sel == 0)
+	{
+		memset(&keys, 0, sizeof(keys));
+		start_time = ktime_get();
+		ret = __skb_flow_dissect(NULL, NULL, &flow_keys_basic_dissector,
+                                  &keys, data, proto,nh_off, hlen, 0);
+		stop_time = ktime_get();
+		elapsed_time= ktime_sub(stop_time, start_time);
+		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
+		if (ret == true)
+		{
+#if DEBUG
+			pr_err("\n%d   %s keys.control.thoff= %d \n ",
+					__LINE__,__func__, keys.control.thoff);
+
+			pr_err("%d   %s keys.control.addr_type= %d \n ",
+					__LINE__,__func__, keys.control.addr_type);
+			pr_err("%d   %s keys.control.flags= %d \n ",
+					__LINE__,__func__, keys.control.flags);
+			pr_err("%d   %s keys.basic.n_proto= 0x0x \n ",
+					__LINE__,__func__, ntohs(keys.basic.n_proto));
+			pr_err("%d   %s keys.basic.ip_proto= %d \n ",
+					__LINE__,__func__, keys.basic.ip_proto);
+#endif
+		}
+
+		memcpy((char*)buf, &keys, sizeof(keys));
+		return 0;
+
+	} else if (flowd_sel == 1)
+	{
+		memset(&flow, 0, sizeof(flow));
+		start_time = ktime_get();
+		ret = __skb_flow_dissect(NULL, NULL, &flow_keys_dissector,
+                                  &flow, data, proto, nh_off, hlen, 0);
+		stop_time = ktime_get();
+		elapsed_time= ktime_sub(stop_time, start_time);
+		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
+		if (ret == true)
+		{
+ //       		pr_err("\n::5:1:0 %d   %s \n ",__LINE__,__func__);
+#if DEBUG
+			pr_err("::5:1:1 %d   %s control.thoff= %d \n ",
+				__LINE__,__func__, flowptr->control.thoff);
+			pr_err("::5:1:2 %d   %s keys.control.addr_type= %d \n ",
+					__LINE__,__func__, flowptr->control.addr_type);
+			pr_err("::5:1:3 %d   %s keys.control.flags= %d \n ",
+					__LINE__,__func__, flowptr->control.flags);
+			pr_err("::5:1:4 %d   %s flowptr->basic.n_proto= 0x0%x \n ",
+					__LINE__,__func__, ntohs(flowptr->basic.n_proto));
+			pr_err("::5:1:5 %d   %s flowptr->basic.ip_proto= %d \n ",
+					__LINE__,__func__, flowptr->basic.ip_proto);
+			pr_err("::5:1:6 %d   %s flowptr->addrs.v4addrs.src = %pI4 \n ",
+					__LINE__,__func__, &(flowptr->addrs.v4addrs.src));
+			pr_err("::5:1:7 %d   %s flowptr->addrs.v4addrs.dst = %pI4 \n ",
+					__LINE__,__func__, &(flowptr->addrs.v4addrs.dst));
+#endif
+		}
+		memcpy((char*)buf, &flow, sizeof(flow));
+		return 0;
+	}
+        strcpy((char*)buf,"KPARSER TESTING SUCCESS");
+	return 0;
+}
+
+BPF_CALL_4(bpf_xdp_kparser_test, struct xdp_buff *, xdp, u32, offset,
+           void *, buf, u32, len)
+{
+	int ret;
+        void *ptr;
+        struct xdp_frame *xdpf;
+        struct sk_buff *skb;
+        struct net_device *dev = xdp->rxq->dev;
+/*
+        ptr = bpf_xdp_pointer(xdp, offset, len);
+        if (IS_ERR(ptr))
+                return PTR_ERR(ptr);
+*/
+        pr_err("\nbpf_xdp_kparser_test is called   %s   \n ",__func__);
+/*
+        if (!ptr)
+                bpf_xdp_copy_buf(xdp, offset, buf, len, false);
+        else
+                memcpy(buf, ptr, len);
+*/
+
+	ret = kparser_handler_test(xdp, offset, buf, len);
+        return ret;
+}
+
+const struct bpf_func_proto bpf_xdp_kparser_test_proto = {
+        .func           = bpf_xdp_kparser_test,
+        .gpl_only       = false,
+        .ret_type       = RET_INTEGER,
+        .arg1_type      = ARG_PTR_TO_CTX,
+        .arg2_type      = ARG_ANYTHING,
+        .arg3_type      = ARG_PTR_TO_UNINIT_MEM,
+        .arg4_type      = ARG_CONST_SIZE,
+};
+
+#endif
+
+
+
+struct get_kparser_funcptrs {
+
+	const void * (*kparser_get_parser_ptr)(const struct kparser_hkey *kparser_key);
+	int  (* __kparser_parse_ptr)(const struct kparser_parser *parser, void *_hdr,\
+                size_t parse_len, void *_metadata, size_t metadata_len);
+
+	bool (*kparser_put_parser_ptr)(const void *prsr);
+};
+
+
+struct get_kparser_funcptrs kparser_funcptrs = {
+	.kparser_get_parser_ptr = NULL,
+	.__kparser_parse_ptr = NULL,
+	.kparser_put_parser_ptr =NULL,
+
+};
+
+EXPORT_SYMBOL_GPL(kparser_funcptrs);
+
+
+
+
+#define MAX_ENCAP 3
+#define CNTR_ARRAY_SIZE 2
+
+struct user_metametadata {
+	__u32 num_nodes;
+	__u32 num_encaps;
+	int ret_code;
+	__u16 cntr;
+	__u16 cntrs[CNTR_ARRAY_SIZE];
+} __packed;
+
+#define VLAN_COUNT_MAX 2
+
+struct user_frame {
+	__u16 fragment_bit_offset;
+	__u16 src_ip_offset;
+	__u16 dst_ip_offset;
+	__u16 src_port_offset;
+	__u16 dst_port_offset;
+	__u16 mss_offset;
+	__u32 tcp_ts_value;
+	__u16 sack_left_edge_offset;
+	__u16 sack_right_edge_offset;
+	__u16 gre_flags;
+	__u16 gre_seqno_offset;
+	__u32 gre_seqno;
+	__u16 vlan_cntr;
+	__u16 vlantcis[VLAN_COUNT_MAX];
+} __packed;
+
+struct user_metadata {
+	struct user_metametadata metametadata;
+	struct user_frame frames[MAX_ENCAP];
+} __packed;
+
+static inline void dump_parsed_user_buf(const void *buffer, size_t len)
+{
+	/* char (*__warn1)[sizeof(struct user_metadata)] = 1; */
+	const struct user_metadata *buf = buffer;
+	int i;
+
+	pr_debug("user_metametadata:%lu user_frame:%lu user_metadata:%lu\n",
+		sizeof(struct user_metametadata),
+		sizeof(struct user_frame),
+		sizeof(struct user_metadata));
+
+	if (!buf || len < sizeof(*buf)) {
+		pr_debug("%s: Insufficient buffer\n", __FUNCTION__);
+		return;
+	}
+
+	pr_debug("metametadata: num_nodes:%u\n", buf->metametadata.num_nodes);
+	pr_debug("metametadata: num_encaps:%u\n", buf->metametadata.num_encaps);
+	pr_debug("metametadata: ret_code:%d\n", buf->metametadata.ret_code);
+	pr_debug("metametadata: cntr:%u, addr: %p\n", buf->metametadata.cntr,
+		&buf->metametadata.cntr);
+	for (i = 0; i < CNTR_ARRAY_SIZE; i++) {
+		pr_debug("metametadata: cntrs[%d]:%u\n",
+				i, buf->metametadata.cntrs[i]);
+	}
+
+	for (i = 0; i <= buf->metametadata.num_encaps; i++) {
+		if (buf->frames[i].fragment_bit_offset != 0xffff)
+			pr_debug(
+				"fragment_bit_offset[%d]:{doff:%lu value:%u}\n",
+				i, offsetof(struct user_metadata,
+					frames[i].fragment_bit_offset),
+				buf->frames[i].fragment_bit_offset);
+		if (buf->frames[i].src_ip_offset != 0xffff)
+			pr_debug("src_ip_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].src_ip_offset),
+					buf->frames[i].src_ip_offset);
+		if (buf->frames[i].dst_ip_offset != 0xffff)
+			pr_debug("dst_ip_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].dst_ip_offset),
+					buf->frames[i].dst_ip_offset);
+		if (buf->frames[i].src_port_offset != 0xffff)
+			pr_debug("src_port_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].src_port_offset),
+					buf->frames[i].src_port_offset);
+		if (buf->frames[i].dst_port_offset != 0xffff)
+			pr_debug("dst_port_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].dst_port_offset),
+					buf->frames[i].dst_port_offset);
+		if (buf->frames[i].mss_offset != 0xffff)
+			pr_debug("mss_offset[%d]:{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].mss_offset),
+					buf->frames[i].mss_offset);
+		/* below check to detect if field is set can be a bug */
+		if (buf->frames[i].tcp_ts_value != 0xffffffff)
+			pr_debug("tcp_ts[%d]:{doff:%lu value:0x%04x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].tcp_ts_value),
+					buf->frames[i].tcp_ts_value);
+		if (buf->frames[i].sack_left_edge_offset != 0xffff)
+			pr_debug("sack_left_edge_offset[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].
+						sack_left_edge_offset),
+					buf->frames[i].sack_left_edge_offset);
+		if (buf->frames[i].sack_right_edge_offset != 0xffff)
+			pr_debug("sack_right_edge_offset[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].
+						sack_right_edge_offset),
+					buf->frames[i].sack_right_edge_offset);
+		if (buf->frames[i].gre_flags != 0xffff)
+			pr_debug("gre_flags[%d]:"
+					"{doff:%lu value:0x%02x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].gre_flags),
+					buf->frames[i].gre_flags);
+		if (buf->frames[i].gre_seqno_offset != 0xffff)
+			pr_debug("gre_seqno_offset[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].gre_seqno_offset),
+					buf->frames[i].gre_seqno_offset);
+		if (buf->frames[i].gre_seqno != 0xffffffff)
+			pr_debug("gre_seqno[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].gre_seqno),
+					buf->frames[i].gre_seqno);
+		if (buf->frames[i].vlan_cntr != 0xffff)
+			pr_debug("vlan_cntr[%d]:"
+					"{doff:%lu value:%u}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].vlan_cntr),
+					buf->frames[i].vlan_cntr);
+		if (buf->frames[i].vlantcis[0] != 0xffff)
+			pr_debug("vlantcis[%d][0]:"
+					"{doff:%lu value:0x%02x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].vlantcis[0]),
+					buf->frames[i].vlantcis[0]);
+		if (buf->frames[i].vlantcis[1] != 0xffff)
+			pr_debug("vlantcis[%d][1]:"
+					"{doff:%lu value:0x%02x}\n", i,
+					offsetof(struct user_metadata,
+						frames[i].vlantcis[1]),
+					buf->frames[i].vlantcis[1]);
+	}
+}
+
+
+int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
+                      void *_metadata, size_t metadata_len)
+{
+	struct user_metadata *user_buffer;
+	const void *parser;
+	struct kparser_hkey key;
+	void *data ;
+	int pktlen;
+	int rc = 0;
+
+	ktime_t start_time, stop_time, elapsed_time;
+#if 1
+
+	struct kparser_hkey *keyptr= (struct kparser_hkey *)conf;
+	key.id = keyptr->id;
+	strcpy(key.name , keyptr->name);
+#endif
+	user_buffer =(struct user_metadata *) _metadata;
+        pr_err("\n   :1 %s  metadata_len= %d user_buff size = %d \n ",
+			__func__, metadata_len,sizeof(*user_buffer));
+        if (!user_buffer || metadata_len < sizeof(*user_buffer))
+	{
+		pr_err("\n    %s %d metadata_len error \n ",__func__,__LINE__);
+		return -1;
+	}
+
+	memset(&user_buffer->metametadata, 0, sizeof(user_buffer->metametadata));
+	memset(&user_buffer->frames, 0xff, sizeof(user_buffer->frames));
+	user_buffer->frames[0].vlan_cntr = 0;
+
+	pktlen = xdp_get_buff_len(xdp);
+	pr_err("\n   :2 %s %d pktlen = %d  \n ",__func__,__LINE__ ,pktlen);
+	data = (void *)(long)xdp->data;
+	pr_err("\n   :2 %s %d  key.name = %s key.id =  %d   \n ",
+			__func__,__LINE__ , key.name, key.id);
+	if (!kparser_funcptrs.kparser_get_parser_ptr)
+	{
+		pr_err("\n kparser module not loaded \n");
+		return -1;
+	} else {
+		parser = kparser_funcptrs.kparser_get_parser_ptr(&key);
+		if (!parser) {
+			pr_debug("kparser_get_parser() failed, key:{%s:%u}\n",
+					key.name, key.id);
+			return -1;
+		}
+	}
+
+        pr_err("\n   :3 %s %d  \n ",__func__,__LINE__ );
+	if (!kparser_funcptrs.__kparser_parse_ptr)
+	{
+		pr_err("\n kparser module not loaded \n");
+		return -1;
+	} else {
+
+		start_time = ktime_get();
+		rc = kparser_funcptrs.__kparser_parse_ptr(parser, data, pktlen, _metadata, metadata_len);
+
+		stop_time = ktime_get();
+		elapsed_time= ktime_sub(stop_time, start_time);
+		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
+	if (!kparser_funcptrs.kparser_put_parser_ptr)
+		{
+			pr_err("\n kparser module not loaded \n");
+			return -1;
+		} else {
+
+			if (kparser_funcptrs.kparser_put_parser_ptr(parser) != true)
+			pr_debug("kparser_put_parser() failed\n");
+
+		}
+
+		pr_debug("%s:rc:{%d:%s}\n", __FUNCTION__, rc, kparser_code_to_text(rc));
+		if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL)
+		printk("parser ok: %s\n", kparser_code_to_text(rc));
+	}
+        pr_err("\n   :4 %s %d  \n ",__func__,__LINE__ );
+       //print func
+	dump_parsed_user_buf(_metadata,metadata_len);
+        pr_err("\n   :5 %s %d  \n ",__func__,__LINE__ );
+      return rc;
+}
+
+
+
+BPF_CALL_5(bpf_xdp_kparser, struct xdp_buff *, xdp, void *, conf,
+		u32, conf_len, void *, buf, u32, len)
+{
+        int err;
+	int len1;
+	pr_err("\n    %s %d  \n ",__func__,__LINE__);
+#if 0
+        ptr = bpf_xdp_kparse_pointer(xdp, offset, len);
+        if (IS_ERR(ptr))
+                return PTR_ERR(ptr);
+	pr_err("\n    %s %d  \n ",__func__,__LINE__);
+        if (!ptr)
+	{
+		pr_err("\n    %s %d  \n ",__func__,__LINE__);
+                bpf_xdp_copy_buf(xdp, offset, buf, len, false);
+
+		pr_err("\n    %s %d  \n ",__func__,__LINE__);
+	}
+#endif
+        pr_err("\n    %s %d  \n ",__func__,__LINE__);
+	len1 = xdp_get_buff_len(xdp);
+        pr_err("\n    %s %d  \n ",__func__,__LINE__);
+	pr_err("\n bpf_xdp_kparser called pkt len = %d buff len = %d \
+		::3 ",len1,len);
+	err = kparser_xdp_parse(xdp, conf, conf_len, buf, len);
+        pr_err("\n bpf_xdp_kparser called  ::4%s   \n ",__func__);
+
+        return 0;
+}
+
+const struct bpf_func_proto bpf_xdp_kparser_proto = {
+        .func           = bpf_xdp_kparser,
+        .gpl_only       = false,
+        .ret_type       = RET_INTEGER,
+        .arg1_type      = ARG_PTR_TO_CTX,
+        .arg2_type      = ARG_PTR_TO_MEM | MEM_RDONLY,
+        .arg3_type      = ARG_CONST_SIZE,
+        .arg4_type      = ARG_PTR_TO_UNINIT_MEM,
+        .arg5_type      = ARG_CONST_SIZE,
+};
+
+
+
 
 static int bpf_xdp_frags_increase_tail(struct xdp_buff *xdp, int offset)
 {
@@ -7941,6 +8488,10 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_tcp_raw_check_syncookie_ipv6_proto;
 #endif
 #endif
+        case BPF_FUNC_xdp_kparser_test:
+                return &bpf_xdp_kparser_test_proto;
+        case BPF_FUNC_xdp_kparser:
+                return &bpf_xdp_kparser_proto;
 	default:
 		return bpf_sk_base_func_proto(func_id);
 	}

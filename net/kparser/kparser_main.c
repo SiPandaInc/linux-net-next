@@ -42,6 +42,22 @@
 #include <net/netlink.h>
 #include <net/pkt_cls.h>
 
+
+struct get_kparser_funcptrs {
+
+        const void * (*kparser_get_parser_ptr)(const struct kparser_hkey *kparser_key);
+
+        int  (* __kparser_parse_ptr)(const struct kparser_parser *parser, void *_hdr,\
+                size_t parse_len, void *_metadata, size_t metadata_len);
+
+        bool (*kparser_put_parser_ptr)(const void *prsr);
+
+
+};
+
+extern struct get_kparser_funcptrs kparser_funcptrs;
+
+
 static int kparser_cli_cmd_handler(struct sk_buff *skb,
 		struct genl_info *info);
 
@@ -305,6 +321,22 @@ out:
 
 	return rc;
 }
+extern struct get_kparser_funcptrs kparser_funcptrs;
+
+void init_kparser_ptrs(void)
+{
+	kparser_funcptrs.kparser_get_parser_ptr = &kparser_get_parser;
+	kparser_funcptrs.__kparser_parse_ptr    = &__kparser_parse;
+	kparser_funcptrs.kparser_put_parser_ptr = &kparser_put_parser;
+}
+
+void ext_kparser_ptrs(void)
+{
+	kparser_funcptrs.kparser_get_parser_ptr = NULL;
+	kparser_funcptrs.__kparser_parse_ptr = NULL;
+	kparser_funcptrs.kparser_put_parser_ptr = NULL;
+}
+
 
 static int __init init_kparser(void)
 {
@@ -325,6 +357,7 @@ static int __init init_kparser(void)
 		goto out;
 	}
 
+	init_kparser_ptrs();
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
 	return rc;
@@ -336,6 +369,7 @@ out:
 
 	pr_debug("ERR OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 
+	ext_kparser_ptrs();
 	return rc;
 }
 
@@ -354,6 +388,8 @@ static void __exit exit_kparser(void)
 		printk("kparser_deinit() err:%d\n", rc);
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	ext_kparser_ptrs();
 }
 
 module_init(init_kparser);
