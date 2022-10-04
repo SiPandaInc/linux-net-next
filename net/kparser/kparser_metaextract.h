@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
 /* Copyright (c) 2022, SiPanda Inc.
  *
- * kparser_metaextract.h - kParser metadata helper and structures header file
+ * kParser metadata helper and structures header file
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -120,40 +120,40 @@
  *	    Write the length of the current header to metadata. The length is
  *	    written in two bytes. A counter operation may be specified as
  *	    described below
-*    - KPARSER_METADATA_CTRL_NUM_NODES: control field
-*	    Write the current number of parse nodes that have been visited to
-*	    metadata. The number of nodes is written in two bytes. A counter
-*	    operation may be specified as described below
-*    - KPARSER_METADATA_CTRL_NUM_ENCAPS: control field
-*	    Write the current number of encapsulation levels to metadata. The
-*	    number of nodes is written in two bytes. A counter operation may be
-*	    specified as described below
-*    - KPARSER_METADATA_CTRL_TIMESTAMP: control field
-*	    Write the receive timestamp of a packet to metadata. The timestamp
-*	    number of nodes is written in eight bytes. A counter operation may
-*	    be specified as described below
-*    - KPARSER_METADATA_CTRL_COUNTER: control_counter field
-*	    Write the current value of a counter to metadata. The counter is
-*	    specified in counter_for_data. The counter is written in two bytes.
-*	    A counter operation may be specified as described below
-*    - KPARSER_METADATA_CTRL_NOOP: control_noop field
-*	    "No operation". This pseudo instruction does not write any data.
-*	    It's primary purpose is to allow counter operations after performing
-*	    non-control pseudo instructions (note that the non-control variants
-		*	    don't have a cntr_op field)
-*
-* There are two operations that may be performed on a counter and that are
-* expressed in control type pseudo instructions: increment and reset. A
-* counter operation is set in the cntr_op field of control pseudo instructions.
-* The defined counter operations are:
-*    - KPARSER_METADATA_CNTROP_NULL: No counter operation
-*    - KPARSER_METADATA_CNTROP_INCREMENT: Increment the counter specified
-*	    in cntr by one. The configuration for the counter is check and
-*	    if the limit for the counter is exceeded the appropriate behavior
-*	    is done
-*    - KPARSER_METADATA_CNTROP_RESET: Reset the counter specified
-*          in cntr to zero
-*/
+ *    - KPARSER_METADATA_CTRL_NUM_NODES: control field
+ *	    Write the current number of parse nodes that have been visited to
+ *	    metadata. The number of nodes is written in two bytes. A counter
+ *	    operation may be specified as described below
+ *    - KPARSER_METADATA_CTRL_NUM_ENCAPS: control field
+ *	    Write the current number of encapsulation levels to metadata. The
+ *	    number of nodes is written in two bytes. A counter operation may be
+ *	    specified as described below
+ *    - KPARSER_METADATA_CTRL_TIMESTAMP: control field
+ *	    Write the receive timestamp of a packet to metadata. The timestamp
+ *	    number of nodes is written in eight bytes. A counter operation may
+ *	    be specified as described below
+ *    - KPARSER_METADATA_CTRL_COUNTER: control_counter field
+ *	    Write the current value of a counter to metadata. The counter is
+ *	    specified in counter_for_data. The counter is written in two bytes.
+ *	    A counter operation may be specified as described below
+ *    - KPARSER_METADATA_CTRL_NOOP: control_noop field
+ *	    "No operation". This pseudo instruction does not write any data.
+ *	    It's primary purpose is to allow counter operations after performing
+ *	    non-control pseudo instructions (note that the non-control variants
+ *			    don't have a cntr_op field)
+ *
+ * There are two operations that may be performed on a counter and that are
+ * expressed in control type pseudo instructions: increment and reset. A
+ * counter operation is set in the cntr_op field of control pseudo instructions.
+ * The defined counter operations are:
+ *    - KPARSER_METADATA_CNTROP_NULL: No counter operation
+ *    - KPARSER_METADATA_CNTROP_INCREMENT: Increment the counter specified
+ *	    in cntr by one. The configuration for the counter is check and
+ *	    if the limit for the counter is exceeded the appropriate behavior
+ *	    is done
+ *    - KPARSER_METADATA_CNTROP_RESET: Reset the counter specified
+ *          in cntr to zero
+ */
 
 /* Metatdata extract codes */
 #define KPARSER_METADATA_BYTES_EXTRACT		0 /* Var bytes */
@@ -425,30 +425,30 @@ static inline int __kparser_metadata_bytes_extract(const __u8 *sptr,
 		return KPARSER_OKAY;
 
 	switch (length) {
-		case sizeof(__u8):
-			*dptr = *sptr;
-			break;
-		case sizeof(__u16):
-			v16 = *(__u16 *)sptr;
-			*((__u16 *)dptr) = e_bit ? ntohs(v16) : v16;
-			break;
-		case sizeof(__u32):
-			v32 = *(__u32 *)sptr;
-			*((__u32 *)dptr) = e_bit ? ntohl(v32) : v32;
-			break;
-		case sizeof(__u64):
-			v64 = *(__u64 *)sptr;
-			*((__u64 *)dptr) = e_bit ? kparser_ntohll(v64) : v64;
-			break;
-		default:
-			if (e_bit) {
-				int i;
+	case sizeof(__u8):
+		*dptr = *sptr;
+		break;
+	case sizeof(__u16):
+		v16 = *(__u16 *)sptr;
+		*((__u16 *)dptr) = e_bit ? ntohs(v16) : v16;
+		break;
+	case sizeof(__u32):
+		v32 = *(__u32 *)sptr;
+		*((__u32 *)dptr) = e_bit ? ntohl(v32) : v32;
+		break;
+	case sizeof(__u64):
+		v64 = *(__u64 *)sptr;
+		*((__u64 *)dptr) = e_bit ? kparser_ntohll(v64) : v64;
+		break;
+	default:
+		if (e_bit) {
+			int i;
 
-				for (i = 0; i < length; i++)
-					dptr[i] = sptr[length - 1 - i];
-			} else {
-				memcpy(dptr, sptr, length);
-			}
+			for (i = 0; i < length; i++)
+				dptr[i] = sptr[length - 1 - i];
+		} else {
+			memcpy(dptr, sptr, length);
+		}
 	}
 
 	return KPARSER_OKAY;
@@ -533,24 +533,24 @@ static inline int __metadata_cntr_operation(
 		return KPARSER_STOP_BAD_CNTR;
 
 	switch (operation) {
-		default:
-		case KPARSER_METADATA_CNTROP_NULL:
-			break;
-		case KPARSER_METADATA_CNTROP_INCREMENT:
-			/* Note: parser is const but
-			 * parser->cntrs->cntr is writable
-			 */
-			if (parser->cntrs->cntr[cntr] <
-					parser->cntrs_conf.
-					cntrs[cntr].max_value)
-				parser->cntrs->cntr[cntr]++;
-			else if (parser->cntrs_conf.cntrs[cntr].
-					error_on_exceeded)
-				return KPARSER_STOP_CNTR1 - cntr;
-			break;
-		case KPARSER_METADATA_CNTROP_RESET:
-			parser->cntrs->cntr[cntr] = 0;
-			break;
+	default:
+	case KPARSER_METADATA_CNTROP_NULL:
+		break;
+	case KPARSER_METADATA_CNTROP_INCREMENT:
+		/* Note: parser is const but
+		 * parser->cntrs->cntr is writable
+		 */
+		if (parser->cntrs->cntr[cntr] <
+				parser->cntrs_conf.
+				cntrs[cntr].max_value)
+			parser->cntrs->cntr[cntr]++;
+		else if (parser->cntrs_conf.cntrs[cntr].
+				error_on_exceeded)
+			return KPARSER_STOP_CNTR1 - cntr;
+		break;
+	case KPARSER_METADATA_CNTROP_RESET:
+		parser->cntrs->cntr[cntr] = 0;
+		break;
 	}
 
 	return KPARSER_OKAY;
@@ -763,38 +763,38 @@ static inline int __kparser_metadata_control_extract(
 			mde.control.cntr, mde.control.code);
 
 	switch (mde.control.code) {
-		case KPARSER_METADATA_CTRL_HDR_LENGTH:
-			if (dptr)
-				*((__u16 *)dptr) = hdr_len;
-			break;
-		case KPARSER_METADATA_CTRL_NUM_NODES:
-			if (dptr)
-				*((__u16 *)dptr) = ctrl->node_cnt;
-			break;
-		case KPARSER_METADATA_CTRL_NUM_ENCAPS:
-			if (dptr)
-				*((__u16 *)dptr) = ctrl->encap_levels;
-			break;
-		case KPARSER_METADATA_CTRL_TIMESTAMP:
-			/* TODO */
-			break;
-		case KPARSER_METADATA_CTRL_COUNTER:
-			if (!__metatdata_validate_counter(parser,
-						mde.control.cntr_for_data))
-				return KPARSER_STOP_BAD_CNTR;
-			if (dptr)
-				*(__u16 *)dptr = parser->cntrs->cntr[
-					mde.control.cntr_for_data - 1];
-			break;
-		case KPARSER_METADATA_CTRL_RET_CODE:
-			if (dptr)
-				*((int *)dptr) = ctrl->ret;
-			break;
-		case KPARSER_METADATA_CTRL_NOOP:
-			break;
-		default:
-			pr_debug("Unknown extract\n");
-			return KPARSER_STOP_BAD_EXTRACT;
+	case KPARSER_METADATA_CTRL_HDR_LENGTH:
+		if (dptr)
+			*((__u16 *)dptr) = hdr_len;
+		break;
+	case KPARSER_METADATA_CTRL_NUM_NODES:
+		if (dptr)
+			*((__u16 *)dptr) = ctrl->node_cnt;
+		break;
+	case KPARSER_METADATA_CTRL_NUM_ENCAPS:
+		if (dptr)
+			*((__u16 *)dptr) = ctrl->encap_levels;
+		break;
+	case KPARSER_METADATA_CTRL_TIMESTAMP:
+		/* TODO */
+		break;
+	case KPARSER_METADATA_CTRL_COUNTER:
+		if (!__metatdata_validate_counter(parser,
+					mde.control.cntr_for_data))
+			return KPARSER_STOP_BAD_CNTR;
+		if (dptr)
+			*(__u16 *)dptr = parser->cntrs->cntr[
+				mde.control.cntr_for_data - 1];
+		break;
+	case KPARSER_METADATA_CTRL_RET_CODE:
+		if (dptr)
+			*((int *)dptr) = ctrl->ret;
+		break;
+	case KPARSER_METADATA_CTRL_NOOP:
+		break;
+	default:
+		pr_debug("Unknown extract\n");
+		return KPARSER_STOP_BAD_EXTRACT;
 	}
 
 	return __metadata_cntr_operation(parser, mde.control.cntr_op,
@@ -816,32 +816,32 @@ static inline int kparser_metadata_extract(
 	int ret;
 
 	switch (mde.gen.code) {
-		case KPARSER_METADATA_BYTES_EXTRACT:
-			ret = kparser_metadata_bytes_extract(parser, mde,
-					_hdr, mdata);
-			break;
-		case KPARSER_METADATA_NIBBS_EXTRACT:
-			ret = kparser_metadata_nibbs_extract(parser, mde,
-					_hdr, mdata);
-			break;
-		case KPARSER_METADATA_CONSTANT_BYTE_SET:
-			ret = kparser_metadata_const_set_byte(parser, mde,
-					mdata);
-			break;
-		case KPARSER_METADATA_CONSTANT_HWORD_SET:
-			ret = kparser_metadata_const_set_hword(parser, mde,
-					mdata);
-			break;
-		case KPARSER_METADATA_OFFSET_SET:
-			ret = kparser_metadata_set_offset(parser, mde, mdata,
-					hdr_offset);
-			break;
-		default: /* Should be a control metadata extraction */
-			ret = __kparser_metadata_control_extract(parser, mde,
-					_hdr,
-					hdr_len,
-					hdr_offset,
-					mdata, ctrl);
+	case KPARSER_METADATA_BYTES_EXTRACT:
+		ret = kparser_metadata_bytes_extract(parser, mde,
+				_hdr, mdata);
+		break;
+	case KPARSER_METADATA_NIBBS_EXTRACT:
+		ret = kparser_metadata_nibbs_extract(parser, mde,
+				_hdr, mdata);
+		break;
+	case KPARSER_METADATA_CONSTANT_BYTE_SET:
+		ret = kparser_metadata_const_set_byte(parser, mde,
+				mdata);
+		break;
+	case KPARSER_METADATA_CONSTANT_HWORD_SET:
+		ret = kparser_metadata_const_set_hword(parser, mde,
+				mdata);
+		break;
+	case KPARSER_METADATA_OFFSET_SET:
+		ret = kparser_metadata_set_offset(parser, mde, mdata,
+				hdr_offset);
+		break;
+	default: /* Should be a control metadata extraction */
+		ret = __kparser_metadata_control_extract(parser, mde,
+				_hdr,
+				hdr_len,
+				hdr_offset,
+				mdata, ctrl);
 	}
 
 	return ret;
@@ -853,76 +853,83 @@ static inline bool kparser_metadata_convert(
 {
 	__u32 encoding_type;
 
-	switch(conf->type) {
-		case KPARSER_METADATA_HDRDATA:
-			*mde = __kparser_metadata_make_bytes_extract(
-					conf->frame,
-					conf->soff, conf->doff, conf->len,
-					conf->e_bit, cntridx);
-			return true;
+	switch (conf->type) {
+	case KPARSER_METADATA_HDRDATA:
+		*mde = __kparser_metadata_make_bytes_extract(
+				conf->frame,
+				conf->soff, conf->doff, conf->len,
+				conf->e_bit, cntridx);
+		return true;
 
-		case KPARSER_METADATA_BIT_OFFSET: 
-			*mde = 	__kparser_metadata_offset_set(conf->frame,
-					conf->doff,
-					true,
-					conf->add_off,
-					cntridx);
-			return true;
+	case KPARSER_METADATA_HDRDATA_NIBBS_EXTRACT:
+		*mde = __kparser_make_make_nibbs_extract(
+				conf->frame,
+				conf->soff, conf->doff, conf->len,
+				conf->e_bit, cntridx);
+		return true;
 
-		case KPARSER_METADATA_OFFSET: 
-			*mde = 	__kparser_metadata_offset_set(conf->frame,
-					conf->doff,
-					false,
-					conf->add_off,
-					cntridx);
-			return true;
+	case KPARSER_METADATA_BIT_OFFSET:
+		*mde = __kparser_metadata_offset_set(conf->frame,
+				conf->doff,
+				true,
+				conf->add_off,
+				cntridx);
+		return true;
 
-		case KPARSER_METADATA_CONSTANT_BYTE:
-			*mde = 	__kparser_metadata_set_const_byte(conf->frame,
-					conf->doff, conf->constant_value,
-					cntridx);
-			return true;
+	case KPARSER_METADATA_OFFSET:
+		*mde = __kparser_metadata_offset_set(conf->frame,
+				conf->doff,
+				false,
+				conf->add_off,
+				cntridx);
+		return true;
 
-		case KPARSER_METADATA_CONSTANT_HALFWORD:
-			*mde = 	__kparser_metadata_set_const_halfword(
-					conf->frame,
-					conf->doff, conf->constant_value,
-					cntridx);
-			return true;
+	case KPARSER_METADATA_CONSTANT_BYTE:
+		*mde = __kparser_metadata_set_const_byte(conf->frame,
+				conf->doff, conf->constant_value,
+				cntridx);
+		return true;
 
-		case KPARSER_METADATA_COUNTER:
-			*mde = __kparser_metadata_set_control_counter(
-					conf->frame, conf->doff,
-					cntridx, cntridx,
-					conf->cntr_op);
-			return true;
+	case KPARSER_METADATA_CONSTANT_HALFWORD:
+		*mde = __kparser_metadata_set_const_halfword(
+				conf->frame,
+				conf->doff, conf->constant_value,
+				cntridx);
+		return true;
 
-		case KPARSER_METADATA_HDRLEN:
-			encoding_type = KPARSER_METADATA_CTRL_HDR_LENGTH;
-			break;
+	case KPARSER_METADATA_COUNTER:
+		*mde = __kparser_metadata_set_control_counter(
+				conf->frame, conf->doff,
+				cntridx, cntridx,
+				conf->cntr_op);
+		return true;
 
-		case KPARSER_METADATA_NUMENCAPS:
-			encoding_type = KPARSER_METADATA_CTRL_NUM_ENCAPS;
-			break;
+	case KPARSER_METADATA_HDRLEN:
+		encoding_type = KPARSER_METADATA_CTRL_HDR_LENGTH;
+		break;
 
-		case KPARSER_METADATA_NUMNODES:
-			encoding_type = KPARSER_METADATA_CTRL_NUM_NODES;
-			break;
+	case KPARSER_METADATA_NUMENCAPS:
+		encoding_type = KPARSER_METADATA_CTRL_NUM_ENCAPS;
+		break;
 
-		case KPARSER_METADATA_TIMESTAMP:
-			encoding_type = KPARSER_METADATA_CTRL_TIMESTAMP;
-			break;
+	case KPARSER_METADATA_NUMNODES:
+		encoding_type = KPARSER_METADATA_CTRL_NUM_NODES;
+		break;
 
-		case KPARSER_METADATA_RETURN_CODE:
-			encoding_type = KPARSER_METADATA_CTRL_RET_CODE;
-			break;
+	case KPARSER_METADATA_TIMESTAMP:
+		encoding_type = KPARSER_METADATA_CTRL_TIMESTAMP;
+		break;
 
-		case KPARSER_METADATA_COUNTEROP_NOOP:
-			encoding_type = KPARSER_METADATA_CTRL_NOOP;
-			break;
+	case KPARSER_METADATA_RETURN_CODE:
+		encoding_type = KPARSER_METADATA_CTRL_RET_CODE;
+		break;
 
-		default:
-			return false;
+	case KPARSER_METADATA_COUNTEROP_NOOP:
+		encoding_type = KPARSER_METADATA_CTRL_NOOP;
+		break;
+
+	default:
+		return false;
 	}
 
 	*mde = __kparser_metadata_set_control(conf->frame,

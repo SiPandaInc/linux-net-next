@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
 /* Copyright (c) 2022, SiPanda Inc.
  *
- * kparser_condexpr.h - kParser conditionals helper and structures header file
+ * kParser conditionals helper and structures header file
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,7 +44,7 @@ static inline bool kparser_expr_evaluate(
 	__u64 val;
 
 	pr_debug("{%s:%d}: soff:%u len:%u mask:%x type:%d\n",
-			__FUNCTION__, __LINE__, expr->src_off,
+			__func__, __LINE__, expr->src_off,
 			expr->length, expr->mask, expr->type);
 	__kparser_metadata_bytes_extract(hdr + expr->src_off, (__u8 *)&val,
 					expr->length, false);
@@ -52,7 +52,7 @@ static inline bool kparser_expr_evaluate(
 	val &= expr->mask;
 
 	pr_debug("{%s:%d}: type:%d val:%llx expr->value:%u\n",
-			__FUNCTION__, __LINE__,
+			__func__, __LINE__,
 			expr->type, val, expr->value);
 
 	switch (expr->type) {

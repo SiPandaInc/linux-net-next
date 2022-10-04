@@ -54,39 +54,6 @@ void count_pkts(void)
     	}
 }
 
-void dump_flowd_user_buf(void *buf , int len)
-{
-	struct flow_keys *flowptr = (struct flow_keys *)buf;
-
-	  if (!buf || len < sizeof(*flowptr)) {
-                bpf_printk(" Insufficient buffer\n");
-                return;
-        }
-
-#if DEBUG
-	bpf_printk("pkts received = %lu \n ", pkts);
-	bpf_printk("control.thoff= %d \n ",
-			flowptr->control.thoff);
-
-        bpf_printk("keys.control.addr_type= %d \n ",
-                                        flowptr->control.addr_type);
-        bpf_printk("keys.control.flags= %d \n ",
-                                        flowptr->control.flags);
-
-        bpf_printk("flowptr->basic.n_proto= 0x0%x \n ",
-                                        ntohs(flowptr->basic.n_proto));
-        bpf_printk("flowptr->basic.ip_proto= %d \n ",
-                                        flowptr->basic.ip_proto);
-        bpf_printk("flowptr->addrs.v4addrs.src = %pi4 \n ",
-                                        &(flowptr->addrs.v4addrs.src));
-        bpf_printk("flowptr->addrs.v4addrs.dst = %pi4\n ",
-		  (&flowptr->addrs.v4addrs.dst));
-#endif
-
-}
-
-
-
 char arr1[512] = {0};
 SEC("prog")
 int xdp_parser_prog(struct xdp_md *ctx)
@@ -99,18 +66,13 @@ int xdp_parser_prog(struct xdp_md *ctx)
 	 * 1 - big key flow dissector
 	 */
 
-#if 1
-//	bpf_xdp_kparser_test(ctx,0,arr1,256);
-	bpf_xdp_kparser_test(ctx,1,arr1,512);
 
 	count_pkts();
-// 	dump_flowd_user_buf(arr1,sizeof(arr1));
-#endif
 
 
 	
         return XDP_DROP;
-       // return XDP_PASS;
+        //return XDP_PASS;
 
 }
 

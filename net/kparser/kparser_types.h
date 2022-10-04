@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
 /* Copyright (c) 2022, SiPanda Inc.
  *
- * kparser_types.h - kParser data types header file
+ * kParser data types header file
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -253,7 +253,7 @@ struct kparser_proto_tlvs_node {
 /* Descriptor for a protocol field with flag fields
  *
  * Defines the flags and their data fields for one instance a flag field in
- * in a protocol header (e.g. GRE v0 flags):
+ * a protocol header (e.g. GRE v0 flags):
  *
  * num_idx: Number of flag_field structures
  * fields: List of defined flag fields
@@ -281,7 +281,7 @@ struct kparser_proto_flag_fields_ops {
 };
 #endif
 
-/* A flag-fields protocol node. Note this is a super structure for aKPARSER 
+/* A flag-fields protocol node. Note this is a super structure for a KPARSER
  * protocol node and type is KPARSER_NODE_TYPE_FLAG_FIELDS
  */
 struct kparser_proto_flag_fields_node {
@@ -499,7 +499,7 @@ static inline ssize_t __kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
 	for (i = 0; i < targ_idx; i++) {
 		flag = flag_fields->fields[i].flag;
 		if (flag_fields->fields[i].endian)
-				flag = ntohs(flag);
+			flag = ntohs(flag);
 		mask = flag_fields->fields[i].mask ? : flag;
 		if ((flags & mask) == flag)
 			offset += flag_fields->fields[i].size;
@@ -516,7 +516,7 @@ static inline ssize_t kparser_flag_fields_offset(__u32 targ_idx, __u32 flags,
 
 	flag = flag_fields->fields[targ_idx].flag;
 	if (flag_fields->fields[targ_idx].endian)
-			flag = ntohs(flag);
+		flag = ntohs(flag);
 	mask = flag_fields->fields[targ_idx].mask ? : flag;
 	if ((flags & mask) != flag) {
 		/* Flag not set */

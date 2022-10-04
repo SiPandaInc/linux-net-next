@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (c) 2017-18 David Ahern <dsahern@gmail.com>
- *
+/* Copyright (c) 2022-23 Aravind Kumar Buduri <aravind.buduri@gmail.com>
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
@@ -10,6 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  */
+
 #define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
@@ -21,6 +21,7 @@
 
 #include <bpf/bpf_helpers.h>
 
+#include "metadata_def.h"
 #define IPV6_FLOWINFO_MASK              cpu_to_be32(0x0FFFFFFF)
 
 struct {
@@ -36,43 +37,33 @@ struct k_struct {
 		unsigned int dest_ip;
 		unsigned short proto_id;
 };
+#if 1
 
 
 
-#define MAX_ENCAP 3
-#define CNTR_ARRAY_SIZE 2
+struct {
+        __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+        __type(key, u32);
+        __type(value, __u64);
+        __uint(max_entries, 1);
+} counter_map SEC(".maps");
 
-struct user_metametadata {
-	__u32 num_nodes;
-	__u32 num_encaps;
-	int ret_code;
-	__u16 cntr;
-	__u16 cntrs[CNTR_ARRAY_SIZE];
-} __packed;
 
-#define VLAN_COUNT_MAX 2
+u64 *counter;
+u64 pkts;
+void count_pkts(void)
+{
+	u32 key = 0;
+    	counter = bpf_map_lookup_elem(&counter_map, &key);
+    	if (counter) {
+      		*counter += 1;
+		pkts = *counter;
+    	}
+}
 
-struct user_frame {
-	__u16 fragment_bit_offset;
-	__u16 src_ip_offset;
-	__u16 dst_ip_offset;
-	__u16 src_port_offset;
-	__u16 dst_port_offset;
-	__u16 mss_offset;
-	__u32 tcp_ts_value;
-	__u16 sack_left_edge_offset;
-	__u16 sack_right_edge_offset;
-	__u16 gre_flags;
-	__u16 gre_seqno_offset;
-	__u32 gre_seqno;
-	__u16 vlan_cntr;
-	__u16 vlantcis[VLAN_COUNT_MAX];
-} __packed;
 
-struct user_metadata {
-	struct user_metametadata metametadata;
-	struct user_frame frames[MAX_ENCAP];
-} __packed;
+#endif
+
 
 struct {
         __uint(type, BPF_MAP_TYPE_HASH);
@@ -108,125 +99,6 @@ static __always_inline void xdp_update_ctx(const void *buffer, size_t len)
 }
 
 
-static inline void dump_parsed_user_buf(const void *buffer, size_t len)
-{
-	/* char (*__warn1)[sizeof(struct user_metadata)] = 1; */
-	const struct user_metadata *buf = buffer;
-	int i;
-
-	bpf_printk("user_metametadata:%lu user_frame:%lu user_metadata:%lu\n",
-		sizeof(struct user_metametadata),
-		sizeof(struct user_frame),
-		sizeof(struct user_metadata));
-
-	if (!buf || len < sizeof(*buf)) {
-		bpf_printk("%s: Insufficient buffer\n", __FUNCTION__);
-		return;
-	}
-
-	bpf_printk("metametadata: num_nodes:%u\n", buf->metametadata.num_nodes);
-	bpf_printk("metametadata: num_encaps:%u\n", buf->metametadata.num_encaps);
-	bpf_printk("metametadata: ret_code:%d\n", buf->metametadata.ret_code);
-	bpf_printk("metametadata: cntr:%u, addr: %p\n", buf->metametadata.cntr,
-		&buf->metametadata.cntr);
-/*	for (i = 0; i < CNTR_ARRAY_SIZE; i++) {
-		bpf_printk("metametadata: cntrs[%d]:%u\n",
-				i, buf->metametadata.cntrs[i]);
-	}
-*/
-		bpf_printk("metametadata: cntrs[0]:%u\n",
-				 buf->metametadata.cntrs[0]);
-		i=0;
-//	for (i = 0; i <= buf->metametadata.num_encaps; i++) {
-		if (buf->frames[i].fragment_bit_offset != 0xffff)
-			bpf_printk(
-				"fragment_bit_offset[%d]:{doff:%lu value:%u}\n",
-				i, offsetof(struct user_metadata,
-					frames[i].fragment_bit_offset),
-				buf->frames[i].fragment_bit_offset);
-		if (buf->frames[i].src_ip_offset != 0xffff)
-			bpf_printk("src_ip_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].src_ip_offset),
-					buf->frames[i].src_ip_offset);
-		if (buf->frames[i].dst_ip_offset != 0xffff)
-			bpf_printk("dst_ip_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].dst_ip_offset),
-					buf->frames[i].dst_ip_offset);
-		if (buf->frames[i].src_port_offset != 0xffff)
-			bpf_printk("src_port_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].src_port_offset),
-					buf->frames[i].src_port_offset);
-		if (buf->frames[i].dst_port_offset != 0xffff)
-			bpf_printk("dst_port_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].dst_port_offset),
-					buf->frames[i].dst_port_offset);
-		if (buf->frames[i].mss_offset != 0xffff)
-			bpf_printk("mss_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].mss_offset),
-					buf->frames[i].mss_offset);
-		/* below check to detect if field is set can be a bug */
-		if (buf->frames[i].tcp_ts_value != 0xffffffff)
-			bpf_printk("tcp_ts[%d]:{doff:%lu value:0x%04x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].tcp_ts_value),
-					buf->frames[i].tcp_ts_value);
-		if (buf->frames[i].sack_left_edge_offset != 0xffff)
-			bpf_printk("sack_left_edge_offset[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].
-						sack_left_edge_offset),
-					buf->frames[i].sack_left_edge_offset);
-		if (buf->frames[i].sack_right_edge_offset != 0xffff)
-			bpf_printk("sack_right_edge_offset[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].
-						sack_right_edge_offset),
-					buf->frames[i].sack_right_edge_offset);
-		if (buf->frames[i].gre_flags != 0xffff)
-			bpf_printk("gre_flags[%d]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].gre_flags),
-					buf->frames[i].gre_flags);
-		if (buf->frames[i].gre_seqno_offset != 0xffff)
-			bpf_printk("gre_seqno_offset[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].gre_seqno_offset),
-					buf->frames[i].gre_seqno_offset);
-		if (buf->frames[i].gre_seqno != 0xffffffff)
-			bpf_printk("gre_seqno[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].gre_seqno),
-					buf->frames[i].gre_seqno);
-		if (buf->frames[i].vlan_cntr != 0xffff)
-			bpf_printk("vlan_cntr[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlan_cntr),
-					buf->frames[i].vlan_cntr);
-		if (buf->frames[i].vlantcis[0] != 0xffff)
-			bpf_printk("vlantcis[%d][0]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlantcis[0]),
-					buf->frames[i].vlantcis[0]);
-		if (buf->frames[i].vlantcis[1] != 0xffff)
-			bpf_printk("vlantcis[%d][1]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlantcis[1]),
-					buf->frames[i].vlantcis[1]);
-//	}
-}
 
 #define KPARSER_MAX_NAME                128
 //#define KPARSER_MAX_NAME                20
@@ -267,8 +139,8 @@ int xdp_parser_prog(struct xdp_md *ctx)
 	key_config(arr);
 	keyptr= (struct kparser_hkey *)arr;
 
-	bpf_printk("\n keyptr->name = %s  \n",keyptr->name);
-	bpf_printk("\n keyptr->id = %d  \n",keyptr->id);
+	//bpf_printk("\n keyptr->name = %s  \n",keyptr->name);
+	//bpf_printk("\n keyptr->id = %d  \n",keyptr->id);
 	//bpf_printk("\n key.name = %s  \n",key.name);
 	//bpf_printk("\n key.id = %d  \n", key.id);
 	
@@ -279,25 +151,11 @@ int xdp_parser_prog(struct xdp_md *ctx)
         xdp_update_ctx(arr1,sizeof(arr1));	
 #endif
 
-	/* 
-	 * code for flow dissector 
-	 * 2nd parameter differenciate flow dissector selection 
-	 * 0 - basic key flow dissector
-	 * 1 - big key flow dissector
-	 */
 
-#if 0
-	bpf_xdp_kparser_test(ctx,0,arr1,256);
-//	bpf_xdp_kparser_test(ctx,1,arr1,512);
-//	bpf_xdp_kparser_test(ctx,2,arr1,256);
-	bpf_printk("\n STRING = %s  \n",arr1);
-
-#endif
-
-
+	count_pkts();
 	
-       // return XDP_DROP;
-        return XDP_PASS;
+        return XDP_DROP;
+       // return XDP_PASS;
 
 }
 

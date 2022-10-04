@@ -185,6 +185,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	printf(" Loading program \n");
 	snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
 	obj = bpf_object__open_file(filename, NULL);
 	if (libbpf_get_error(obj))

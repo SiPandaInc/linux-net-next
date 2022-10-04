@@ -80,6 +80,12 @@
 #include <net/xdp.h>
 #include <net/mptcp.h>
 
+#if defined DEBUG
+    #define TRACE( format, ... )   pr_err( "%s::%s(%d) " format, __FILE__, __FUNCTION__,  __LINE__, __VA_ARGS__ )
+#else
+    #define TRACE( format, ... )
+#endif
+
 #if 1
 #include "../../include/uapi/linux/kparser.h"
 #include "../kparser/kparser.h"
@@ -4007,10 +4013,10 @@ static void *bpf_xdp_kparse_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 	void *addr = xdp->data;
 	int i;
 
-        pr_err("\n ::0 %s   \n ",__func__);
+        TRACE("\n ::0 %s   \n ",__func__);
 	if (unlikely(offset > 0xffff || len > 0xffff))
 		return ERR_PTR(-EFAULT);
-        pr_err("\n  ::2 %s   \n ",__func__);
+        TRACE("\n  ::2 %s   \n ",__func__);
 	if (offset < size) /* linear area */
 		goto out;
 
@@ -4025,7 +4031,7 @@ static void *bpf_xdp_kparse_pointer(struct xdp_buff *xdp, u32 offset, u32 len)
 		}
 		offset -= frag_size;
 	}
-        pr_err("\n   ::3 %s   \n ",__func__);
+        TRACE("\n   ::3 %s   \n ",__func__);
 out:
 	return offset + len <= size ? addr + offset : NULL;
 }
@@ -4060,7 +4066,7 @@ static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, 
 
 	if (!buf || flowd_sel > 0xFFFF || len > 0xFFFF)
 	{
-               pr_err("\n  %s %d len = \n ",
+               TRACE("\n  %s %d len = \n ",
 				__func__,__LINE__);
                 return -1;
 	}
@@ -4069,7 +4075,7 @@ static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, 
 	{
 		if ( len < sizeof(struct flow_keys_basic))
 		{
-			pr_err("\n  %s %d len = %d size flow_keys_basic= %d len error \n ",
+			TRACE("\n  %s %d len = %d size flow_keys_basic= %d len error \n ",
 				__func__,__LINE__,sizeof(struct flow_keys_basic));
 			return -1;
 		}
@@ -4078,7 +4084,7 @@ static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, 
 
 		if ( len < sizeof(struct flow_keys))
 		{
-			pr_err("\n  %s %d len = %d size flow_keys= %d len error \n ",
+			TRACE("\n  %s %d len = %d size flow_keys= %d len error \n ",
 				__func__,__LINE__,sizeof(struct flow_keys));
 			return -1;
 		}
@@ -4088,12 +4094,12 @@ static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, 
 	nh_off = sizeof(*eth);
 
 #if DEBUG
-        pr_err("\n %s nh_off = %d hlen= %d  \n ",
+        TRACE("\n %s nh_off = %d hlen= %d  \n ",
 			__func__, nh_off, hlen);
-        pr_err(" %s proto = %d htons(ETH_P_IP)= %d  \n ",
+        TRACE(" %s proto = %d htons(ETH_P_IP)= %d  \n ",
 			__func__, proto, htons(ETH_P_IP));
 #endif
-        pr_err(" %s eth->h_proto = %d ETH_P_IP= %d  \n ",
+        TRACE(" %s eth->h_proto = %d ETH_P_IP= %d  \n ",
 			__func__, eth->h_proto, ETH_P_IP);
 
 	/* Extract L3 protocol */
@@ -4113,7 +4119,7 @@ static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, 
 	default:
 		break;
 	}
-        pr_err("\n kaprser_handler called  ::1 %s   \n ",__func__);
+        TRACE("\n kaprser_handler called  ::1 %s   \n ",__func__);
 
 	if (flowd_sel == 0)
 	{
@@ -4123,20 +4129,20 @@ static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, 
                                   &keys, data, proto,nh_off, hlen, 0);
 		stop_time = ktime_get();
 		elapsed_time= ktime_sub(stop_time, start_time);
-		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
+		TRACE("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
 		if (ret == true)
 		{
 #if DEBUG
-			pr_err("\n%d   %s keys.control.thoff= %d \n ",
+			TRACE("\n%d   %s keys.control.thoff= %d \n ",
 					__LINE__,__func__, keys.control.thoff);
 
-			pr_err("%d   %s keys.control.addr_type= %d \n ",
+			TRACE("%d   %s keys.control.addr_type= %d \n ",
 					__LINE__,__func__, keys.control.addr_type);
-			pr_err("%d   %s keys.control.flags= %d \n ",
+			TRACE("%d   %s keys.control.flags= %d \n ",
 					__LINE__,__func__, keys.control.flags);
-			pr_err("%d   %s keys.basic.n_proto= 0x0x \n ",
+			TRACE("%d   %s keys.basic.n_proto= 0x0x \n ",
 					__LINE__,__func__, ntohs(keys.basic.n_proto));
-			pr_err("%d   %s keys.basic.ip_proto= %d \n ",
+			TRACE("%d   %s keys.basic.ip_proto= %d \n ",
 					__LINE__,__func__, keys.basic.ip_proto);
 #endif
 		}
@@ -4152,24 +4158,24 @@ static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, 
                                   &flow, data, proto, nh_off, hlen, 0);
 		stop_time = ktime_get();
 		elapsed_time= ktime_sub(stop_time, start_time);
-		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
+		TRACE("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
 		if (ret == true)
 		{
- //       		pr_err("\n::5:1:0 %d   %s \n ",__LINE__,__func__);
+ //       		TRACE("\n::5:1:0 %d   %s \n ",__LINE__,__func__);
 #if DEBUG
-			pr_err("::5:1:1 %d   %s control.thoff= %d \n ",
+			TRACE("::5:1:1 %d   %s control.thoff= %d \n ",
 				__LINE__,__func__, flowptr->control.thoff);
-			pr_err("::5:1:2 %d   %s keys.control.addr_type= %d \n ",
+			TRACE("::5:1:2 %d   %s keys.control.addr_type= %d \n ",
 					__LINE__,__func__, flowptr->control.addr_type);
-			pr_err("::5:1:3 %d   %s keys.control.flags= %d \n ",
+			TRACE("::5:1:3 %d   %s keys.control.flags= %d \n ",
 					__LINE__,__func__, flowptr->control.flags);
-			pr_err("::5:1:4 %d   %s flowptr->basic.n_proto= 0x0%x \n ",
+			TRACE("::5:1:4 %d   %s flowptr->basic.n_proto= 0x0%x \n ",
 					__LINE__,__func__, ntohs(flowptr->basic.n_proto));
-			pr_err("::5:1:5 %d   %s flowptr->basic.ip_proto= %d \n ",
+			TRACE("::5:1:5 %d   %s flowptr->basic.ip_proto= %d \n ",
 					__LINE__,__func__, flowptr->basic.ip_proto);
-			pr_err("::5:1:6 %d   %s flowptr->addrs.v4addrs.src = %pI4 \n ",
+			TRACE("::5:1:6 %d   %s flowptr->addrs.v4addrs.src = %pI4 \n ",
 					__LINE__,__func__, &(flowptr->addrs.v4addrs.src));
-			pr_err("::5:1:7 %d   %s flowptr->addrs.v4addrs.dst = %pI4 \n ",
+			TRACE("::5:1:7 %d   %s flowptr->addrs.v4addrs.dst = %pI4 \n ",
 					__LINE__,__func__, &(flowptr->addrs.v4addrs.dst));
 #endif
 		}
@@ -4193,7 +4199,7 @@ BPF_CALL_4(bpf_xdp_kparser_test, struct xdp_buff *, xdp, u32, offset,
         if (IS_ERR(ptr))
                 return PTR_ERR(ptr);
 */
-        pr_err("\nbpf_xdp_kparser_test is called   %s   \n ",__func__);
+        TRACE("\nbpf_xdp_kparser_test is called   %s   \n ",__func__);
 /*
         if (!ptr)
                 bpf_xdp_copy_buf(xdp, offset, buf, len, false);
@@ -4412,11 +4418,11 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 	strcpy(key.name , keyptr->name);
 #endif
 	user_buffer =(struct user_metadata *) _metadata;
-        pr_err("\n   :1 %s  metadata_len= %d user_buff size = %d \n ",
+        TRACE("\n   :1 %s  metadata_len= %d user_buff size = %d \n ",
 			__func__, metadata_len,sizeof(*user_buffer));
         if (!user_buffer || metadata_len < sizeof(*user_buffer))
 	{
-		pr_err("\n    %s %d metadata_len error \n ",__func__,__LINE__);
+		TRACE("\n    %s %d metadata_len error \n ",__func__,__LINE__);
 		return -1;
 	}
 
@@ -4425,13 +4431,13 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 	user_buffer->frames[0].vlan_cntr = 0;
 
 	pktlen = xdp_get_buff_len(xdp);
-	pr_err("\n   :2 %s %d pktlen = %d  \n ",__func__,__LINE__ ,pktlen);
+	TRACE("\n   :2 %s %d pktlen = %d  \n ",__func__,__LINE__ ,pktlen);
 	data = (void *)(long)xdp->data;
-	pr_err("\n   :2 %s %d  key.name = %s key.id =  %d   \n ",
+	TRACE("\n   :2 %s %d  key.name = %s key.id =  %d   \n ",
 			__func__,__LINE__ , key.name, key.id);
 	if (!kparser_funcptrs.kparser_get_parser_ptr)
 	{
-		pr_err("\n kparser module not loaded \n");
+		TRACE("\n kparser module not loaded \n");
 		return -1;
 	} else {
 		parser = kparser_funcptrs.kparser_get_parser_ptr(&key);
@@ -4442,10 +4448,10 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 		}
 	}
 
-        pr_err("\n   :3 %s %d  \n ",__func__,__LINE__ );
+        TRACE("\n   :3 %s %d  \n ",__func__,__LINE__ );
 	if (!kparser_funcptrs.__kparser_parse_ptr)
 	{
-		pr_err("\n kparser module not loaded \n");
+		TRACE("\n kparser module not loaded \n");
 		return -1;
 	} else {
 
@@ -4454,10 +4460,10 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 
 		stop_time = ktime_get();
 		elapsed_time= ktime_sub(stop_time, start_time);
-		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
+		TRACE("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
 	if (!kparser_funcptrs.kparser_put_parser_ptr)
 		{
-			pr_err("\n kparser module not loaded \n");
+			TRACE("\n kparser module not loaded \n");
 			return -1;
 		} else {
 
@@ -4468,12 +4474,12 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 
 		pr_debug("%s:rc:{%d:%s}\n", __FUNCTION__, rc, kparser_code_to_text(rc));
 		if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL)
-		printk("parser ok: %s\n", kparser_code_to_text(rc));
+		//printk("parser ok: %s\n", kparser_code_to_text(rc));
 	}
-        pr_err("\n   :4 %s %d  \n ",__func__,__LINE__ );
+        TRACE("\n   :4 %s %d  \n ",__func__,__LINE__ );
        //print func
 	dump_parsed_user_buf(_metadata,metadata_len);
-        pr_err("\n   :5 %s %d  \n ",__func__,__LINE__ );
+        TRACE("\n   :5 %s %d  \n ",__func__,__LINE__ );
       return rc;
 }
 
@@ -4484,27 +4490,27 @@ BPF_CALL_5(bpf_xdp_kparser, struct xdp_buff *, xdp, void *, conf,
 {
         int err;
 	int len1;
-	pr_err("\n    %s %d  \n ",__func__,__LINE__);
+	TRACE("\n    %s %d  \n ",__func__,__LINE__);
 #if 0
         ptr = bpf_xdp_kparse_pointer(xdp, offset, len);
         if (IS_ERR(ptr))
                 return PTR_ERR(ptr);
-	pr_err("\n    %s %d  \n ",__func__,__LINE__);
+	TRACE("\n    %s %d  \n ",__func__,__LINE__);
         if (!ptr)
 	{
-		pr_err("\n    %s %d  \n ",__func__,__LINE__);
+		TRACE("\n    %s %d  \n ",__func__,__LINE__);
                 bpf_xdp_copy_buf(xdp, offset, buf, len, false);
 
-		pr_err("\n    %s %d  \n ",__func__,__LINE__);
+		TRACE("\n    %s %d  \n ",__func__,__LINE__);
 	}
 #endif
-        pr_err("\n    %s %d  \n ",__func__,__LINE__);
+        TRACE("\n    %s %d  \n ",__func__,__LINE__);
 	len1 = xdp_get_buff_len(xdp);
-        pr_err("\n    %s %d  \n ",__func__,__LINE__);
-	pr_err("\n bpf_xdp_kparser called pkt len = %d buff len = %d \
+        TRACE("\n    %s %d  \n ",__func__,__LINE__);
+	TRACE("\n bpf_xdp_kparser called pkt len = %d buff len = %d \
 		::3 ",len1,len);
 	err = kparser_xdp_parse(xdp, conf, conf_len, buf, len);
-        pr_err("\n bpf_xdp_kparser called  ::4%s   \n ",__func__);
+        TRACE("\n bpf_xdp_kparser called  ::4%s   \n ",__func__);
 
         return 0;
 }

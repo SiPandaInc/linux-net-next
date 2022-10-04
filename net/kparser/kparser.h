@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
 /* Copyright (c) 2022, SiPanda Inc.
  *
- * kparser.h - kParser local header file
+ * kParser local header file
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@
 #include <linux/mutex.h>
 #include <linux/rhashtable-types.h>
 #include <linux/skbuff.h>
+#include <linux/timekeeping.h>
 #include <linux/xxhash.h>
 
 #include "kparser_types.h"
@@ -81,6 +82,7 @@ struct kparser_glue {
 	struct rhash_head ht_node_name;
 	struct kref refcount;
 	struct kparser_conf_cmd config;
+	__u64 traversal_ts_id_ns;
 	struct list_head owner_list;
 	struct list_head owned_list;
 };
@@ -113,7 +115,7 @@ struct kparser_glue_counter_table {
 
 struct kparser_glue_metadata_extract {
 	struct kparser_glue glue;
-	struct kparser_metadata_extract mde; 
+	struct kparser_metadata_extract mde;
 };
 
 struct kparser_glue_metadata_table {
@@ -178,19 +180,19 @@ struct kparser_glue_parser {
 };
 
 static inline int kparser_cmp_fn_name(struct rhashtable_compare_arg *arg,
-                              const void *ptr)
+		const void *ptr)
 {
 	const char *key2 = arg->key;
-        const struct kparser_hkey *key1 = ptr;
+	const struct kparser_hkey *key1 = ptr;
 
 	return strcmp(key1->name, key2);
 }
 
 static inline int kparser_cmp_fn_id(struct rhashtable_compare_arg *arg,
-                              const void *ptr)
+		const void *ptr)
 {
 	const __u16 *key2 = arg->key;
-        const __u16 *key1 = ptr;
+	const __u16 *key1 = ptr;
 
 	return (*key1 != *key2);
 }
@@ -268,10 +270,10 @@ int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
 int kparser_do_parse(const struct kparser_hkey *kparser_key, void *_hdr,
 		size_t parse_len,  void *_metadata, size_t metadata_len);
 
-void * kparser_namespace_lookup(enum kparser_global_namespace_ids ns_id,
+void *kparser_namespace_lookup(enum kparser_global_namespace_ids ns_id,
 		const struct kparser_hkey *key);
 
-const void * kparser_get_parser(const struct kparser_hkey *kparser_key);
+const void *kparser_get_parser(const struct kparser_hkey *kparser_key);
 
 bool kparser_put_parser(const void *parser);
 #endif /* __KPARSER_H */
