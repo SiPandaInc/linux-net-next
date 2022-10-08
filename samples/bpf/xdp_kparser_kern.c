@@ -78,11 +78,6 @@ static __always_inline void xdp_update_ctx(const void *buffer, size_t len)
        const struct user_metadata *buf = buffer;
       
 
-        bpf_printk("user_metametadata:%lu user_frame:%lu user_metadata:%lu\n",
-                sizeof(struct user_metametadata),
-                sizeof(struct user_frame),
-                sizeof(struct user_metadata));
-
         if (!buf || len < sizeof(*buf)) {
                 bpf_printk("%s: Insufficient buffer\n", __FUNCTION__);
                 return;
@@ -145,6 +140,7 @@ int xdp_parser_prog(struct xdp_md *ctx)
 	//bpf_printk("\n key.id = %d  \n", key.id);
 	
 
+	memset(arr1, 0xff, 256);
 	
 	bpf_xdp_kparser(ctx,arr,sizeof(arr),arr1,256);
         //dump_parsed_user_buf(arr1,sizeof(arr1));	
@@ -154,8 +150,8 @@ int xdp_parser_prog(struct xdp_md *ctx)
 
 	count_pkts();
 	
-        return XDP_DROP;
-       // return XDP_PASS;
+       // return XDP_DROP;
+        return XDP_PASS;
 
 }
 

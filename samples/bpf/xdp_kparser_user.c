@@ -49,7 +49,7 @@ static void poll_stats(int map_fd, int interval)
         unsigned int nr_cpus = bpf_num_possible_cpus();
         __u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
         int i;
-	printf("poll_stats called \n");
+	// printf("poll_stats called \n");
 	while (1) {
                 __u32 key = UINT32_MAX;
         //        __u32 key = 0;
