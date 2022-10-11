@@ -47,33 +47,25 @@ static void kparser_release_ref(struct kref *kref)
 {
 }
 
-void kparser_locked_ref_get(struct kref *refcount)
+void kparser_ref_get(struct kref *refcount)
 {
 	unsigned int refcnt;
-
-	// mutex_lock(&kparser_config_lock);
 
 	refcnt = kref_read(refcount);
 	pr_debug("{%s:%d}:refcnt:%u\n", __func__, __LINE__, refcnt);
 
 	kref_get(refcount);
-
-	// mutex_unlock(&kparser_config_lock);
 }
 
-void kparser_locked_ref_put(struct kref *refcount)
+void kparser_ref_put(struct kref *refcount)
 {
 	unsigned int refcnt;
-
-	// mutex_lock(&kparser_config_lock);
 
 	refcnt = kref_read(refcount);
 	pr_debug("{%s:%d}:refcnt:%u\n", __func__, __LINE__, refcnt);
 
 	if (refcnt > KREF_INIT_VALUE)
 		kref_put(refcount, kparser_release_ref);
-
-	// mutex_unlock(&kparser_config_lock);
 }
 
 static inline bool kparser_link_attach(const void *owner_obj,
@@ -5405,6 +5397,9 @@ error:
 static bool kparser_dump_parser(const struct kparser_glue_parser *kparsr,
 		    struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
 {
+	if (0)
+		kparser_dump_parser_tree(&kparsr->parser);
+
 	kparser_start_new_tree_traversal();
 
 	if (!kparser_dump_parse_node(
@@ -5427,133 +5422,6 @@ static bool kparser_dump_parser(const struct kparser_glue_parser *kparsr,
 error:
 	return false;
 }
-
-#if 1
-	/* UDP packet
-	 * stun2.cap
-	 */
-static __u8 pktbuf[] = {
-	0x00,0x90,0xd0,0x23,0xed,0x2a,0x00,0x1c,0xbf,0xca,
-	0xa3,0xd5,0x08,0x00,0x45,0x00,0x00,0x30,0x00,0x00,
-	0x40,0x00,0x40,0x11,0x30,0x5a,0x0a,0x00,0x00,0xa5,
-	0x84,0xb1,0x7b,0x0d,0xeb,0x11,0x0d,0x96,0x00,0x1c,
-	0x42,0x7f,0x00,0x01,0x00,0x00,0x21,0x12,0xa4,0x42,
-	0xfd,0x95,0xe8,0x83,0x8a,0x05,0x28,0x45,0x6a,0x8e,
-	0xf1,0xe2
-};
-
-struct user_frame {
-	__u16 ipv4_ttl;
-	__u16 ipproto_offset;
-	__u16 src_ip_offset;
-	__u16 dst_ip_offset;
-	__u16 src_port_offset;
-	__u16 dst_port_offset;
-	__u16 udp_src_port;
-	__u16 udp_dst_port;
-} __packed;
-
-struct user_metadata {
-	struct user_frame frame;
-} __packed;
-
-static inline void dump_parsed_user_buf(const void *buffer, size_t len)
-{
-	/* char (*__warn1)[sizeof(struct user_metadata)] = 1; */
-	const struct user_metadata *buf = buffer;
-
-	pr_debug("user_metadata:%lu user_frame:%lu\n",
-			sizeof(struct user_metadata),
-			sizeof(struct user_frame));
-
-	if (!buf || len < sizeof(*buf)) {
-		pr_debug("%s: Insufficient buffer\n", __FUNCTION__);
-		return;
-	}
-
-	if (buf->frame.ipproto_offset != 0xffff)
-		pr_debug("ipproto_offset:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.ipproto_offset),
-				buf->frame.ipproto_offset);
-
-	if (buf->frame.src_ip_offset != 0xffff)
-		pr_debug("src_ip_offset:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.src_ip_offset),
-				buf->frame.src_ip_offset);
-
-	if (buf->frame.dst_ip_offset != 0xffff)
-		pr_debug("dst_ip_offset:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.dst_ip_offset),
-				buf->frame.dst_ip_offset);
-
-	if (buf->frame.src_port_offset != 0xffff)
-		pr_debug("src_port_offset:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.src_port_offset),
-				buf->frame.src_port_offset);
-
-	if (buf->frame.dst_port_offset != 0xffff)
-		pr_debug("dst_port_offset:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.dst_port_offset),
-				buf->frame.dst_port_offset);
-
-	if (buf->frame.ipv4_ttl != 0xffff)
-		pr_debug("ipv4_ttl:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.ipv4_ttl),
-				buf->frame.ipv4_ttl);
-
-	if (buf->frame.udp_src_port != 0xffff)
-		pr_debug("udp_src_port:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.udp_src_port),
-				buf->frame.udp_src_port);
-
-	if (buf->frame.udp_dst_port != 0xffff)
-		pr_debug("udp_dst_port:{doff:%lu value:%u}\n",
-				offsetof(struct user_metadata,
-					frame.udp_dst_port),
-				buf->frame.udp_dst_port);
-}
-
-static void run_dummy_parser(const struct kparser_hkey *key)
-{
-	struct user_metadata user_buffer;
-	const void *parser;
-	int rc = 0;
-
-	if (!key) {
-		pr_debug("key missing\n");
-		return;
-	}
-
-	memset(&user_buffer, 0xff, sizeof(user_buffer));
-
-	parser = kparser_get_parser(key);
-	if (!parser) {
-		pr_debug("kparser_get_parser() failed, key:{%s:%u}\n",
-			key->name, key->id);
-		return;
-	}
-
-	rc = __kparser_parse(parser, pktbuf, sizeof(pktbuf),
-			&user_buffer, sizeof(user_buffer));
-
-	if (kparser_put_parser(parser) != true)
-		pr_debug("kparser_put_parser() failed\n");
-
-	pr_debug("%s:rc:{%d:%s}\n", __FUNCTION__, rc, kparser_code_to_text(rc));
-	if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL)
-		printk("parser ok: %s\n", kparser_code_to_text(rc));
-
-	dump_parsed_user_buf(&user_buffer, sizeof(user_buffer));
-}
-
-#endif
 
 int kparser_read_parser(const struct kparser_hkey *key,
 		    struct kparser_cmd_rsp_hdr **rsp,
@@ -5588,14 +5456,10 @@ int kparser_read_parser(const struct kparser_hkey *key,
 	if (recursive_read &&
 			kparser_dump_parser(kparsr, rsp, rsp_len) == false)
 		pr_debug("kparser_dump_parser failed");
+
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	if (0)
-		kparser_dump_parser_tree(&kparsr->parser);
-
-	if (kparsr && strcmp(key->name, "test_parser") == 0)
-		run_dummy_parser(key);
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);

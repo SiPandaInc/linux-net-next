@@ -37,9 +37,6 @@
 #include <linux/rhashtable.h>
 #include <linux/skbuff.h>
 
-extern void kparser_locked_ref_get(struct kref *refcount);
-extern void kparser_locked_ref_put(struct kref *refcount);
-
 /* Lookup a type in a node table*/
 static const struct kparser_parse_node *lookup_node(int type,
 		const struct kparser_proto_table *table, bool *isencap)
@@ -1104,10 +1101,10 @@ int kparser_parse(struct sk_buff *skb,
 		return EINVAL;
 	}
 
-	kparser_locked_ref_get(&k_prsr->glue.refcount);
-	parser = &k_prsr->parser;
-
 	rcu_read_lock();
+
+	kparser_ref_get(&k_prsr->glue.refcount);
+	parser = &k_prsr->parser;
 
 	ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
 	k_prsr = rcu_dereference(ptr);
@@ -1117,7 +1114,7 @@ int kparser_parse(struct sk_buff *skb,
 				__func__, __LINE__,
 				kparser_key->name, kparser_key->id);
 		rcu_read_unlock();
-		kparser_locked_ref_put(&k_prsr->glue.refcount);
+		kparser_ref_put(&k_prsr->glue.refcount);
 		return ENOENT;
 	}
 
@@ -1125,7 +1122,7 @@ int kparser_parse(struct sk_buff *skb,
 
 	rcu_read_unlock();
 
-	kparser_locked_ref_put(&k_prsr->glue.refcount);
+	kparser_ref_put(&k_prsr->glue.refcount);
 
 	return err;
 }
@@ -1137,7 +1134,7 @@ const void *kparser_get_parser(const struct kparser_hkey *kparser_key)
 	k_prsr = kparser_get_parser_ctx(kparser_key);
 	if (!k_prsr)
 		return NULL;
-	kparser_locked_ref_get(&k_prsr->glue.refcount);
+	kparser_ref_get(&k_prsr->glue.refcount);
 	return &k_prsr->parser;
 }
 
@@ -1150,7 +1147,7 @@ bool kparser_put_parser(const void *prsr)
 		return false;
 	parser = prsr;
 	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
-	kparser_locked_ref_put(&k_prsr->glue.refcount);
+	kparser_ref_put(&k_prsr->glue.refcount);
 	return true;
 }
 

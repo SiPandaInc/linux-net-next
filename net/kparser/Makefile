@@ -3,8 +3,7 @@
 # Makefile for KPARSER module
 #
 
-#ccflags-y := -DDEBUG -DKERNEL_MOD
-ccflags-y :=  -DKERNEL_MOD
+ccflags-y := -DDEBUG -DKERNEL_MOD
 
 obj-$(CONFIG_KPARSER) += kparser.o
 
