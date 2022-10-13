@@ -80,27 +80,13 @@
 #include <net/xdp.h>
 #include <net/mptcp.h>
 
-#if 1
-#include "../../include/uapi/linux/kparser.h"
-#include "../kparser/kparser.h"
-#include "../kparser/kparser_condexpr.h"
-#include "../kparser/kparser_metaextract.h"
-#include "../kparser/kparser_types.h"
-
+#if IS_ENABLED(CONFIG_KPARSER)
+#include <linux/kparser.h>
+#include <net/kparser.h>
 #include <linux/rhashtable.h>
 
 #include <linux/ktime.h>
 #define DEBUG 1
-extern struct flow_dissector flow_basic_dissector;
-
-extern const void * kparser_get_parser(const struct kparser_hkey *kparser_key);
-
-extern int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
-                size_t parse_len, void *_metadata, size_t metadata_len);
-extern bool kparser_put_parser(const void *prsr);
-
-
-
 #endif
 static const struct bpf_func_proto *
 bpf_sk_base_func_proto(enum bpf_func_id func_id);
@@ -4032,8 +4018,7 @@ out:
 
 #endif
 
-#if 1
-
+#if IS_ENABLED(CONFIG_KPARSER)
 
 static int kparser_handler_test(struct xdp_buff *xdp, u32 flowd_sel, void *buf, u32 len)
 {
@@ -4215,185 +4200,6 @@ const struct bpf_func_proto bpf_xdp_kparser_test_proto = {
         .arg4_type      = ARG_CONST_SIZE,
 };
 
-#endif
-
-
-
-struct get_kparser_funcptrs {
-
-	const void * (*kparser_get_parser_ptr)(const struct kparser_hkey *kparser_key);
-	int  (* __kparser_parse_ptr)(const struct kparser_parser *parser, void *_hdr,\
-                size_t parse_len, void *_metadata, size_t metadata_len);
-
-	bool (*kparser_put_parser_ptr)(const void *prsr);
-};
-
-
-struct get_kparser_funcptrs kparser_funcptrs = {
-	.kparser_get_parser_ptr = NULL,
-	.__kparser_parse_ptr = NULL,
-	.kparser_put_parser_ptr =NULL,
-
-};
-
-EXPORT_SYMBOL_GPL(kparser_funcptrs);
-
-
-
-
-#define MAX_ENCAP 3
-#define CNTR_ARRAY_SIZE 2
-
-struct user_metametadata {
-	__u32 num_nodes;
-	__u32 num_encaps;
-	int ret_code;
-	__u16 cntr;
-	__u16 cntrs[CNTR_ARRAY_SIZE];
-} __packed;
-
-#define VLAN_COUNT_MAX 2
-
-struct user_frame {
-	__u16 fragment_bit_offset;
-	__u16 src_ip_offset;
-	__u16 dst_ip_offset;
-	__u16 src_port_offset;
-	__u16 dst_port_offset;
-	__u16 mss_offset;
-	__u32 tcp_ts_value;
-	__u16 sack_left_edge_offset;
-	__u16 sack_right_edge_offset;
-	__u16 gre_flags;
-	__u16 gre_seqno_offset;
-	__u32 gre_seqno;
-	__u16 vlan_cntr;
-	__u16 vlantcis[VLAN_COUNT_MAX];
-} __packed;
-
-struct user_metadata {
-	struct user_metametadata metametadata;
-	struct user_frame frames[MAX_ENCAP];
-} __packed;
-
-static inline void dump_parsed_user_buf(const void *buffer, size_t len)
-{
-	/* char (*__warn1)[sizeof(struct user_metadata)] = 1; */
-	const struct user_metadata *buf = buffer;
-	int i;
-
-	pr_debug("user_metametadata:%lu user_frame:%lu user_metadata:%lu\n",
-		sizeof(struct user_metametadata),
-		sizeof(struct user_frame),
-		sizeof(struct user_metadata));
-
-	if (!buf || len < sizeof(*buf)) {
-		pr_debug("%s: Insufficient buffer\n", __FUNCTION__);
-		return;
-	}
-
-	pr_debug("metametadata: num_nodes:%u\n", buf->metametadata.num_nodes);
-	pr_debug("metametadata: num_encaps:%u\n", buf->metametadata.num_encaps);
-	pr_debug("metametadata: ret_code:%d\n", buf->metametadata.ret_code);
-	pr_debug("metametadata: cntr:%u, addr: %p\n", buf->metametadata.cntr,
-		&buf->metametadata.cntr);
-	for (i = 0; i < CNTR_ARRAY_SIZE; i++) {
-		pr_debug("metametadata: cntrs[%d]:%u\n",
-				i, buf->metametadata.cntrs[i]);
-	}
-
-	for (i = 0; i <= buf->metametadata.num_encaps; i++) {
-		if (buf->frames[i].fragment_bit_offset != 0xffff)
-			pr_debug(
-				"fragment_bit_offset[%d]:{doff:%lu value:%u}\n",
-				i, offsetof(struct user_metadata,
-					frames[i].fragment_bit_offset),
-				buf->frames[i].fragment_bit_offset);
-		if (buf->frames[i].src_ip_offset != 0xffff)
-			pr_debug("src_ip_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].src_ip_offset),
-					buf->frames[i].src_ip_offset);
-		if (buf->frames[i].dst_ip_offset != 0xffff)
-			pr_debug("dst_ip_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].dst_ip_offset),
-					buf->frames[i].dst_ip_offset);
-		if (buf->frames[i].src_port_offset != 0xffff)
-			pr_debug("src_port_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].src_port_offset),
-					buf->frames[i].src_port_offset);
-		if (buf->frames[i].dst_port_offset != 0xffff)
-			pr_debug("dst_port_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].dst_port_offset),
-					buf->frames[i].dst_port_offset);
-		if (buf->frames[i].mss_offset != 0xffff)
-			pr_debug("mss_offset[%d]:{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].mss_offset),
-					buf->frames[i].mss_offset);
-		/* below check to detect if field is set can be a bug */
-		if (buf->frames[i].tcp_ts_value != 0xffffffff)
-			pr_debug("tcp_ts[%d]:{doff:%lu value:0x%04x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].tcp_ts_value),
-					buf->frames[i].tcp_ts_value);
-		if (buf->frames[i].sack_left_edge_offset != 0xffff)
-			pr_debug("sack_left_edge_offset[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].
-						sack_left_edge_offset),
-					buf->frames[i].sack_left_edge_offset);
-		if (buf->frames[i].sack_right_edge_offset != 0xffff)
-			pr_debug("sack_right_edge_offset[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].
-						sack_right_edge_offset),
-					buf->frames[i].sack_right_edge_offset);
-		if (buf->frames[i].gre_flags != 0xffff)
-			pr_debug("gre_flags[%d]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].gre_flags),
-					buf->frames[i].gre_flags);
-		if (buf->frames[i].gre_seqno_offset != 0xffff)
-			pr_debug("gre_seqno_offset[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].gre_seqno_offset),
-					buf->frames[i].gre_seqno_offset);
-		if (buf->frames[i].gre_seqno != 0xffffffff)
-			pr_debug("gre_seqno[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].gre_seqno),
-					buf->frames[i].gre_seqno);
-		if (buf->frames[i].vlan_cntr != 0xffff)
-			pr_debug("vlan_cntr[%d]:"
-					"{doff:%lu value:%u}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlan_cntr),
-					buf->frames[i].vlan_cntr);
-		if (buf->frames[i].vlantcis[0] != 0xffff)
-			pr_debug("vlantcis[%d][0]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlantcis[0]),
-					buf->frames[i].vlantcis[0]);
-		if (buf->frames[i].vlantcis[1] != 0xffff)
-			pr_debug("vlantcis[%d][1]:"
-					"{doff:%lu value:0x%02x}\n", i,
-					offsetof(struct user_metadata,
-						frames[i].vlantcis[1]),
-					buf->frames[i].vlantcis[1]);
-	}
-}
-
-
 int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
                       void *_metadata, size_t metadata_len)
 {
@@ -4429,42 +4235,24 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 	data = (void *)(long)xdp->data;
 	pr_err("\n   :2 %s %d  key.name = %s key.id =  %d   \n ",
 			__func__,__LINE__ , key.name, key.id);
-	if (!kparser_funcptrs.kparser_get_parser_ptr)
-	{
-		pr_err("\n kparser module not loaded \n");
+	parser = kparser_get_parser(&key);
+	if (!parser) {
+		pr_debug("kparser_get_parser() failed, key:{%s:%u}\n",
+				key.name, key.id);
 		return -1;
-	} else {
-		parser = kparser_funcptrs.kparser_get_parser_ptr(&key);
-		if (!parser) {
-			pr_debug("kparser_get_parser() failed, key:{%s:%u}\n",
-					key.name, key.id);
-			return -1;
-		}
 	}
 
         pr_err("\n   :3 %s %d  \n ",__func__,__LINE__ );
-	if (!kparser_funcptrs.__kparser_parse_ptr)
-	{
-		pr_err("\n kparser module not loaded \n");
-		return -1;
-	} else {
 
 		start_time = ktime_get();
-		rc = kparser_funcptrs.__kparser_parse_ptr(parser, data, pktlen, _metadata, metadata_len);
+		rc = __kparser_parse(parser, data, pktlen, _metadata, metadata_len);
 
 		stop_time = ktime_get();
 		elapsed_time= ktime_sub(stop_time, start_time);
 		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
-	if (!kparser_funcptrs.kparser_put_parser_ptr)
-		{
-			pr_err("\n kparser module not loaded \n");
-			return -1;
-		} else {
-
-			if (kparser_funcptrs.kparser_put_parser_ptr(parser) != true)
+		if (kparser_put_parser(parser) != true)
 			pr_debug("kparser_put_parser() failed\n");
 
-		}
 
 		pr_debug("%s:rc:{%d:%s}\n", __FUNCTION__, rc, kparser_code_to_text(rc));
 		if (rc <= KPARSER_OKAY && rc > KPARSER_STOP_FAIL)
@@ -4521,6 +4309,7 @@ const struct bpf_func_proto bpf_xdp_kparser_proto = {
 };
 
 
+#endif
 
 
 static int bpf_xdp_frags_increase_tail(struct xdp_buff *xdp, int offset)
@@ -8488,10 +8277,12 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_tcp_raw_check_syncookie_ipv6_proto;
 #endif
 #endif
+#if IS_ENABLED(CONFIG_KPARSER)
         case BPF_FUNC_xdp_kparser_test:
                 return &bpf_xdp_kparser_test_proto;
         case BPF_FUNC_xdp_kparser:
                 return &bpf_xdp_kparser_proto;
+#endif
 	default:
 		return bpf_sk_base_func_proto(func_id);
 	}

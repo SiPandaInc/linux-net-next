@@ -321,22 +321,6 @@ out:
 
 	return rc;
 }
-extern struct get_kparser_funcptrs kparser_funcptrs;
-
-void init_kparser_ptrs(void)
-{
-	kparser_funcptrs.kparser_get_parser_ptr = &kparser_get_parser;
-	kparser_funcptrs.__kparser_parse_ptr    = &__kparser_parse;
-	kparser_funcptrs.kparser_put_parser_ptr = &kparser_put_parser;
-}
-
-void ext_kparser_ptrs(void)
-{
-	kparser_funcptrs.kparser_get_parser_ptr = NULL;
-	kparser_funcptrs.__kparser_parse_ptr = NULL;
-	kparser_funcptrs.kparser_put_parser_ptr = NULL;
-}
-
 
 static int __init init_kparser(void)
 {
