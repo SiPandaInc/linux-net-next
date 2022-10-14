@@ -150,8 +150,8 @@ int xdp_parser_prog(struct xdp_md *ctx)
 
 	count_pkts();
 	
-       // return XDP_DROP;
-        return XDP_PASS;
+        return XDP_DROP;
+       // return XDP_PASS;
 
 }
 
