@@ -10,138 +10,121 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  */
-
 #include <linux/bpf.h>
 #include <linux/if_link.h>
-#include <linux/limits.h>
-#include <net/if.h>
+#include <assert.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <libgen.h>
-
-#include <bpf/libbpf.h>
+#include <net/if.h>
+#include <locale.h>
+#include <math.h>
+#include <net/if.h>
+#include <poll.h>
+#include <stdbool.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/signalfd.h>
+#include <sys/sysinfo.h>
+#include <sys/timerfd.h>
+#include <sys/utsname.h>
+#include <time.h>
+#include "bpf_util.h"
 #include <bpf/bpf.h>
+#include <bpf/libbpf.h>
 
+static int ifindex;
 static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST;
+static __u32 prog_id;
 
-static int do_attach(int idx, int prog_fd, int map_fd, const char *name)
+
+
+
+static void poll_stats(int map_fd, int interval)
 {
-	int err;
+        unsigned int nr_cpus = bpf_num_possible_cpus();
+        __u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
+        int i;
+	while (1) {
+                __u32 key = UINT32_MAX;
 
-	err = bpf_xdp_attach(idx, prog_fd, xdp_flags, NULL);
-	if (err < 0) {
-		printf("ERROR: failed to attach program to %s\n", name);
-		return err;
+                sleep(interval);
+
+                if (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
+                        __u64 sum = 0;
+
+                        assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
+                        for (i = 0; i < nr_cpus; i++)
+                                sum += values[i];
+                        if (sum > prev[key])
+                                printf(" packet rate =%10llu pkt/s \n",
+                                        (sum - prev[key]) / interval );
+                        prev[key] = sum;
+
+                }
 	}
-
-	/* Adding ifindex as a possible egress TX port */
-	err = bpf_map_update_elem(map_fd, &idx, &idx, 0);
-	if (err)
-		printf("ERROR: failed using device %s as TX-port\n", name);
-
-	return err;
+        
 }
 
-static int do_detach(int ifindex, const char *ifname, const char *app_name)
+
+static void int_exit(int sig)
 {
-	LIBBPF_OPTS(bpf_xdp_attach_opts, opts);
-	struct bpf_prog_info prog_info = {};
-	char prog_name[BPF_OBJ_NAME_LEN];
-	__u32 info_len, curr_prog_id;
-	int prog_fd;
-	int err = 1;
+	__u32 curr_prog_id = 0;
 
 	if (bpf_xdp_query_id(ifindex, xdp_flags, &curr_prog_id)) {
-		printf("ERROR: bpf_xdp_query_id failed (%s)\n",
-		       strerror(errno));
-		return err;
+		printf("bpf_xdp_query_id failed\n");
+		exit(1);
 	}
-
-	if (!curr_prog_id) {
-		printf("ERROR: flags(0x%x) xdp prog is not attached to %s\n",
-		       xdp_flags, ifname);
-		return err;
-	}
-
-	info_len = sizeof(prog_info);
-	prog_fd = bpf_prog_get_fd_by_id(curr_prog_id);
-	if (prog_fd < 0) {
-		printf("ERROR: bpf_prog_get_fd_by_id failed (%s)\n",
-		       strerror(errno));
-		return prog_fd;
-	}
-
-	err = bpf_obj_get_info_by_fd(prog_fd, &prog_info, &info_len);
-	if (err) {
-		printf("ERROR: bpf_obj_get_info_by_fd failed (%s)\n",
-		       strerror(errno));
-		goto close_out;
-	}
-	snprintf(prog_name, sizeof(prog_name), "%s_prog", app_name);
-	prog_name[BPF_OBJ_NAME_LEN - 1] = '\0';
-
-	if (strcmp(prog_info.name, prog_name)) {
-		printf("ERROR: %s isn't attached to %s\n", app_name, ifname);
-		err = 1;
-		goto close_out;
-	}
-
-	opts.old_prog_fd = prog_fd;
-	err = bpf_xdp_detach(ifindex, xdp_flags, &opts);
-	if (err < 0)
-		printf("ERROR: failed to detach program from %s (%s)\n",
-		       ifname, strerror(errno));
-	/* TODO: Remember to cleanup map, when adding use of shared map
-	 *  bpf_map_delete_elem((map_fd, &idx);
-	 */
-close_out:
-	close(prog_fd);
-	return err;
+	if (prog_id == curr_prog_id)
+		bpf_xdp_detach(ifindex, xdp_flags, NULL);
+	else if (!curr_prog_id)
+		printf("couldn't find a prog id on a given interface\n");
+	else
+		printf("program on interface changed, not removing\n");
+	exit(0);
 }
+
+
+
 
 static void usage(const char *prog)
 {
 	fprintf(stderr,
-		"usage: %s [OPTS] interface-list\n"
-		"\nOPTS:\n"
-		"    -d    detach program\n"
+		"usage: %s [OPTS] IFACE\n\n"
+		"OPTS:\n"
 		"    -S    use skb-mode\n"
-		"    -F    force loading prog\n"
-		"    -D    direct table lookups (skip fib rules)\n",
+		"    -N    enforce native mode\n"
+		"    -F    force loading prog\n",
 		prog);
 }
 
 int main(int argc, char **argv)
 {
-	const char *prog_name = "xdp_fwd";
-	struct bpf_program *prog = NULL;
-	struct bpf_program *pos;
-	const char *sec_name;
-	int prog_fd = -1, map_fd = -1;
-	char filename[PATH_MAX];
+	struct bpf_prog_info info = {};
+	__u32 info_len = sizeof(info);
+	const char *optstr = "FSN";
+	int prog_fd, map_fd, opt;
+	struct bpf_program *prog;
 	struct bpf_object *obj;
-	int opt, i, idx, err;
-	int attach = 1;
-	int ret = 0;
+	struct bpf_map *map;
+	char filename[256];
+	char outfilename[256];
+	int err;
 
-	while ((opt = getopt(argc, argv, ":dDSF")) != -1) {
+	while ((opt = getopt(argc, argv, optstr)) != -1) {
 		switch (opt) {
-		case 'd':
-			attach = 0;
-			break;
 		case 'S':
 			xdp_flags |= XDP_FLAGS_SKB_MODE;
 			break;
+		case 'N':
+			/* default, set below */
+			//break;
 		case 'F':
 			xdp_flags &= ~XDP_FLAGS_UPDATE_IF_NOEXIST;
-			break;
-		case 'D':
-			prog_name = "xdp_fwd_direct";
 			break;
 		default:
 			usage(basename(argv[0]));
@@ -152,75 +135,61 @@ int main(int argc, char **argv)
 	if (!(xdp_flags & XDP_FLAGS_SKB_MODE))
 		xdp_flags |= XDP_FLAGS_DRV_MODE;
 
+	printf("  filename %s optind %d \n",filename, optind);
 	if (optind == argc) {
 		usage(basename(argv[0]));
 		return 1;
 	}
 
-	if (attach) {
-		snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
-
-		if (access(filename, O_RDONLY) < 0) {
-			printf("error accessing file %s: %s\n",
-				filename, strerror(errno));
-			return 1;
-		}
-
-		obj = bpf_object__open_file(filename, NULL);
-		if (libbpf_get_error(obj))
-			return 1;
-
-		prog = bpf_object__next_program(obj, NULL);
-		bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
-
-		err = bpf_object__load(obj);
-		if (err) {
-			printf("Does kernel support devmap lookup?\n");
-			/* If not, the error message will be:
-			 *  "cannot pass map_type 14 into func bpf_map_lookup_elem#1"
-			 */
-			return 1;
-		}
-
-		bpf_object__for_each_program(pos, obj) {
-			sec_name = bpf_program__section_name(pos);
-			if (sec_name && !strcmp(sec_name, prog_name)) {
-				prog = pos;
-				break;
-			}
-		}
-		prog_fd = bpf_program__fd(prog);
-		if (prog_fd < 0) {
-			printf("program not found: %s\n", strerror(prog_fd));
-			return 1;
-		}
-		map_fd = bpf_map__fd(bpf_object__find_map_by_name(obj,
-							"xdp_tx_ports"));
-		if (map_fd < 0) {
-			printf("map not found: %s\n", strerror(map_fd));
-			return 1;
-		}
+	ifindex = if_nametoindex(argv[optind]);
+	if (!ifindex) {
+		perror("if_nametoindex");
+		return 1;
 	}
 
-	for (i = optind; i < argc; ++i) {
-		idx = if_nametoindex(argv[i]);
-		if (!idx)
-			idx = strtoul(argv[i], NULL, 0);
+	snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
+	obj = bpf_object__open_file(filename, NULL);
+	if (libbpf_get_error(obj))
+		return 1;
 
-		if (!idx) {
-			fprintf(stderr, "Invalid arg\n");
-			return 1;
-		}
-		if (!attach) {
-			err = do_detach(idx, argv[i], prog_name);
-			if (err)
-				ret = err;
-		} else {
-			err = do_attach(idx, prog_fd, map_fd, argv[i]);
-			if (err)
-				ret = err;
-		}
+	prog = bpf_object__next_program(obj, NULL);
+	bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
+
+	err = bpf_object__load(obj);
+	if (err)
+		return 1;
+
+	prog_fd = bpf_program__fd(prog);
+
+	map = bpf_object__next_map(obj, NULL);
+	if (!map) {
+		printf("finding a map in obj file failed\n");
+		return 1;
+	}
+	map_fd = bpf_map__fd(map);
+
+	if (!prog_fd) {
+		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
+		return 1;
 	}
 
-	return ret;
+	signal(SIGINT, int_exit);
+	signal(SIGTERM, int_exit);
+
+	if (bpf_xdp_attach(ifindex, prog_fd, xdp_flags, NULL) < 0) {
+		printf("link set xdp fd failed\n");
+		return 1;
+	}
+
+	err = bpf_obj_get_info_by_fd(prog_fd, &info, &info_len);
+	if (err) {
+		printf("can't get prog info - %s\n", strerror(errno));
+		return err;
+	}
+	prog_id = info.id;
+
+	poll_stats(map_fd, 1);
+
+
+	return 0;
 }

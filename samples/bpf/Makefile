@@ -49,6 +49,7 @@ tprogs-y += xdp_fwd
 tprogs-y += xdp_kparser
 tprogs-y += xdp_kparser_flowd
 tprogs-y += xdp_kparser_drop
+tprogs-y += xdp_kparser_load
 tprogs-y += task_fd_query
 tprogs-y += xdp_sample_pkts
 tprogs-y += ibumad
@@ -178,6 +179,7 @@ always-y += xdp_fwd_kern.o
 always-y += xdp_kparser_kern.o
 always-y += xdp_kparser_flowd_kern.o
 always-y += xdp_kparser_drop_kern.o
+always-y += xdp_kparser_load.o
 always-y += task_fd_query_kern.o
 always-y += xdp_sample_pkts_kern.o
 always-y += ibumad_kern.o
@@ -442,7 +444,7 @@ $(BPF_SKELS_LINKED): $(BPF_OBJS_LINKED) $(BPFTOOL)
 # 'opt' output to IR, and finally 'llc' generates bpf byte code.
 $(obj)/%.o: $(src)/%.c
 	@echo "  CLANG-bpf " $@
-	$(Q)$(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(BPF_EXTRA_CFLAGS) ${TEST_FLAGS}\
+	$(Q)$(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(BPF_EXTRA_CFLAGS) $(TEST_FLAGS) \
 		-I$(obj) -I$(srctree)/tools/testing/selftests/bpf/ \
 		-I$(LIBBPF_INCLUDE) \
 		-D__KERNEL__ -D__BPF_TRACING__ -Wno-unused-value -Wno-pointer-sign \
