@@ -114,7 +114,7 @@ void key_config(char *arr)
 
 	key.id = htons(0xFFFF);
 #if 1
-	strcpy(key.name, "test_parser");
+	strcpy(key.name, KPARSER_NAME);
 #else
 	strcpy(key.name, "");
 #endif
