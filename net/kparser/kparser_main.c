@@ -269,6 +269,20 @@ out:
 	return rc;
 }
 
+void init_kparser_hooks(void)
+{
+        kparser_funchooks.kparser_get_parser_hook = &kparser_get_parser;
+        kparser_funchooks.__kparser_parse_hook    = &__kparser_parse;
+        kparser_funchooks.kparser_put_parser_hook = &kparser_put_parser;
+}
+
+void ext_kparser_hooks(void)
+{
+        kparser_funchooks.kparser_get_parser_hook = NULL;
+        kparser_funchooks.__kparser_parse_hook = NULL;
+        kparser_funchooks.kparser_put_parser_hook = NULL;
+}
+
 static int __init init_kparser(void)
 {
 	int rc;
@@ -287,7 +301,7 @@ static int __init init_kparser(void)
 		pr_debug("kparser_init() err:%d\n", rc);
 		goto out;
 	}
-
+	init_kparser_hooks();
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 
 	return rc;
@@ -299,6 +313,7 @@ out:
 
 	pr_debug("ERR OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 
+	ext_kparser_hooks();
 	return rc;
 }
 
@@ -317,6 +332,7 @@ static void __exit exit_kparser(void)
 		pr_debug("kparser_deinit() err:%d\n", rc);
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	ext_kparser_hooks();
 }
 
 module_init(init_kparser);
