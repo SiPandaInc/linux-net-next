@@ -1,0 +1,164 @@
+{
+  "parsers": [
+    {
+      "name": "sdpu_parser",
+      "root-node": "ether_node",
+      "oknode": "node_exit0",
+      "failnode": "node_exit256"
+    }
+  ],
+  "parse-nodes": [
+    {
+      "name": "ether_node",
+      "min-hdr-length": 14,
+      "next-proto": {
+        "field-off": 12,
+        "field-len": 2,
+        "table": "ether_table"
+      }
+    },
+    {
+      "name": "node_exit0",
+      "metadata": {
+        "ents": [
+          {
+            "name": "md.numencaps",
+            "type": "numencaps",
+            "md-off": 6,
+            "length": 1
+          },
+          {
+            "name": "md.numnodes",
+            "type": "numnodes",
+            "md-off": 7,
+            "length": 1
+          },
+          {
+            "name": "md.returncode",
+            "type": "return_code",
+            "md-off": 8,
+            "length": 1
+          }
+            ]
+        }
+    },
+    {
+      "name": "node_exit256",
+      "metadata": {
+        "ents": [
+          {
+            "name": "md.numencaps",
+            "type": "numencaps",
+            "md-off": 6,
+            "length": 1
+          },
+          {
+            "name": "md.numnodes",
+            "type": "numnodes",
+            "md-off": 7,
+            "length": 1
+          },
+          {
+            "name": "md.returncode",
+            "type": "return_code",
+            "md-off": 8,
+            "length": 1
+          }
+            ]
+        }
+    },
+    {
+      "name": "ipv4_node",
+      "min-hdr-length": 20,
+      "next-proto": {
+        "field-off": 9,
+        "field-len": 1,
+        "table": "ip_table"
+      },
+      "hdr-length": {
+        "field-off": 0,
+        "field-len": 1,
+        "mask": "0xf",
+        "multiplier": 4
+      },
+      "metadata": {
+        "ents": [
+          {
+            "name": "addrs.v4_addrs.src",
+            "type": "hdrdata",
+            "md-off": 0,
+            "hdr-src-off": 12,
+            "length": 1
+          },
+          {
+            "name": "addrs.v4_addrs.dst",
+            "type": "nibbs_hdrdata",
+            "md-off": 1,
+            "hdr-src-off": 16,
+            "length": 1
+          },
+          {
+            "name": "ip_proto",
+            "type": "hdrlen",
+            "md-off": 2,
+            "hdr-src-off": 9,
+            "length": 1
+          },
+          {
+            "name": "cbyte",
+            "type": "constant",
+            "md-off": 3,
+            "length": 1,
+            "value": 10
+          },
+          {
+            "name": "hw_cbyte",
+            "type": "constant_halfword",
+            "md-off": 4,
+            "length": 1,
+            "value": 124
+          },
+          {
+            "name": "boffset",
+            "type": "bit_offset",
+            "md-off": 4,
+            "length": 1,
+            "value": 124
+          },
+          {
+            "name": "offset",
+            "type": "offset",
+            "md-off": 5,
+            "length": 1,
+            "value": 124
+          }
+        ]
+      }
+    }
+  ],
+  "proto-tables": [
+    {
+      "name": "ether_table",
+      "ents": [
+        {
+          "name": "ipv4_node",
+          "key": "0x8",
+          "node": "ipv4_node"
+        }
+      ]
+    },
+    {
+      "name": "ip_table",
+      "ents": [
+        {
+          "key": "0x6",
+          "node": "port_node"
+        },
+        {
+          "key": "0x11",
+          "node": "ports_node"
+        }
+      ]
+    }
+  ]
+}
