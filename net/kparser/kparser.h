@@ -279,12 +279,12 @@ void kparser_ref_get(struct kref *refcount);
 void kparser_ref_put(struct kref *refcount);
 
 struct get_kparser_funchooks {
-
-        const void * (*kparser_get_parser_hook)(const struct kparser_hkey *kparser_key);
-        int  (* __kparser_parse_hook)(const struct kparser_parser *parser, void *_hdr,\
-                size_t parse_len, void *_metadata, size_t metadata_len);
-
-        bool (*kparser_put_parser_hook)(const void *prsr);
+	const void * (*kparser_get_parser_hook)(const struct kparser_hkey *kparser_key);
+	int  (*__kparser_parse_hook)(const struct kparser_parser *parser, void *_hdr,
+					size_t parse_len, void *_metadata,
+					size_t metadata_len);
+	bool (*kparser_put_parser_hook)(const void *prsr);
 };
+
 extern struct get_kparser_funchooks kparser_funchooks;
 #endif /* __KPARSER_H */

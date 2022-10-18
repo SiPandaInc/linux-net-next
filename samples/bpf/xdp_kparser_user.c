@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (c) 2022-23 Aravind Kumar Buduri <aravind.buduri@gmail.com> 
+/* Copyright (c) 2022-23 Aravind Kumar Buduri <aravind.buduri@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
@@ -43,25 +43,24 @@ static __u32 prog_id;
 
 static void poll_stats(int map_fd, int interval)
 {
-        unsigned int nr_cpus = bpf_num_possible_cpus();
-        __u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
-        int i;
+	unsigned int nr_cpus = bpf_num_possible_cpus();
+	__u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
+	int i;
+	__u32 key = UINT32_MAX;
+
 	while (1) {
-                __u32 key = UINT32_MAX;
+		sleep(interval);
+		if (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
+			__u64 sum = 0;
 
-                sleep(interval);
-                if (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
-                        __u64 sum = 0;
-
-                        assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
-                        for (i = 0; i < nr_cpus; i++)
-                                sum += values[i];
-                        if (sum > prev[key])
-                                printf(" packet rate =%10llu pkt/s\n",
-                                        (sum - prev[key]) / interval);
-                        prev[key] = sum;
-
-                }
+			assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
+			for (i = 0; i < nr_cpus; i++)
+				sum += values[i];
+			if (sum > prev[key])
+				printf(" packet rate =%10llu pkt/s\n",
+						(sum - prev[key]) / interval);
+			prev[key] = sum;
+		}
 	}
 }
 

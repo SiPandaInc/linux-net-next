@@ -271,16 +271,16 @@ out:
 
 void init_kparser_hooks(void)
 {
-        kparser_funchooks.kparser_get_parser_hook = &kparser_get_parser;
-        kparser_funchooks.__kparser_parse_hook    = &__kparser_parse;
-        kparser_funchooks.kparser_put_parser_hook = &kparser_put_parser;
+	kparser_funchooks.kparser_get_parser_hook = &kparser_get_parser;
+	kparser_funchooks.__kparser_parse_hook    = &__kparser_parse;
+	kparser_funchooks.kparser_put_parser_hook = &kparser_put_parser;
 }
 
 void ext_kparser_hooks(void)
 {
-        kparser_funchooks.kparser_get_parser_hook = NULL;
-        kparser_funchooks.__kparser_parse_hook = NULL;
-        kparser_funchooks.kparser_put_parser_hook = NULL;
+	kparser_funchooks.kparser_get_parser_hook = NULL;
+	kparser_funchooks.__kparser_parse_hook = NULL;
+	kparser_funchooks.kparser_put_parser_hook = NULL;
 }
 
 static int __init init_kparser(void)
