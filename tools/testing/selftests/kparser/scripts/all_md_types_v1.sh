@@ -50,4 +50,4 @@ ipcmd parser create node name p0.node.exit256 md.ruleset p0.mdset.mdd
 ipcmd parser create table/p0.ether_table name p0.ether_table.tabent.ipv4_node key 0x8 node p0.ipv4_node
 
 # Create parsers
-ipcmd parser create parser name test_parser0 rootnode p0.ether_node oknode p0.node.exit0 failnode p0.node.exit256  metametasize 11
+ipcmd parser create parser name test_parser112 rootnode p0.ether_node oknode p0.node.exit0 failnode p0.node.exit256  metametasize 11
