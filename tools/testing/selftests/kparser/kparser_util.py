@@ -1,7 +1,6 @@
 import pytest
 import netns
 import time
-import test_util
 import subprocess
 import json
 import re
@@ -317,10 +316,10 @@ def load_kparser_config( kparser_obj , del_kparser_cmd=True) :
     return True
 
 if __name__ == '__main__':
-    result1 = setup_kparser( kparser_module="/home/testusr/wspace/linux-net-next/net/kparser/kparser.ko", \
-               xdp_module= "/home/testusr/wspace/linux-net-next/samples/bpf/xdp_kparser_kern.o", \
-               veth= "veth1")
-    print(" Step 1 result " , result1 )
+    #result1 = setup_kparser( kparser_module="/home/testusr/wspace/linux-net-next/net/kparser/kparser.ko", \
+    #           xdp_module= "/home/testusr/wspace/linux-net-next/samples/bpf/xdp_kparser_kern.o", \
+    #           veth= "veth11")
+    #print(" Step 1 result " , result1 )
 
     for i in range(1):
             pkt0 = [Ether()/IP(src="172.180.1.3",dst="172.180.1.4")/TCP(flags="S", sport=RandShort(), dport=80) ]
@@ -328,12 +327,12 @@ if __name__ == '__main__':
             #exit(0) 
             #print(" COMP " , result2 )    
             #result2 = test_tx_rx_packet("nveth0","nveth1", pkt0 ,"ns1","ns2")
-            #src_veth="veth0"
-            #result2 = test_tx_rx_packet(src_veth=src_veth,dst_veth="veth1", packets=pkt0 )
-            ejson = json.loads('[{ "key": 1, "value": { "frame": { "src_eth": [255,255,255,255,255,255 ], "dst_eth": [255,255,255,255,255,255 ], "ip_ver": 65535, "ip_proto": 255, "src_ip_addr": 4294967295, "dst_ip_addr": 4294967295, "src_tcp_port": 65535, "dst_tcp_port": 65535, "src_udp_port": 65535, "dst_udp_port": 65535, "mss": 65535, "tcp_ts": 4294967295, "sack_left_edge": 65535, "sack_right_edge": 65535, "gre_flags": 65535, "gre_seqno": 4294967295, "vlan_cntr": 65535, "vlantcis": [65535,65535 ] } } } ] ')
+            src_veth="veth01"
+            result2 = test_tx_rx_packet(src_veth=src_veth,dst_veth="veth11", packets=pkt0 )
+            continue
             
-            #ipcmdfile = "/home/testusr/wspace/test/data/all_md_types_len2.sh"
-            ipcmdfile = "/home/testusr/wspace/test/data/all_md_def_len2.sh"
+            ipcmdfile = "/home/testusr/wspace/test/data/all_md_types_len2.sh"
+            #ipcmdfile = "/home/testusr/wspace/test/data/all_md_def_len2.sh"
             #gen_test_flow( kparser_json=test_0, src_veth="nveth0", dst_veth="nveth1", packets=pkt0, expect_mdata_json=ejson, src_netns="ns1",dst_netns="ns2", del_kparser_cmd=True) 
-            gen_test_flow( kparser_obj=ipcmdfile, src_veth="veth0", dst_veth="veth1", packets=pkt0, expect_mdata_json=ejson, src_netns=None,dst_netns=None, del_kparser_cmd=True) 
+            gen_test_flow( kparser_obj=ipcmdfile, src_veth="veth01", dst_veth="veth11", packets=pkt0, expect_mdata_json=ejson, src_netns=None,dst_netns=None, del_kparser_cmd=True) 
             

@@ -1,5 +1,5 @@
 #EDEV=enp0s8
-EDEV=veth1
+EDEV=veth11
 ip link set dev $EDEV xdp off
 #ip netns exec ns2 ip link set dev veth1 xdp off
 export PKD_CONFIG_PATH=/home/testusr/wspace/linux-net-next/tools/lib/bpf

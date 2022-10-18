@@ -24,21 +24,84 @@ struct user_metadata {
 	struct user_frame frame;
 } __packed;
 #else 
-#if MDATA == 1
+#if MDATA == 108
 
 #define KPARSER_NAME STR(KPARSER_PREFIX) STR(MDATA)
 struct user_frame {
-	__u16 nnodes_hw;
-	__u16 nencaps_hw;
-	__u16 rcode_hw;
-	__u16 hdata_hw;
-	__u16 nibb_hw;
-	__u16 hdlen_hw;
-	__u16 cbyte_hw;
-	__u16 hcbyte_hw;
-	__u16 boffset_hw;
-	__u16 offset_hw;
-	__u16 tstamp_hw;
+	__u8 nnodes_u8;
+	__u8 nencaps_u8;
+	__u8 rcode_u8;
+	__u8 hdata_u8;
+	__u8 nibb_u8;
+	__u8 hdlen_u8;
+	__u8 cbyte_u8;
+	__u8 hcbyte_u8;
+	__u8 boffset_u8;
+	__u8 offset_u8;
+	__u8 tstamp_u8;
+} __packed;
+
+struct user_metadata {
+	struct user_frame frame;
+} __packed;
+
+#elif MDATA == 116
+
+#define KPARSER_NAME STR(KPARSER_PREFIX) STR(MDATA)
+struct user_frame {
+	__u16 nnodes_u16;
+	__u16 nencaps_u16;
+	__u16 rcode_u16;
+	__u16 hdata_u16;
+	__u16 nibb_u16;
+	__u16 hdlen_u16;
+	__u16 cbyte_u16;
+	__u16 hcbyte_u16;
+	__u16 boffset_u16;
+	__u16 offset_u16;
+	__u16 tstamp_u16;
+} __packed;
+
+struct user_metadata {
+	struct user_frame frame;
+} __packed;
+
+#elif MDATA == 132
+
+#define KPARSER_NAME STR(KPARSER_PREFIX) STR(MDATA)
+struct user_frame {
+	__u32 nnodes_u32;
+	__u32 nencaps_u32;
+	__u32 rcode_u32;
+	__u32 hdata_u32;
+	__u32 nibb_u32;
+	__u32 hdlen_u32;
+	__u32 cbyte_u32;
+	__u32 hcbyte_u32;
+	__u32 boffset_u32;
+	__u32 offset_u32;
+	__u32 tstamp_u32;
+} __packed;
+
+struct user_metadata {
+	struct user_frame frame;
+} __packed;
+
+#elif MDATA == 111
+
+#define KPARSER_NAME STR(KPARSER_PREFIX) STR(MDATA)
+struct user_frame {
+	__u32 nnodes_u8;
+	__u32 nencaps_u8;
+	__u32 rcode_u8;
+	__u8 hdata_u8[6];
+	__u8 nibb_u8;
+	__u16 hdlen_u16;
+	__u32 cbyte_u32;
+	__u32 hcbyte_u32;
+	__u16 boffset_u16;
+	__u32 offset_u32;
+	__u32 tstamp_u32;
 } __packed;
 
 struct user_metadata {
@@ -127,6 +190,7 @@ struct user_metadata {
 } __packed;
 
 #else 
+
 #define KPARSER_NAME STR(KPARSER_PREFIX) STR(' ')
 struct user_frame {
 	__u8 nnodes_b;
