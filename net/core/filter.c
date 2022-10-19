@@ -3985,6 +3985,149 @@ static const struct bpf_func_proto bpf_xdp_store_bytes_proto = {
 };
 
 #if IS_ENABLED(CONFIG_KPARSER)
+static int xdp_flow_dissector(struct xdp_buff *xdp, u32 flowd_sel, void *buf, u32 len)
+{
+	void *data = xdp->data;
+	struct ethhdr *eth = (struct ethhdr *)data;
+	ktime_t start_time, stop_time, elapsed_time;
+	struct iphdr *ip = data + sizeof(*eth);
+	struct flow_keys_basic keys;
+	struct vlan_hdr *vlan_hdr;
+	unsigned short  proto;
+	struct flow_keys flow;
+	struct flow_keys *flowptr = &flow;
+	struct ipv6hdr *ip6h;
+	struct arphdr  *arph;
+	int nh_off;
+	int hlen;
+	bool ret;
+
+	proto =  eth->h_proto;
+
+	if (!buf || flowd_sel > 0xffff || len > 0xffff) {
+		pr_err("\n%s %d len =\n ", __func__, __LINE__);
+		return -EINVAL;
+	}
+	if (flowd_sel == 0) {
+		if (len < sizeof(struct flow_keys_basic)) {
+			pr_err("\n%s %d len = %d size flow_keys_basic= %d len error\n",
+			       __func__, __LINE__, sizeof(struct flow_keys_basic));
+			return -EINVAL;
+		}
+	} else if (flowd_sel == 1) {
+		if (len < sizeof(struct flow_keys)) {
+			pr_err("\n%s %d len = %d size flow_keys= %d len error\n",
+			       __func__, __LINE__, sizeof(struct flow_keys));
+			return -EINVAL;
+		}
+	}
+	nh_off = sizeof(*eth);
+#if KPARSER_DEBUG
+	pr_debug("\n%s nh_off = %d hlen= %d\n",	__func__, nh_off, hlen);
+	pr_debug("%s proto = %d htons(ETH_P_IP)= %d\n",
+		 __func__, proto, htons(ETH_P_IP));
+	pr_debug("%s eth->h_proto = %d ETH_P_IP= %d\n",
+		 __func__, eth->h_proto, ETH_P_IP);
+#endif
+	/* Extract L3 protocol */
+	switch (proto) {
+	case htons(ETH_P_8021Q):
+		hlen = sizeof(*eth) + sizeof(*vlan_hdr);
+		break;
+	case htons(ETH_P_IP):
+		hlen = sizeof(*eth) + sizeof(*ip);
+		break;
+	case htons(ETH_P_IPV6):
+		hlen = sizeof(*eth) + sizeof(*ip6h);
+		break;
+	case htons(ETH_P_ARP):
+		hlen = sizeof(*eth) + sizeof(*arph);
+		break;
+	default:
+		break;
+	}
+
+	if (flowd_sel == 0) {
+		memset(&keys, 0, sizeof(keys));
+		start_time = ktime_get();
+		ret = __skb_flow_dissect(NULL, NULL, &flow_keys_basic_dissector,
+					 &keys, data, proto, nh_off, hlen, 0);
+		stop_time = ktime_get();
+		elapsed_time = ktime_sub(stop_time, start_time);
+		pr_err("elapsed Time : %lld\n",  ktime_to_ns(elapsed_time));
+		if (ret == true) {
+#if KPARSER_DEBUG
+			pr_debug("\n%d %s keys.control.thoff= %d\n",
+				 __LINE__, __func__, keys.control.thoff);
+			pr_debug("%d %s keys.control.addr_type= %d\n",
+				 __LINE__, __func__, keys.control.addr_type);
+			pr_debug("%d %s keys.control.flags= %d\n",
+				 __LINE__, __func__, keys.control.flags);
+			pr_debug("%d %s keys.basic.n_proto= 0x0x\n",
+				 __LINE__, __func__, ntohs(keys.basic.n_proto));
+			pr_debug("%d %s keys.basic.ip_proto= %d\n",
+				 __LINE__, __func__, keys.basic.ip_proto);
+#endif
+		}
+		memcpy((char *)buf, &keys, sizeof(keys));
+		return 0;
+	} else if (flowd_sel == 1) {
+		memset(&flow, 0, sizeof(flow));
+#if KPARSER_DEBUG
+		start_time = ktime_get();
+#endif
+		ret = __skb_flow_dissect(NULL, NULL, &flow_keys_dissector,
+					 &flow, data, proto, nh_off, hlen, 0);
+#if KPARSER_DEBUG
+		stop_time = ktime_get();
+		elapsed_time = ktime_sub(stop_time, start_time);
+		pr_debug("elapsed Time : %lld\n",  ktime_to_ns(elapsed_time));
+#endif
+		if (ret == true) {
+#if KPARSER_DEBUG
+			pr_debug("%d %s control.thoff= %d\n",
+				 __LINE__, __func__, flowptr->control.thoff);
+			pr_debug("%d %s keys.control.addr_type= %d\n",
+				 __LINE__, __func__, flowptr->control.addr_type);
+			pr_debug("%d %s keys.control.flags= %d\n",
+				 __LINE__, __func__, flowptr->control.flags);
+			pr_debug("%d %s flowptr->basic.n_proto= 0x0%x\n",
+				 __LINE__, __func__, ntohs(flowptr->basic.n_proto));
+			pr_debug("%d %s flowptr->basic.ip_proto= %d\n",
+				 __LINE__, __func__, flowptr->basic.ip_proto);
+			pr_debug("%d %s flowptr->addrs.v4addrs.src = %pI4\n",
+				 __LINE__, __func__, &flowptr->addrs.v4addrs.src);
+			pr_debug("%d %s flowptr->addrs.v4addrs.dst = %pI4\n",
+				 __LINE__, __func__, &flowptr->addrs.v4addrs.dst);
+#endif
+		}
+		memcpy((char *)buf, &flow, sizeof(flow));
+		return 0;
+	}
+	return 0;
+}
+
+BPF_CALL_4(bpf_xdp_flow_dissector, struct xdp_buff *, xdp, u32, flowd_sel,
+	   void *, buf, u32, len)
+{
+	int ret;
+
+	ret = xdp_flow_dissector(xdp, flowd_sel, buf, len);
+	return ret;
+}
+
+const struct bpf_func_proto bpf_xdp_flow_dissector_proto = {
+	.func           = bpf_xdp_flow_dissector,
+	.gpl_only       = false,
+	.ret_type       = RET_INTEGER,
+	.arg1_type      = ARG_PTR_TO_CTX,
+	.arg2_type      = ARG_ANYTHING,
+	.arg3_type      = ARG_PTR_TO_UNINIT_MEM,
+	.arg4_type      = ARG_CONST_SIZE,
+};
+#endif
+
+#if IS_ENABLED(CONFIG_KPARSER)
 struct get_kparser_funchooks kparser_funchooks = {
 	.kparser_get_parser_hook = NULL,
 	.__kparser_parse_hook = NULL,
@@ -8034,6 +8177,10 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 	case BPF_FUNC_tcp_raw_check_syncookie_ipv6:
 		return &bpf_tcp_raw_check_syncookie_ipv6_proto;
 #endif
+#endif
+#if IS_ENABLED(CONFIG_KPARSER)
+        case BPF_FUNC_xdp_flow_dissector:
+                return &bpf_xdp_flow_dissector_proto;
 #endif
 #if IS_ENABLED(CONFIG_KPARSER)
         case BPF_FUNC_xdp_kparser:
