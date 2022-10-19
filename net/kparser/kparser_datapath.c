@@ -9,13 +9,17 @@
 
 #include <linux/rhashtable.h>
 #include <linux/skbuff.h>
+#include <net/kparser.h>
 
 #include "kparser.h"
 #include "kparser_condexpr.h"
 #include "kparser_metaextract.h"
 #include "kparser_types.h"
 
-/* Lookup a type in a node table*/
+/* Lookup a type in a node table
+ * TODO: as of now, this table is an array, but in future, this needs to be
+ * converted to hash table for performance benefits
+ */
 static const struct kparser_parse_node *lookup_node(int type,
 						    const struct kparser_proto_table *table,
 						    bool *isencap)
@@ -46,7 +50,7 @@ static const struct kparser_parse_node *lookup_node(int type,
 
 /* Lookup a type in a node TLV table */
 static const struct kparser_parse_tlv_node
-*lookup_tlv_node(int type,
+*lookup_tlv_node(__u8 type,
 		 const struct kparser_proto_tlvs_table *table)
 {
 	int i;
@@ -63,7 +67,9 @@ static const struct kparser_parse_tlv_node
 	return NULL;
 }
 
-/* Lookup a flag-fields index in a protocol node flag-fields table */
+/* Lookup a flag-fields index in a protocol node flag-fields table
+ * TODO: This needs to optimized later to use array for better performance
+ */
 static const struct kparser_parse_flag_field_node
 *lookup_flag_field_node(__u32 flag, const struct kparser_proto_flag_fields_table *table)
 {
@@ -80,7 +86,7 @@ static const struct kparser_parse_flag_field_node
 	return NULL;
 }
 
-/* Metadata table and conditional expressions handdling */
+/* Metadata table processing */
 static int extract_metadata_table(const struct kparser_parser *parser,
 				  const struct kparser_metadata_table *metadata_table,
 				  const void *_hdr, size_t hdr_len, size_t hdr_offset,
@@ -369,6 +375,7 @@ static int kparser_parse_tlvs(const struct kparser_parser *parser,
 
 	pr_debug("{%s:%d}: len:%ld tlv_offset:%ld\n", __func__, __LINE__, len, tlv_offset);
 
+	/* This is the main TLV processing loop */
 	while (len > 0) {
 		if (++loop_cnt > parse_tlvs_node->config.max_loop)
 			return loop_limit_exceeded(KPARSER_STOP_LOOP_CNT,
@@ -634,7 +641,7 @@ static int __kparser_run_exit_node(const struct kparser_parser *parser,
 	return KPARSER_OKAY;
 }
 
-/* Parse a packet
+/* Parse a packet with a header as an input.
  *
  * Arguments:
  *   - parser: Parser being invoked
@@ -646,16 +653,17 @@ static int __kparser_run_exit_node(const struct kparser_parser *parser,
  *
  * rcu lock must be held before calling this function.
  */
-int __kparser_parse(const struct kparser_parser *parser, void *_hdr,
-		    size_t parse_len, void *_metadata, size_t metadata_len)
+int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
+		    void *_metadata, size_t metadata_len)
 {
 	const struct kparser_parse_node *next_parse_node, *atencap_node;
-	int type = -1, i, ret, framescnt = parser->config.max_frames;
 	const struct kparser_parse_node *parse_node, *wildcard_node;
 	struct kparser_ctrl_data ctrl = { .ret = KPARSER_OKAY };
 	const struct kparser_metadata_table *metadata_table;
 	const struct kparser_proto_table *proto_table;
 	const struct kparser_proto_node *proto_node;
+	const struct kparser_parser *parser = obj;
+	int type = -1, i, ret, framescnt;
 	struct kparser_counters *cntrs;
 	void *_frame, *_obj_ref = NULL;
 	const void *base_hdr = _hdr;
@@ -980,18 +988,18 @@ int kparser_parse(struct sk_buff *skb,
 	size_t pktlen;
 	int err;
 
-	/* TODO: since we only need the first 512 bytes, we don't need to pull
-	 * the whole skb.
-	 * See if skb_linearize() can be shortened only for first 512 bytes.
-	 */
+	data = skb_mac_header(skb);
+	pktlen = skb_mac_header_len(skb) + skb->len;
+	if (pktlen > KPARSER_MAX_SKB_PACKET_LEN) {
+		skb_pull(skb, KPARSER_MAX_SKB_PACKET_LEN);
+		data = skb_mac_header(skb);
+		pktlen = skb_mac_header_len(skb) + skb->len;
+	}
+
 	err = skb_linearize(skb);
 	if (err < 0)
 		return err;
-
 	WARN_ON(skb->data_len);
-
-	data = skb_mac_header(skb);
-	pktlen = skb_mac_header_len(skb) + skb->len;
 
 	k_prsr = kparser_get_parser_ctx(kparser_key);
 	if (!k_prsr) {
@@ -1026,7 +1034,8 @@ int kparser_parse(struct sk_buff *skb,
 }
 EXPORT_SYMBOL(kparser_parse);
 
-/* get/freeze a parser instance using a key.
+/* get/freeze a parser instance using a key. Freeze means the whole parse tree
+ * from this parser will be immutable and can not be deleted.
  * kparser_key: key of the associated kParser parser object which must be
  * already created via CLI.
  * return: NULL if key not found, else an opaque parser instance pointer which
@@ -1055,16 +1064,15 @@ EXPORT_SYMBOL(kparser_get_parser);
  * return: true if put operation is success, else false.
  * NOTE: This call makes the whole parser tree deletable for the very last call.
  */
-bool kparser_put_parser(const void *prsr)
+bool kparser_put_parser(const void *obj)
 {
-	const struct kparser_parser *parser;
-	struct kparser_glue_parser *k_prsr;
+	const struct kparser_parser *parser = obj;
+	struct kparser_glue_parser *k_parser;
 
-	if (!prsr)
+	if (!parser)
 		return false;
-	parser = prsr;
-	k_prsr = container_of(parser, struct kparser_glue_parser, parser);
-	kparser_ref_put(&k_prsr->glue.refcount);
+	k_parser = container_of(parser, struct kparser_glue_parser, parser);
+	kparser_ref_put(&k_parser->glue.refcount);
 
 	return true;
 }

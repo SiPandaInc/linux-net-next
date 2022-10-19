@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2022, SiPanda Inc.
  *
- * kparser_types.h - kParser data types header file
+ * kparser_types.h - kParser private data types header file
  *
  * Authors:     Tom Herbert <tom@sipanda.io>
  *              Pratyush Kumar Khan <pratyush@sipanda.io>

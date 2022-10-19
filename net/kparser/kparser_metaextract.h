@@ -22,9 +22,9 @@
 #define kparser_ntohll(x) (x)
 #elif __BYTE_ORDER == __LITTLE_ENDIAN
 #define kparser_htonll(x)						\
-	(((__u64)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
+	(((__u64)htonl((x) & 0xffffffff) << 32) | htonl((x) >> 32))
 #define kparser_ntohll(x)						\
-	(((__u64)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
+	(((__u64)ntohl((x) & 0xffffffff) << 32) | ntohl((x) >> 32))
 #else
 #error "Cannot determine endianness"
 #endif
@@ -150,7 +150,10 @@
 #define KPARSER_METADATA_CNTROP_INCREMENT	1
 #define KPARSER_METADATA_CNTROP_RESET		2
 
-/* Metadata extraction pseudo instructions */
+/* Metadata extraction pseudo instructions
+ * This emulates the custom SiPANDA riscv instructions for metadata extractions,
+ * hence these are called pseudo instructions
+ */
 struct kparser_metadata_extract {
 	union {
 		struct {
@@ -428,7 +431,7 @@ static inline void *metadata_get_dst(size_t dst_off, void *mdata)
 	return &((__u8 *)mdata)[dst_off];
 }
 
-static bool __metatdata_validate_counter(const struct kparser_parser *parser,
+static inline bool __metatdata_validate_counter(const struct kparser_parser *parser,
 					 unsigned int cntr)
 {
 	if (!parser) {
@@ -487,6 +490,8 @@ static inline void *metadata_get_dst_cntr(const struct kparser_parser *parser,
 static inline int __metadata_cntr_operation(const struct kparser_parser *parser,
 					    unsigned int operation, unsigned int cntr)
 {
+	/* cntr 0 means no counter attached, the index starts from 1 in this case
+	 */
 	if (!cntr)
 		return KPARSER_OKAY;
 

@@ -17,6 +17,7 @@
 #include <linux/types.h>
 #include <net/act_api.h>
 #include <net/genetlink.h>
+#include <net/kparser.h>
 #include <net/netlink.h>
 #include <net/pkt_cls.h>
 
@@ -255,7 +256,7 @@ void init_kparser_hooks(void)
 	kparser_funchooks.kparser_put_parser_hook = &kparser_put_parser;
 }
 
-void ext_kparser_hooks(void)
+void deinit_kparser_hooks(void)
 {
 	kparser_funchooks.kparser_get_parser_hook = NULL;
 	kparser_funchooks.__kparser_parse_hook = NULL;
@@ -293,7 +294,7 @@ out:
 
 	pr_debug("ERR OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 
-	ext_kparser_hooks();
+	deinit_kparser_hooks();
 	return rc;
 }
 
@@ -313,7 +314,7 @@ static void __exit exit_kparser(void)
 		pr_debug("kparser_deinit() err:%d\n", rc);
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
-	ext_kparser_hooks();
+	deinit_kparser_hooks();
 }
 
 module_init(init_kparser);
