@@ -262,8 +262,7 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 	}
 
 out:
-	if (rsp)
-		kfree(rsp);
+	kfree(rsp);
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 
