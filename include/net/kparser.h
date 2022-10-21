@@ -68,4 +68,14 @@ extern const void *kparser_get_parser(const struct kparser_hkey *kparser_key);
  */
 extern bool kparser_put_parser(const void *parser);
 
+/* net/core/filter.c's callback hook structure to use kParser APIs if kParser enabled */
+struct get_kparser_funchooks {
+	const void * (*kparser_get_parser_hook)(const struct kparser_hkey *kparser_key);
+	int (*__kparser_parse_hook)(const void *parser, void *_hdr,
+				    size_t parse_len, void *_metadata, size_t metadata_len);
+	bool (*kparser_put_parser_hook)(const void *prsr);
+};
+
+extern struct get_kparser_funchooks kparser_funchooks;
+
 #endif /* _NET_KPARSER_H */

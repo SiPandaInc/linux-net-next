@@ -249,14 +249,14 @@ out:
 }
 
 /* kParser callback hooks to be registered in core/filter.c when enabled */
-void init_kparser_hooks(void)
+static inline void init_kparser_hooks(void)
 {
 	kparser_funchooks.kparser_get_parser_hook = &kparser_get_parser;
 	kparser_funchooks.__kparser_parse_hook = &__kparser_parse;
 	kparser_funchooks.kparser_put_parser_hook = &kparser_put_parser;
 }
 
-void deinit_kparser_hooks(void)
+static inline void deinit_kparser_hooks(void)
 {
 	kparser_funchooks.kparser_get_parser_hook = NULL;
 	kparser_funchooks.__kparser_parse_hook = NULL;

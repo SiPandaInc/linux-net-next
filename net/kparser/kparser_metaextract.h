@@ -816,6 +816,15 @@ static inline bool kparser_metadata_convert(const struct kparser_conf_metadata *
 							     conf->e_bit, cntridx);
 		return true;
 
+	case KPARSER_METADATA_HDRDATA_NIBBS_EXTRACT:
+		*mde = __kparser_make_make_nibbs_extract(conf->frame,
+							 conf->soff,
+							 conf->doff,
+							 conf->len,
+							 conf->e_bit,
+							 cntridx);
+		return true;
+
 	case KPARSER_METADATA_BIT_OFFSET:
 		*mde =	__kparser_metadata_offset_set(conf->frame,
 						      conf->doff,

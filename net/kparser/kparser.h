@@ -306,17 +306,6 @@ int kparser_namespace_insert(enum kparser_global_namespace_ids ns_id,
 			     struct rhash_head *obj_id,
 			     struct rhash_head *obj_name);
 
-
-
-struct get_kparser_funchooks {
-	const void * (*kparser_get_parser_hook)(const struct kparser_hkey *kparser_key);
-	int (*__kparser_parse_hook)(const void *parser, void *_hdr,
-				    size_t parse_len, void *_metadata, size_t metadata_len);
-	bool (*kparser_put_parser_hook)(const void *prsr);
-};
-
-extern struct get_kparser_funchooks kparser_funchooks;
-
 /* Generic kParser KMOD's netlink msg handler's definitions for create */
 typedef int kparser_obj_create_update(const struct kparser_conf_cmd *conf,
 				      size_t conf_len,
