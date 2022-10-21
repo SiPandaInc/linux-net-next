@@ -80,6 +80,13 @@
 #include <net/xdp.h>
 #include <net/mptcp.h>
 
+#if IS_ENABLED(CONFIG_KPARSER)
+#include <linux/kparser.h>
+#include <net/kparser.h>
+#include <linux/rhashtable.h>
+#include <linux/ktime.h>
+#define KPARSER_DEBUG 1
+#endif
 static const struct bpf_func_proto *
 bpf_sk_base_func_proto(enum bpf_func_id func_id);
 
@@ -3975,6 +3982,92 @@ static const struct bpf_func_proto bpf_xdp_store_bytes_proto = {
 	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
 	.arg4_type	= ARG_CONST_SIZE,
 };
+
+#if IS_ENABLED(CONFIG_KPARSER)
+struct get_kparser_funchooks kparser_funchooks = {
+	.kparser_get_parser_hook = NULL,
+	.__kparser_parse_hook = NULL,
+	.kparser_put_parser_hook = NULL,
+};
+EXPORT_SYMBOL_GPL(kparser_funchooks);
+
+int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
+		      void *_metadata, size_t metadata_len)
+{
+	struct kparser_hkey *keyptr = (struct kparser_hkey *)conf;
+	ktime_t start_time, stop_time, elapsed_time;
+	struct kparser_hkey key;
+	const void *parser;
+	void *data;
+	int pktlen;
+	int rc = 0;
+
+	key.id = keyptr->id;
+	strcpy(key.name, keyptr->name);
+	pktlen = xdp_get_buff_len(xdp);
+	data = (void *)(long)xdp->data;
+	if (!kparser_funchooks.kparser_get_parser_hook) {
+		pr_err("\n kparser module not loaded\n");
+		return -EINVAL;
+	} else {
+		parser = kparser_funchooks.kparser_get_parser_hook(&key);
+		if (!parser) {
+			pr_err("kparser_get_parser() failed, key:{%s:%u}\n",
+			       key.name, key.id);
+			return -EINVAL;
+		}
+	}
+
+	if (!kparser_funchooks.__kparser_parse_hook) {
+		pr_err("\n kparser module not loaded\n");
+		return -EINVAL;
+	} else {
+#if KPARSER_DEBUG
+		start_time = ktime_get();
+#endif
+		rc = kparser_funchooks.__kparser_parse_hook(parser, data, pktlen,
+							    _metadata, metadata_len);
+#if KPARSER_DEBUG
+		stop_time = ktime_get();
+		elapsed_time = ktime_sub(stop_time, start_time);
+		pr_err("elapsedTime : %lld\n",  ktime_to_ns(elapsed_time));
+#endif
+		if (!kparser_funchooks.kparser_put_parser_hook) {
+			pr_err("\n kparser module not loaded\n");
+			return -EINVAL;
+		} else {
+			if (kparser_funchooks.kparser_put_parser_hook(parser) != true)
+				pr_err("kparser_put_parser() failed\n");
+		}
+#if KPARSER_DEBUG
+		pr_debug("%s:rc:{%d:%s}\n", __func__, rc, kparser_code_to_text(rc));
+#endif
+	}
+	return rc;
+}
+
+BPF_CALL_5(bpf_xdp_kparser, struct xdp_buff *, xdp, void *, conf,
+	   u32, conf_len, void *, buf, u32, len)
+{
+	int len1;
+	int err;
+
+	len1 = xdp_get_buff_len(xdp);
+	err = kparser_xdp_parse(xdp, conf, conf_len, buf, len);
+	return 0;
+}
+
+const struct bpf_func_proto bpf_xdp_kparser_proto = {
+	.func           = bpf_xdp_kparser,
+	.gpl_only       = false,
+	.ret_type       = RET_INTEGER,
+	.arg1_type      = ARG_PTR_TO_CTX,
+	.arg2_type      = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg3_type      = ARG_CONST_SIZE,
+	.arg4_type      = ARG_PTR_TO_UNINIT_MEM,
+	.arg5_type      = ARG_CONST_SIZE,
+};
+#endif
 
 static int bpf_xdp_frags_increase_tail(struct xdp_buff *xdp, int offset)
 {
@@ -7940,6 +8033,10 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 	case BPF_FUNC_tcp_raw_check_syncookie_ipv6:
 		return &bpf_tcp_raw_check_syncookie_ipv6_proto;
 #endif
+#endif
+#if IS_ENABLED(CONFIG_KPARSER)
+        case BPF_FUNC_xdp_kparser:
+                return &bpf_xdp_kparser_proto;
 #endif
 	default:
 		return bpf_sk_base_func_proto(func_id);
