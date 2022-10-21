@@ -18,6 +18,7 @@
 #include <linux/if_vlan.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
+#include <linux/kparser.h>
 #include <bpf/bpf_helpers.h>
 #include "metadata_def.h"
 #define IPV6_FLOWINFO_MASK              cpu_to_be32(0x0FFFFFFF)
@@ -63,41 +64,28 @@ static __always_inline void xdp_update_ctx(const void *buffer, size_t len)
 	bpf_map_update_elem(&ctx_map, &key, buf, BPF_ANY);
 }
 
-#define KPARSER_MAX_NAME                128
-
-struct kparser_hkey {
-	__u16 id;
-	char name[KPARSER_MAX_NAME];
-} __packed;
-
-char arr1[512] = {0};
-
-void key_config(char *arr)
-{
-	struct kparser_hkey key;
-
-	__builtin_memset(&key, 0, sizeof(key));
-	key.id = htons(0xFFFF);
-	strcpy(key.name, "test_parser");
-	memcpy(arr, &key, sizeof(key));
-}
+static struct user_metadata user_metadata_buffer;
+static struct kparser_hkey key;
 
 SEC("prog")
 int xdp_parser_prog(struct xdp_md *ctx)
 {
-	struct kparser_hkey *keyptr;
-	char arr[130] = {0};
+	/* prepare a parser key which is already created and configured via the ip cli */
+	key.id = 0xffff;
+	strcpy(key.name, "tuple_parser");
 
-	/* code for Kparser */
-	key_config(arr);
-	keyptr = (struct kparser_hkey *)arr;
-#if DEBUG
-	bpf_printk("\n keyptr->name = %s\n", keyptr->name);
-	bpf_printk("\n keyptr->id = %d\n", keyptr->id);
-#endif
-	memset(arr1, 0xff, 256);
-	bpf_xdp_kparser(ctx, arr, sizeof(arr), arr1, 256);
-	xdp_update_ctx(arr1, sizeof(arr1));
+	/* set all bits to 1 in user metadata buffer to easily determine later which
+	 * fields were set/updated by kParser KMOD
+	 */
+	memset(&user_metadata_buffer, 0xff, sizeof(user_metadata_buffer));
+
+	bpf_xdp_kparser(ctx, &key, sizeof(key), &user_metadata_buffer,
+			sizeof(user_metadata_buffer));
+
+	/* now dump the metadata to be displayed by bpftool */
+	xdp_update_ctx(&user_metadata_buffer, sizeof(user_metadata_buffer));
+
+	/* count how many packets were processed in this interval */
 	count_pkts();
 
 	return XDP_PASS;

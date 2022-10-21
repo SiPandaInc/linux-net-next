@@ -10,13 +10,10 @@
  * General Public License for more details.
  */
 struct user_frame {
-	__u8 ipproto;
-	__u32 src_ip;
-	__u32 dst_ip;
-	__u16 src_port;
-	__u16 dst_port;
-	__u16 udp_src;
-	__u16 udp_dst;
+	unsigned short ip_offset;
+	unsigned short l4_offset;
+	unsigned int ipv4_addrs[2];
+	unsigned short ports[2];
 } __packed;
 
 struct user_metadata {
