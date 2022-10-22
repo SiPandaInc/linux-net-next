@@ -1,6 +1,6 @@
 import pytest
-import test_util
 import subprocess
+import kparser_util
 import json
 import re
 
@@ -63,30 +63,22 @@ def check_output( exp_str_list, result_str, negativeTest=False):
              if ( len( re.findall( expected_str , str(result_str) )) > 0 ) :
                    continue
              else :
-                print(" Expected String {} not found in result : {} ".format(expected_str , result_str ))
+                print("  Expected String {} not found in result : {} ".format(expected_str , result_str ))
                 return False
        return True
 
 #@pytest.fixture(scope="class")
 @pytest.fixture()
 def setup(request) :
-        new_test_obj  =   test_util.test_obj( )
-        new_test_obj.set_installdir(request.config.option.installdir)
-        new_test_obj.set_testfile(request.config.option.testfile)
-        new_test_obj.set_docker(request.config.option.docker)
-        new_test_obj.set_static(request.config.option.static )
-        return new_test_obj
+        pass
 
-
-#@pytest.mark.usefixtures("setup")
-#class TestClass:
 
 
 #@pytest.mark.usefixtures("setup")
 #def test_equals( testdata, setup):
 def test_cli( testdata ):
         print(" PARAM " , testdata )
-        result = kparser_cmd(testdata[0])
+        result = kparser_util._kparser_cmd_(" parser " + testdata[0])
         
         if result['returncode']  > 0 :
             if testdata[1] in  "True" :

@@ -1,5 +1,8 @@
 table_create| create table     name table1  id 0xf1  key 0xaf |False|Operation successful|
 table_read| read table     name table1  id 0xf1  key 0xaf |False|"table":{"name":"table1","id":"0xf1","key":"0xaf"}|
+table_create| delete  table/table1 key 0x801  |False|Operation successful|
+table_read| read table     name table1  id 0xf1  key 0xaf |False|"table":{"name":"table1","id":"0xf1","key":"0xaf"}|
+
 table_delete| delete table     name table1  id 0xf1  key 0xaf |False|Operation successful|
 table_read| read table     name table1  id 0xf1  key 0xaf |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
 counter_create| create counter name counter1 id 0x2 maxvalue 5  arraylimit 15  arrayelementsize 32 resetonencap false|False|Operation successful|
@@ -46,3 +49,40 @@ metadata-rule_counter-mode-reset_create|create metadata-rule name md.cntr.reset 
 metadata-rule_counter-mode-reset_read| read metadata-rule name md.cntr.reset  |False|{"metadata-rule":{"name":"md.cntr.reset","type":"counter_mode","counterop":"reset","counteridx":"counter1"|
 metadata-rule_counter-mode-reset_delete| delete metadata-rule name md.cntr.reset |False|Operation successful|
 metadata-rule_counter-mode-reset_read| read metadata-rule name md.cntr.reset  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-ruleset_create| create metadata-ruleset name mdl.final_status|False|Operation successful|
+metadata-ruleset_read| read metadata-ruleset name mdl.final_status|False|"objidx:0":{"metadata-ruleset":{"name":"mdl.final_status"}}|
+metadata-ruleset_delete| delete metadata-ruleset name mdl.final_status|False|Operation successful|
+metadata-ruleset_read| read metadata-ruleset name mdl.final_status|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_equal_create| create condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_equal_read| read condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond1","type":"equal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+condexprs_equal_delete| delete condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_equal_read| read condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_notequal_create| create condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_notequal_read| read condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond2","type":"notequal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+condexprs_notequal_delete| delete condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_notequal_read| read condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_lessthan_create| create condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_lessthan_read| read condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond3","type":"lessthan","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+condexprs_lessthan_delete| delete condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_lessthan_read| read condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_lessthanequal_create| create condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_lessthanequal_read| read condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond3","type":"lessthanequal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+condexprs_lessthanequal_delete| delete condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_lessthanequal_read| read condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_greaterthan_create| create condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_greaterthan_read| read condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond4","type":"greaterthan","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+condexprs_greaterthan_delete| delete condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_greaterthan_read| read condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_greaterthanequal_create| create condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_greaterthanequal_read| read condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond5","type":"greaterthanequal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+condexprs_greaterthanequal_delete| delete condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_greaterthanequal_read| read condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_greaterthanequal_create| create condexprs name ftv3.ipv4.cond1 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprslist_create|create condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|Operation successful|
+condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|{"condexprslist":{"name":"ftv3.ipv4.clist","defaultfail":"STOP_FAIL","condexprs":"ftv3.ipv4.cond1"}|
+condexprslist_delete|delete condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|Operation successful|
+condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprstable_create| create condexprstable name ftv3.ipv4.ctable |False|Operation successful|
+condexprstable_read| read condexprstable name ftv3.ipv4.ctable |False|Operation successful|
+condexprstable_delete| delete condexprstable name ftv3.ipv4.ctable |False|Operation successful|
+condexprstable_read| read condexprstable name ftv3.ipv4.ctable |True|"opretcode":"0x2","opdesc":"read: Object key not found"|

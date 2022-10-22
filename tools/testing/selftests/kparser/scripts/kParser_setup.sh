@@ -10,7 +10,7 @@ LIBBPFDIR=/home/testusr/wspace/libbpf_${rndStr}
 REPO=https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git
 LNN_REPO=https://$USERNAME:$TOKEN@github.com/SiPandaInc/linux-net-next.git
 IPROUTE2_REPO=https://$USERNAME:$TOKEN@github.com/SiPandaInc/iproute2.git
-LNN_BRANCH="test-v0"
+LNN_BRANCH="kparser-dev"
 IPROUTE2_BRANCH="kParser-dev"
 
 export PKG_CONFIG_PATH=${KERNDIR}/tools/lib/bpf
@@ -91,6 +91,7 @@ function perform_step()
 
 function compile_kernel() 
 {
+
 	perform_step cd ${KERNDIR}/
 	perform_step make -j4
 	perform_step make modules_install
@@ -102,7 +103,7 @@ function compile_kernel()
 function compile_libbpf() 
 {
 	perform_step cd ${KERNDIR}/tools/lib/bpf
-	perform_step make clean 
+	#perform_step make clean 
 	perform_step make DESTDIR=${LIBBPFDIR} install  
 
 	perform_step mv ${LIBBPFDIR}/usr/local/include ${LIBBPFDIR}/usr/
@@ -113,6 +114,7 @@ function compile_libbpf()
 function compile_iproute2() 
 {
 	perform_step cd $IPROUTE2_DIR
+	perform_step make clean
 	perform_step ./configure --libbpf_dir ${LIBBPFDIR}
 	perform_step make
 }
@@ -121,6 +123,7 @@ function compile_bpftool()
 {
 	
 	perform_step cd ${KERNDIR}/tools/bpf
+	#perform_step make clean
 	perform_step make
 
 }
@@ -144,9 +147,11 @@ function compile_kparser()
 
 #pre_install
 #clone_linux_net_next
-compile_kernel
-#compile_libbpf
-#compile_iproute2
+#compile_kernel
+#exit 0
+#reboot
+compile_libbpf
+compile_iproute2
 #compile_bpftool
 #compile_kparser
 #compile_xdp

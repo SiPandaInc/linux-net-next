@@ -1,0 +1,4 @@
+metadata-rule_hdrdata_create| create metadata-rule name md.gre.seqno type hdrdata hdr-src-off 0  md-off 24 length 4 isframe true  isendianneeded true |False|Operation successful|
+metadata-rule_hdrdata_read| read metadata-rule name md.gre.seqno  |False|"metadata-rule":{"name":"md.gre.seqno","type":"hdrdata","isframe":"true","isendianneeded":"true","hdr-src-off":0,"md-off":24,"length":4 |
+metadata-rule_hdrdata_delete| delete metadata-rule name md.gre.seqno |False|Operation successful|
+metadata-rule_hdrdata_read| read metadata-rule name md.gre.seqno  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|

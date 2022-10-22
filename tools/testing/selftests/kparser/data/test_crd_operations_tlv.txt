@@ -1,0 +1,12 @@
+tlvnode_create|  create tlvnode name node.tlv.tcp.mss |False|Operation successful|
+tlvnode_read|  read tlvnode name node.tlv.tcp.mss |False|"tlvnode":{"name":"node.tlv.tcp.mss"}|
+tlvtable_create|  create tlvtable name table.tlv.tcp |False|Operation successful|
+tlvtable_read|  read tlvtable name table.tlv.tcp |False|"tlvtable":{"name":"table.tlv.tcp"}|
+tlvtable_ent1_create|  create tlvtable/table.tlv.tcp tlvtype 2 tlvnode node.tlv.tcp.mss |False|Operation successful|
+tlvtable_ent1_read|  read tlvtable name table.tlv.tcp |False|"tlvtable":{"tlvtype":0,"table":"table.tlv.tcp","tlvnode":""}|
+tlvtable_ent1_delete|  delete tlvtable/table.tlv.tcp tlvtype 2 tlvnode node.tlv.tcp.mss |False|Operation successful|
+tlvtable_ent1_readF|  read tlvtable name table.tlv.tcp |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+tlvtable_delete|  delete tlvtable name table.tlv.tcp |False|Operation successful|
+tlvtable_readF|  read tlvtable name table.tlv.tcp |True|"opretcode":"0x2","opdesc":"read: Object key not found"
+tlvnode_delete|  delete tlvnode name node.tlv.tcp.mss |False|Operation successful|
+tlvnode_readF|  read tlvnode name node.tlv.tcp.mss |True|"opretcode":"0x2","opdesc":"read: Object key not found"
