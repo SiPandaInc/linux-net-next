@@ -1,0 +1,12 @@
+condexprs_equal_create| create condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
+condexprs_equal_read| read condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond1","type":"equal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+test_crd_operations.txt:condexprslist_create|create condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|Operation successful|
+test_crd_operations.txt:condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|{"condexprslist":{"name":"ftv3.ipv4.clist","defaultfail":"STOP_FAIL","condexprs":"ftv3.ipv4.cond1"}|
+test_crd_operations.txt:condexprslist_delete|delete condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|Operation successful|
+test_crd_operations.txt:condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprstable_create| create condexprstable name ftv3.ipv4.ctable |False|Operation successful|
+condexprstable_read| read condexprstable name ftv3.ipv4.ctable |False|Operation successful|
+condexprstable_delete| delete condexprstable name ftv3.ipv4.ctable |False|Operation successful|
+condexprstable_read| read condexprstable name ftv3.ipv4.ctable |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_equal_delete| delete condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_equal_read| read condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|

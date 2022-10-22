@@ -32,14 +32,16 @@ perform_step ip addr add $IP2 dev $VETH1
 
 setup_iptable() 
 {
-perform_step iptables -t mangle -s $IP1/32 -A OUTPUT -j MARK --set-mark 1
-perform_step iptables -t mangle -s $IP2/32 -A OUTPUT -j MARK --set-mark 1
+#perform_step iptables -t mangle -s $IP1/32 -A OUTPUT -j MARK --set-mark 1
+perform_step iptables -t mangle -s $IP1/32 -A OUTPUT -j CONNMARK  --set-mark 1
+#perform_step iptables -t mangle -s $IP2/32 -A OUTPUT -j MARK --set-mark 1
+perform_step iptables -t mangle -s $IP2/32 -A OUTPUT -j CONNMARK  --set-mark 1
 }
 
 setup_priority()
 {
- ip rule del from all pref 0 lookup local
- ip rule add from all pref 100 lookup local
+perform_step ip rule del from all pref 0 lookup local
+perform_step ip rule add from all pref 100 lookup local
 }
 
 setup_route()
@@ -51,7 +53,7 @@ perform_step ip route add $IP1/32 via $IP2 dev $VETH1 table 100
 
 setup_finish()
 {
- ip rule add fwmark 1 pref 10 lookup 100
+perform_step ip rule add fwmark 1 pref 10 lookup 100
 
 echo "   ..... "
 echo 1 > /proc/sys/net/ipv4/conf/$VETH0/accept_local
@@ -75,9 +77,9 @@ perform_step ip netns exec ns2 ip addr add $IP2/24 dev $VETH1
 perform_step ip netns exec ns2 ip link set $VETH1 up
 }
 
-#setup_veth
-#setup_iptable
-#setup_priority
-#setup_route
+setup_veth
+setup_iptable
+setup_priority
+setup_route
 setup_finish
 #setup_nns

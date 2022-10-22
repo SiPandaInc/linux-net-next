@@ -1,6 +1,6 @@
 import pytest
 import json
-import kparser_api
+import kparser_util
 import os
 from scapy.all import *
 
@@ -20,7 +20,7 @@ def setup_xdp(self ) :
     self.veth0 = "veth0"
     self.veth1 = "veth1"
 
-    kparser_api.setup_kparser(lnn_path + "/net/kparser/kparser.ko",
+    kparser_util.setup_kparser(lnn_path + "/net/kparser/kparser.ko",
             lnn_path + "/samples/bpf/xdp_kparser_kern.o",
             self.veth1 )
 """ 
@@ -45,7 +45,7 @@ class TestKparserMD():
         cls.pkts = [Ether()/IP(src="172.200.1.3",dst="172.200.1.4")/TCP(flags="S", sport=RandShort(), dport=80) ]
 
         cls.ejson = json.loads('[{ "key": 1, "value": { "frame": { "src_eth": [255,255,255,255,255,255 ], "dst_eth": [255,255,255,255,255,255 ], "ip_ver": 65535, "ip_proto": 255, "src_ip_addr": 4294967295, "dst_ip_addr": 4294967295, "src_tcp_port": 65535, "dst_tcp_port": 65535, "src_udp_port": 65535, "dst_udp_port": 65535, "mss": 65535, "tcp_ts": 4294967295, "sack_left_edge": 65535, "sack_right_edge": 65535, "gre_flags": 65530, "gre_seqno": 4294967295, "vlan_cntr": 65535, "vlantcis": [65535,65535 ] } } } ] ')
-        kparser_api.setup_kparser(lnn_path + "/net/kparser/kparser.ko",
+        kparser_util.setup_kparser(lnn_path + "/net/kparser/kparser.ko",
             lnn_path + "/samples/bpf/xdp_kparser_kern.o",
             cls.veth1, cls.netns1 )
 
@@ -53,7 +53,7 @@ class TestKparserMD():
 
     def test_table00(self) :
         
-        result = kparser_api.gen_test_flow( kparser_json=test_0, src_veth=self.veth0, dst_veth=self.veth1, packets=self.pkts[0], expect_mdata_json=self.ejson, src_netns="ns1", dst_netns="ns2",del_kparser_cmd=True) 
+        result = kparser_util.gen_test_flow( kparser_json=test_0, src_veth=self.veth0, dst_veth=self.veth1, packets=self.pkts[0], expect_mdata_json=self.ejson, src_netns="ns1", dst_netns="ns2",del_kparser_cmd=True) 
        
         assert result
 
@@ -78,7 +78,7 @@ class TestKparserMD():
         {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
         {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':24, 'rootnode':'node.ether'}
         ]
-        result = kparser_api.gen_test_flow( kparser_json=test_0, src_veth=self.veth0, dst_veth=self.veth1, packets=self.pkts[0], expect_mdata_json=self.ejson, src_netns="ns1", dst_netns="ns2",del_kparser_cmd=True) 
+        result = kparser_util.gen_test_flow( kparser_json=test_0, src_veth=self.veth0, dst_veth=self.veth1, packets=self.pkts[0], expect_mdata_json=self.ejson, src_netns="ns1", dst_netns="ns2",del_kparser_cmd=True) 
        
         assert result
 
@@ -93,7 +93,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
         
     #MD-OFF = 100000
     def xtest_md_off_outside(self) :
@@ -106,7 +106,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
         assert not retval
 
     #length = 100000
@@ -120,7 +120,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
 
     #mddata = 100000
     def xtest_length_md_offlimit(self) :
@@ -133,7 +133,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':320, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
 
     #addoff = 100000
     def xtest_addoff_offlimit(self) :
@@ -146,7 +146,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
 
     #isframe = true without userframe
     def xtest_isframe_wo(self) :
@@ -159,7 +159,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
         assert not retval
 
 
@@ -174,7 +174,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':4504 , 'nxt.field-off':12, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
         assert not retval
 
 
@@ -189,7 +189,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':65534, 'nxt.field-len':2, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
 
 
     #nxt field len > 65530
@@ -203,7 +203,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'node', 'name':'node.ether', 'min-hdr-length':14 , 'nxt.field-off':12, 'nxt.field-len':255, 'nxt.table': 'table.ether', 'md.ruleset': 'mdl.ether' },
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
 
 
     #nxt field len > 65530
@@ -225,7 +225,7 @@ class TestKparserMD():
             { 'operation':'create', 'object':'table/table.ipv4' , 'key':'0x800', 'node':'node.ether'},
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
 
     #nxt field len > 65530
     def xtest_nxt_field_multiplier(self) :
@@ -246,7 +246,7 @@ class TestKparserMD():
             { 'operation':'create', 'object':'table/table.ipv4' , 'key':'0x6', 'node':'node.ether'},
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
-        retval = kparser_api.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
+        retval = kparser_util.gen_test_flow( test_0, self.veth0, self.veth1, self.pkts[0], self.ejson, True) 
 
 
     # populate mini mdatada
@@ -271,7 +271,7 @@ class TestKparserMD():
             {'operation':'create', 'object':'parser', 'name':'test_parser', 'metametasize':18, 'rootnode':'node.ether'}
         ]
 
-        result = kparser_api.gen_test_flow( kparser_json=test_0, src_veth=self.veth0, dst_veth=self.veth1, packets=self.pkts[0], expect_mdata_json=self.ejson, src_netns="ns1", dst_netns="ns2",del_kparser_cmd=True) 
+        result = kparser_util.gen_test_flow( kparser_json=test_0, src_veth=self.veth0, dst_veth=self.veth1, packets=self.pkts[0], expect_mdata_json=self.ejson, src_netns="ns1", dst_netns="ns2",del_kparser_cmd=True) 
        
         assert result
 
