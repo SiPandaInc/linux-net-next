@@ -2,7 +2,6 @@ table_create| create table     name table1  id 0xf1  key 0xaf |False|Operation s
 table_read| read table     name table1  id 0xf1  key 0xaf |False|"table":{"name":"table1","id":"0xf1","key":"0xaf"}|
 table_create| delete  table/table1 key 0x801  |False|Operation successful|
 table_read| read table     name table1  id 0xf1  key 0xaf |False|"table":{"name":"table1","id":"0xf1","key":"0xaf"}|
-
 table_delete| delete table     name table1  id 0xf1  key 0xaf |False|Operation successful|
 table_read| read table     name table1  id 0xf1  key 0xaf |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
 counter_create| create counter name counter1 id 0x2 maxvalue 5  arraylimit 15  arrayelementsize 32 resetonencap false|False|Operation successful|
