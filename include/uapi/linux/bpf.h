@@ -5435,6 +5435,15 @@ union bpf_attr {
  *		**-E2BIG** if user-space has tried to publish a sample which is
  *		larger than the size of the ring buffer, or which cannot fit
  *		within a struct bpf_dynptr.
+ *
+ * long bpf_xdp_kparser(struct xdp_buff *xdp_md, void *conf, u32 conf_len, void *buf, u32 len)
+ *      Description
+ *              This helper is provided as an easy way to parse the metadata in
+ *              xdp buffer .The frame associated to *xdp_md*,configuration *conf*
+ *              config len of *conf_len* and metadata is stored
+ *              in *buf* of *len* bytes.
+ *      Return
+ *              0 on success, or a negative error in case of failure.
  */
 #define ___BPF_FUNC_MAPPER(FN, ctx...)			\
 	FN(unspec, 0, ##ctx)				\
@@ -5647,6 +5656,7 @@ union bpf_attr {
 	FN(tcp_raw_check_syncookie_ipv6, 207, ##ctx)	\
 	FN(ktime_get_tai_ns, 208, ##ctx)		\
 	FN(user_ringbuf_drain, 209, ##ctx)		\
+	FN(xdp_kparser, 210, ##ctx)			\
 	/* */
 
 /* backwards-compatibility macros for users of __BPF_FUNC_MAPPER that don't
