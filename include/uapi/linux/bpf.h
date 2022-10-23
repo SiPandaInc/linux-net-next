@@ -5394,6 +5394,15 @@ union bpf_attr {
  *              in *buf* of *len* bytes.
  *      Return
  *              0 on success, or a negative error in case of failure.
+ *
+ * long bpf_xdp_flow_dissector(struct xdp_buff *xdp_md, u32 flowd_sel, void *buf, u32 len)
+ *      Description
+ *              This helper is provided as an easy way to parse the metadata
+ *              and test the functionality. The frame associated to *xdp_md*,
+ *              choosing flowd *flowd_sel* and metadata is stored in *buf* of
+ *              *len* bytes.
+ *      Return
+ *              0 on success, or a negative error in case of failure.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -5606,6 +5615,7 @@ union bpf_attr {
 	FN(tcp_raw_check_syncookie_ipv6),	\
 	FN(ktime_get_tai_ns),		\
 	FN(xdp_kparser),                \
+	FN(xdp_flow_dissector),           \
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
