@@ -484,10 +484,10 @@ struct kparser_conf_parser {
  * since this is shared with user space code.
  */
 #define BITS_IN_BYTE	8
-#define BITS_IN_ULONG	(sizeof(unsigned long) * BITS_IN_BYTE)
+#define BITS_IN_U32	(sizeof(__u32) * BITS_IN_BYTE)
 
 #define KPARSER_CONFIG_MAX_KEYS			128
-#define KPARSER_CONFIG_MAX_KEYS_BV_LEN		((KPARSER_CONFIG_MAX_KEYS / BITS_IN_ULONG) + 1)
+#define KPARSER_CONFIG_MAX_KEYS_BV_LEN ((KPARSER_CONFIG_MAX_KEYS / BITS_IN_U32) + 1)
 struct kparser_config_set_keys_bv {
 	__u32 ns_keys_bvs[KPARSER_CONFIG_MAX_KEYS_BV_LEN];
 };
