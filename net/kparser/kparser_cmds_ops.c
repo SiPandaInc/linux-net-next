@@ -961,7 +961,7 @@ done:
 /* free handler for object metadata */
 void kparser_free_metadata(void *ptr, void *arg)
 {
-	kparser_free(ptr);
+	/* TODO: */
 }
 
 /* create handler for object metadata list */
@@ -1316,27 +1316,7 @@ done:
 /* free handler for object metadata list */
 void kparser_free_metalist(void *ptr, void *arg)
 {
-	struct kparser_glue_metadata_table *kmdl = ptr;
-	struct kparser_glue_metadata_extract *kmde;
-	int i;
-
-	if (!ptr)
-		return;
-
-	for (i = 0; i < kmdl->md_configs_len; i++) {
-		kmde = kparser_namespace_lookup(KPARSER_NS_METADATA,
-						&kmdl->md_configs[i].md_conf.key);
-		if (!kmde)
-			continue;
-
-		(void)kparser_namespace_remove(KPARSER_NS_METADATA, &kmde->glue.ht_node_id,
-					       &kmde->glue.ht_node_name);
-		kparser_free(kmde);
-	}
-
-	kparser_free(kmdl->md_configs);
-	kparser_free(kmdl->metadata_table.entries);
-	kparser_free(kmdl);
+	/* TODO:  */
 }
 
 /* handler to convert and map netlink node context to kParser KMOD's node context */
@@ -1713,7 +1693,7 @@ done:
 /* free handler for object parse node */
 void kparser_free_node(void *ptr, void *arg)
 {
-	kparser_free(ptr);
+	/* TODO: */
 }
 
 /* create handler for object protocol table entry */
@@ -2049,13 +2029,7 @@ done:
 /* free handler for object protocol table */
 void kparser_free_proto_tbl(void *ptr, void *arg)
 {
-	struct kparser_glue_protocol_table *proto_table = ptr;
-
-	if (!ptr)
-		return;
-	kparser_free(proto_table->proto_table.entries);
-
-	kparser_free(proto_table);
+	/* TODO: */
 }
 
 /* handler to convert and map from netlink tlv node to kParser KMOD's tlv node */
@@ -3563,13 +3537,7 @@ done:
 /* free handler for object parser */
 void kparser_free_parser(void *ptr, void *arg)
 {
-	struct kparser_glue_parser *kparser = ptr;
-
-	if (!ptr)
-		return;
-
-	kparser_free(kparser->parser.cntrs);
-	kparser_free(kparser);
+	/* TODO: */
 }
 
 /* handler for object parser lock */
