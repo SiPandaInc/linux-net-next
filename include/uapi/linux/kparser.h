@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+/* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /* Copyright (c) 2022, SiPanda Inc.
  *
  * kparser.h - kParser global Linux header file
