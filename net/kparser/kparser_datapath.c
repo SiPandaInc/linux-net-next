@@ -655,6 +655,12 @@ static int __kparser_run_exit_node(const struct kparser_parser *parser,
  *
  * rcu lock must be held before calling this function.
  */
+int ___kparser_parse(const void *obj, void *_hdr, size_t parse_len,
+		     struct sk_buff *skb, void *_metadata, size_t metadata_len)
+{
+	return 0;
+}
+
 int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 		    void *_metadata, size_t metadata_len)
 {
@@ -737,6 +743,10 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 		if (flags & KPARSER_F_DEBUG)
 			pr_debug("kParser parsing %s\n", parse_node->name);
 
+		/* when SKB is passed, if parse_len < hdr_len, then
+		 * try to do skb_pullup(hdr_len) here. reset parse_len based on
+		 * new parse_len, reset data ptr. Do this inside this loop.
+		 */
 		if (parse_len < hdr_len) {
 			ctrl.ret = KPARSER_STOP_LENGTH;
 			goto parser_out;
@@ -966,8 +976,17 @@ kparser_get_parser_ctx(const struct kparser_hkey *kparser_key)
 	if (!kparser_key)
 		return NULL;
 
-	ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
+	if (kparser_key->id >= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START &&
+	    kparser_key->id <= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP) {
+		rcu_read_lock();
+		ptr = kparser_fast_lookup_array[kparser_key->id];
+		rcu_read_unlock();
+	} else {
+		ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
+	}
+
 	parser = rcu_dereference(ptr);
+
 	return parser;
 }
 
@@ -1005,6 +1024,22 @@ int kparser_parse(struct sk_buff *skb,
 		return err;
 	WARN_ON(skb->data_len);
 
+	/*
+	   // TODO: do this pullup inside the loop of ___kparser_parse(), when
+	   // parse_len < hdr_len
+
+		if (pktlen > KPARSER_MAX_SKB_PACKET_LEN) {
+			skb_pull(skb, KPARSER_MAX_SKB_PACKET_LEN);
+			data = skb_mac_header(skb);
+			pktlen = skb_mac_header_len(skb) + skb->len;
+		}
+
+		err = skb_linearize(skb);
+		if (err < 0)
+			return err;
+		WARN_ON(skb->data_len);
+		___kparser_parse(parser, skb, _metadata, metadata_len);
+	*/
 	k_prsr = kparser_get_parser_ctx(kparser_key);
 	if (!k_prsr) {
 		pr_debug("{%s:%d}: parser is not found\n", __func__, __LINE__);

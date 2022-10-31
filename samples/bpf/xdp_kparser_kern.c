@@ -71,8 +71,8 @@ SEC("prog")
 int xdp_parser_prog(struct xdp_md *ctx)
 {
 	/* prepare a parser key which is already created and configured via the ip cli */
-	key.id = 0xffff;
-	strcpy(key.name, "tuple_parser");
+	key.id = 0;
+	// strcpy(key.name, "tuple_parser");
 
 	/* set all bits to 1 in user metadata buffer to easily determine later which
 	 * fields were set/updated by kParser KMOD

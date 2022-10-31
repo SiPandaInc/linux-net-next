@@ -527,15 +527,15 @@ static inline int kparser_metadata_bytes_extract(const struct kparser_parser *pa
 						 const void *hdr, void *mdata)
 {
 	__u8 *dptr = metadata_get_dst_cntr(parser, mde.bytes.dst_off, mdata,
-			mde.bytes.cntr, 0);
+					   mde.bytes.cntr, 0);
 	const __u8 *sptr = &((__u8 *)hdr)[mde.bytes.src_off];
 
 	if (!dptr)
 		return KPARSER_OKAY;
 
 	return __kparser_metadata_bytes_extract(sptr, dptr,
-			mde.bytes.length + 1,
-			mde.bytes.e_bit);
+						mde.bytes.length + 1,
+						mde.bytes.e_bit);
 }
 
 static inline int kparser_metadata_nibbs_extract(const struct kparser_parser *parser,
@@ -543,7 +543,7 @@ static inline int kparser_metadata_nibbs_extract(const struct kparser_parser *pa
 						 const void *hdr, void *mdata)
 {
 	__u8 *dptr = metadata_get_dst_cntr(parser, mde.nibbs.dst_off, mdata,
-			mde.nibbs.cntr, 0);
+					   mde.nibbs.cntr, 0);
 	const __u8 *sptr = &((__u8 *)hdr)[mde.nibbs.src_off / 2];
 	size_t nibb_len = mde.nibbs.length + 1;
 	__u8 data;
@@ -556,8 +556,8 @@ static inline int kparser_metadata_nibbs_extract(const struct kparser_parser *pa
 		/* This is effectively a byte transfer case */
 
 		return __kparser_metadata_bytes_extract(sptr, dptr,
-				mde.nibbs.length / 2,
-				mde.nibbs.e_bit);
+							mde.nibbs.length / 2,
+							mde.nibbs.e_bit);
 	}
 
 	if (mde.nibbs.e_bit) {
@@ -597,8 +597,7 @@ static inline int kparser_metadata_nibbs_extract(const struct kparser_parser *pa
 					 * byte. The result is set in the
 					 * reversed position in the output
 					 */
-					dptr[i] = data |
-						sptr[dlen - 1 - i] << 4;
+					dptr[i] = data | sptr[dlen - 1 - i] << 4;
 
 					/* Get the next data value */
 					data = sptr[dlen - 1 - i] >> 4;
@@ -674,8 +673,8 @@ static inline int kparser_metadata_const_set_byte(const struct kparser_parser *p
 						  struct kparser_metadata_extract mde,
 						  void *mdata)
 {
-	__u16 *dptr = metadata_get_dst_cntr(parser, mde.constant_byte.dst_off,
-			mdata, mde.constant_byte.cntr, 0);
+	__u8 *dptr = metadata_get_dst_cntr(parser, mde.constant_byte.dst_off,
+					   mdata, mde.constant_byte.cntr, 0);
 
 	if (dptr)
 		*dptr = mde.constant_byte.data;
@@ -688,7 +687,7 @@ static inline int kparser_metadata_const_set_hword(const struct kparser_parser *
 						   void *mdata)
 {
 	__u16 *dptr = metadata_get_dst_cntr(parser, mde.constant_hword.dst_off,
-			mdata, mde.constant_hword.cntr, 0);
+					    mdata, mde.constant_hword.cntr, 0);
 
 	if (dptr)
 		*dptr = mde.constant_hword.data;
@@ -701,7 +700,7 @@ static inline int kparser_metadata_set_offset(const struct kparser_parser *parse
 					      void *mdata, size_t hdr_offset)
 {
 	__u16 *dptr = metadata_get_dst_cntr(parser, mde.offset.dst_off, mdata,
-			mde.offset.cntr, 0);
+					    mde.offset.cntr, 0);
 
 	if (dptr) {
 		*dptr = mde.offset.bit_offset ?
@@ -719,7 +718,7 @@ static inline int __kparser_metadata_control_extract(const struct kparser_parser
 						     const struct kparser_ctrl_data *ctrl)
 {
 	__u16 *dptr = metadata_get_dst_cntr(parser, mde.control.dst_off, mdata,
-			mde.control.cntr, mde.control.code);
+					    mde.control.cntr, mde.control.code);
 
 	switch (mde.control.code) {
 	case KPARSER_METADATA_CTRL_HDR_LENGTH:
@@ -755,8 +754,7 @@ static inline int __kparser_metadata_control_extract(const struct kparser_parser
 		return KPARSER_STOP_BAD_EXTRACT;
 	}
 
-	return __metadata_cntr_operation(parser, mde.control.cntr_op,
-			mde.control.cntr);
+	return __metadata_cntr_operation(parser, mde.control.cntr_op, mde.control.cntr);
 }
 
 /* Front end functions to process one metadata extraction pseudo instruction
