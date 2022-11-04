@@ -77,13 +77,13 @@ int xdp_parser_prog(struct xdp_md *ctx)
 	/* set all bits to 1 in user metadata buffer to easily determine later which
 	 * fields were set/updated by kParser KMOD
 	 */
-	memset(&user_metadata_buffer, 0xff, sizeof(user_metadata_buffer));
+	// memset(&user_metadata_buffer, 0xff, sizeof(user_metadata_buffer));
 
 	bpf_xdp_kparser(ctx, &key, sizeof(key), &user_metadata_buffer,
 			sizeof(user_metadata_buffer));
 
 	/* now dump the metadata to be displayed by bpftool */
-	xdp_update_ctx(&user_metadata_buffer, sizeof(user_metadata_buffer));
+	// xdp_update_ctx(&user_metadata_buffer, sizeof(user_metadata_buffer));
 
 	/* count how many packets were processed in this interval */
 	count_pkts();

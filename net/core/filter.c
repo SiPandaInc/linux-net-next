@@ -4147,7 +4147,7 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 	int rc = 0;
 
 	key.id = keyptr->id;
-	strcpy(key.name, keyptr->name);
+	// strcpy(key.name, keyptr->name);
 	pktlen = xdp_get_buff_len(xdp);
 	data = (void *)(long)xdp->data;
 	if (!kparser_funchooks.kparser_get_parser_hook) {
