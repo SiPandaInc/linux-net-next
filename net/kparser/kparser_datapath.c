@@ -998,12 +998,19 @@ kparser_get_parser_ctx(const struct kparser_hkey *kparser_key)
  * _metadata: User provided metadata buffer. It must be same as configured
  *            metadata objects in CLI.
  * metadata_len: Total length of the user provided metadata buffer.
+ * avoid_ref: Set this flag in case caller wants to avoid holding the reference
+ *            of the active parser object to save performance on the data path.
+ *            But please be advised, caller should hold the reference of the
+ *            parser object while using this data path. In this case, the CLI
+ *            can be used in advance to get the reference, and caller will also
+ *            need to release the reference via CLI once it is done with the
+ *            data path.
  *
  * return: kParser error code as defined in include/uapi/linux/kparser.h
  */
 int kparser_parse(struct sk_buff *skb,
 		  const struct kparser_hkey *kparser_key,
-		  void *_metadata, size_t metadata_len)
+		  void *_metadata, size_t metadata_len, bool avoid_ref)
 {
 	struct kparser_glue_parser *k_prsr;
 	struct kparser_parser *parser;
@@ -1048,7 +1055,8 @@ int kparser_parse(struct sk_buff *skb,
 
 	rcu_read_lock();
 
-	// kparser_ref_get(&k_prsr->glue.refcount);
+	if (likely(avoid_ref == false))
+		kparser_ref_get(&k_prsr->glue.refcount);
 	parser = &k_prsr->parser;
 
 	ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
@@ -1059,7 +1067,8 @@ int kparser_parse(struct sk_buff *skb,
 			 __func__, __LINE__,
 			 kparser_key->name, kparser_key->id);
 		rcu_read_unlock();
-		// kparser_ref_put(&k_prsr->glue.refcount);
+		if (likely(avoid_ref == false))
+			kparser_ref_put(&k_prsr->glue.refcount);
 		return -ENOENT;
 	}
 
@@ -1067,7 +1076,8 @@ int kparser_parse(struct sk_buff *skb,
 
 	rcu_read_unlock();
 
-	// kparser_ref_put(&k_prsr->glue.refcount);
+	if (likely(avoid_ref == false))
+		kparser_ref_put(&k_prsr->glue.refcount);
 
 	return err;
 }
@@ -1083,19 +1093,29 @@ EXPORT_SYMBOL(kparser_parse);
  *
  * return: NULL if key not found, else an opaque parser instance pointer which
  * can be used in the following APIs 3 and 4.
+ * avoid_ref: Set this flag in case caller wants to avoid holding the reference
+ *            of the active parser object to save performance on the data path.
+ *            But please be advised, caller should hold the reference of the
+ *            parser object while using this data path. In this case, the CLI
+ *            can be used in advance to get the reference, and caller will also
+ *            need to release the reference via CLI once it is done with the
+ *            data path.
  *
  * NOTE: This call makes the whole parser tree immutable. If caller calls this
  * more than once, later caller will need to release the same parser exactly that
  * many times using the API kparser_put_parser().
  */
-const void *kparser_get_parser(const struct kparser_hkey *kparser_key)
+const void *kparser_get_parser(const struct kparser_hkey *kparser_key,
+			       bool avoid_ref)
 {
 	struct kparser_glue_parser *k_prsr;
 
 	k_prsr = kparser_get_parser_ctx(kparser_key);
 	if (!k_prsr)
 		return NULL;
-	// kparser_ref_get(&k_prsr->glue.refcount);
+
+	if (likely(avoid_ref == false))
+		kparser_ref_get(&k_prsr->glue.refcount);
 
 	return &k_prsr->parser;
 }
@@ -1109,20 +1129,26 @@ EXPORT_SYMBOL(kparser_get_parser);
  * parser: void *, Non NULL opaque pointer which was previously returned by kparser_get_parser().
  * Caller can use cached opaque pointer as long as system does not restart and kparser.ko is not
  * reloaded.
+ * avoid_ref: Set this flag only when this was used in the prio call to
+ *            kparser_get_parser(). Incorrect usage of this flag might cause
+ *            error and make the parser state unstable.
  *
  * return: boolean, true if put operation is success, else false.
  *
  * NOTE: This call makes the whole parser tree deletable for the very last call.
  */
-bool kparser_put_parser(const void *obj)
+bool kparser_put_parser(const void *obj, bool avoid_ref)
 {
 	const struct kparser_parser *parser = obj;
-	// struct kparser_glue_parser *k_parser;
+	struct kparser_glue_parser *k_parser;
 
 	if (!parser)
 		return false;
-	// k_parser = container_of(parser, struct kparser_glue_parser, parser);
-	// kparser_ref_put(&k_parser->glue.refcount);
+
+	if (likely(avoid_ref == false)) {
+		k_parser = container_of(parser, struct kparser_glue_parser, parser);
+		kparser_ref_put(&k_parser->glue.refcount);
+	}
 
 	return true;
 }

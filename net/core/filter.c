@@ -4140,24 +4140,21 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 {
 	struct kparser_hkey *keyptr = (struct kparser_hkey *)conf;
 	ktime_t start_time, stop_time, elapsed_time;
-	struct kparser_hkey key;
 	const void *parser;
 	void *data;
 	int pktlen;
 	int rc = 0;
 
-	key.id = keyptr->id;
-	// strcpy(key.name, keyptr->name);
 	pktlen = xdp_get_buff_len(xdp);
 	data = (void *)(long)xdp->data;
 	if (!kparser_funchooks.kparser_get_parser_hook) {
 		pr_err("\n kparser module not loaded\n");
 		return -EINVAL;
 	} else {
-		parser = kparser_funchooks.kparser_get_parser_hook(&key);
+		parser = kparser_funchooks.kparser_get_parser_hook(keyptr, true);
 		if (!parser) {
-			pr_err("kparser_get_parser() failed, key:{%s:%u}\n",
-			       key.name, key.id);
+			pr_debug("kparser_get_parser() failed, key:{%s:%u}\n",
+				 keyptr->name, keyptr->id);
 			return -EINVAL;
 		}
 	}
@@ -4180,7 +4177,7 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
 			pr_err("\n kparser module not loaded\n");
 			return -EINVAL;
 		} else {
-			if (kparser_funchooks.kparser_put_parser_hook(parser) != true)
+			if (kparser_funchooks.kparser_put_parser_hook(parser, true) != true)
 				pr_err("kparser_put_parser() failed\n");
 		}
 #if KPARSER_DEBUG

@@ -3568,7 +3568,7 @@ int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
-	parser = kparser_get_parser(key);
+	parser = kparser_get_parser(key, false);
 	if (!parser) {
 		(*rsp)->op_ret_code = ENOENT;
 		snprintf((*rsp)->err_str_buf,
@@ -3612,7 +3612,7 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 		goto done;
 	}
 
-	if (!kparser_put_parser(&kparser->parser)) {
+	if (!kparser_put_parser(&kparser->parser, false)) {
 		(*rsp)->op_ret_code = EINVAL;
 		snprintf((*rsp)->err_str_buf,
 			 sizeof((*rsp)->err_str_buf),

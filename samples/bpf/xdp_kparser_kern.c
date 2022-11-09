@@ -70,19 +70,27 @@ static struct kparser_hkey key;
 SEC("prog")
 int xdp_parser_prog(struct xdp_md *ctx)
 {
-	/* prepare a parser key which is already created and configured via the ip cli */
+	/* prepare a parser key which is already created and configured via the ip cli
+	 * NOTE: Using hard coded parser id 0 since as of now there is no way to
+	 * pass parser id to this function from the caller. Hence user either
+	 * must configure the parser with id 0 using the ip cli, or change this
+	 * hard coded value to the correct configured value, recompile this user
+	 * code and use the program.
+	 */
 	key.id = 0;
-	// strcpy(key.name, "tuple_parser");
 
 	/* set all bits to 1 in user metadata buffer to easily determine later which
 	 * fields were set/updated by kParser KMOD
+	 * NOTE: Perf ENH: commented out this memset.
 	 */
 	// memset(&user_metadata_buffer, 0xff, sizeof(user_metadata_buffer));
 
 	bpf_xdp_kparser(ctx, &key, sizeof(key), &user_metadata_buffer,
 			sizeof(user_metadata_buffer));
 
-	/* now dump the metadata to be displayed by bpftool */
+	/* now dump the metadata to be displayed by bpftool
+	 * NOTE: Perf ENH: commented out this call to xdp_update_ctx().
+	 */
 	// xdp_update_ctx(&user_metadata_buffer, sizeof(user_metadata_buffer));
 
 	/* count how many packets were processed in this interval */
