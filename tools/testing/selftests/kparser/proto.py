@@ -1,19 +1,5 @@
 from scapy.all import *
 
-class TestPLF1(Packet):
-    fields_desc=[ FieldLenField("len", None, count_of="plist"),
-    #PacketListField("plist", None, IP, count_from=lambda pkt:pkt.len) ]
-    PacketListField("plist", 0x00,ByteField, count_from=lambda pkt:pkt.len) ]
-
-class TestSLF(Packet):
-    fields_desc=[ FieldLenField("len", None, length_of="data"),
-    StrLenField("data", "", length_from=lambda pkt:pkt.len) ]
-
-class TestPkt1(Packet):
-    fields_desc=[ ByteField('f1',0x00), StrField('s1',"a1"), 
-                 StrLenField("s1","",length_from=lambda pkt: pkt.len),
-                ByteField('type',0x00)]
-
 def vlenq2str(l):
     s = []
     s.append(l & 0x7F)
@@ -31,7 +17,7 @@ def str2vlenq(s=b""):
         l = l + (ord(s[i:i+1]) & 0x7F)
         i = i + 1
     if i == len(s):
-        warning("Broken vlenq: no ending byte")
+        print("Broken vlenq: no ending byte")
     l = l << 7
     l = l + (ord(s[i:i+1]) & 0x7F)
 
@@ -64,7 +50,7 @@ class VarLenQField(Field):
         return str2vlenq(s)
 
 class TestProto2(Packet):
-    name = "Proto2"
+    name = "TestProto2"
     fields_desc = [ VarLenQField("len", None, "data"),
                     StrLenField("data", "", length_from=lambda pkt: pkt.len) ,
                     ByteField('field1',0x11), ByteField('type',0x8)
@@ -72,10 +58,6 @@ class TestProto2(Packet):
 
 if __name__ == '__main__':
 
-    #t1 = TestPkt1(f1=0x11,s1="839383939",type=0x12)
-    #print( bytes(t1) )
-    #pe = TestPkt1(f1='0x11',len=10,s1="1234567890",type="0x12")/IP(src="10.10.11.2", dst="10.10.11.3")/TCP(flags="S", sport=1234, dport=2345)   
-    #print( bytes(pe ) )
     p1 = TestProto2(data='A'*200)/IP(src="10.10.11.2", dst="10.10.11.3")/TCP(flags="S", sport=1234, dport=2345)   
     print( bytes(p1))
     print(" XYZ : ", bytes(p1))

@@ -154,102 +154,6 @@ def get_metadata_dump(ctx_id):
         return None
 
 
-def test_tx_rx_packet(src_veth="veth0", dst_veth=None, packets=None,
-                      src_netns=None, dst_netns=None):
-
-    print("Initialize sniff ")
-    if dst_netns is not None:
-        with netns.NetNS(nsname=dst_netns):
-            sniff_hndl = AsyncSniffer(iface=dst_veth)
-            sniff_hndl.start()
-        verify_packet = True
-    elif dst_veth is not None:
-        sniff_hndl = AsyncSniffer(iface=dst_veth)
-        sniff_hndl.start()
-        verify_packet = True
-    else: 
-        verify_packet = False
-
-    if src_netns is not None:
-        with netns.NetNS(nsname=src_netns):
-            sendp(packets, iface=src_veth)
-    else:
-        sendp(packets, iface=src_veth)
-
-    time.sleep(2)
-
-    if not verify_packet:
-        return True 
-
-    if dst_netns is not None:
-        with netns.NetNS(nsname=dst_netns):
-            recv_pkts = sniff_hndl.stop()
-    else:
-        recv_pkts = sniff_hndl.stop()
-
-    print(" Recieved Packet Details : ", recv_pkts, sniff_hndl.results)
-    rcount = len(recv_pkts)
-    scount = len(packets)
-    if rcount < scount:
-        print(" Number of packets received {} is less then sent {} ".
-              format(rcount, scount))
-        return False
-    else:
-        return compare_packets(packets, recv_pkts)
-
-def test_tap_tx(iname,pkts):
-    t = TunTapInterface(iname,mode_tun=False) 
-    t.send(pkts)
-    return True
-
-def compare_packets(exp_pkts, act_pkts):
-
-    for pkt0 in exp_pkts:
-        i = 0
-        for pkt1 in exp_pkts:
-            if compare_packet(pkt0, pkt1):
-                act_pkts.pop(i)
-                found = True
-                break
-            else:
-                i = i + 1
-
-        if not found:
-            print(" Compare Packets, following packet not found :",
-                  pkt0)
-            return False
-    return True
-
-
-def compare_packet(exp_pkt, act_pkt):
-
-    return_val = True
-    exp_payload = exp_pkt.payload
-    act_payload = act_pkt.payload
-    while True:
-      len1 = len(exp_payload)
-      len2 = len(act_payload)
-
-      if len1 == len2:
-         if (len1 == 0):
-            break
-         else:
-            if exp_payload.fields == act_payload.fields:
-               exp_payload = exp_payload.payload
-               act_payload = act_payload.payload
-               continue
-            else:
-               print(" Compare packets, payload mismatch ", exp_payload.fields, act_payload.fields)
-               return_val = False
-               break
-      else:
-         print(" Compare packets, payload len mismatch ", exp_payload.fields, act_payload.fields)
-         return_val = False
-         break
-
-    return return_val
-
-
 def diff_data(d1, d2):
     result = DeepDiff(d1[0], d2[0])
 
@@ -374,6 +278,21 @@ def create_veth_setup(src_veth="veth0", dst_veth="veth1",
 
     ipdb_dst.routes.add({'dst': 'default',
                  'gateway' : dst_ip}).commit()
+
+def create_tap_setup(tapname="tap100", ip="192.168.100.10",  mtu=1500):
+    
+    result_0 = run_cmd("sudo ip tuntap add name {}  mode tap".format(
+                    tapname))
+    result_1 = run_cmd("sudo ip link set dev {} mtu {}".format(
+                    tapname, mtu))
+    result_2 = run_cmd("sudo ip link set {} up".format(
+                    tapname))
+    result_3 = run_cmd("sudo ip link set {} promisc on".format(
+                    tapname))
+    result_4 = run_cmd("sudo ip addr add {}/24 dev {}".format(
+                    ip, tapname))
+
+    return result_0 and result_1 and result_2 and result_3 and result_4
 
 
 def cleanup_netns(src_netns="ns0", dst_netns="ns1"):
