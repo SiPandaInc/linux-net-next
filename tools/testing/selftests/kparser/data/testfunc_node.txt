@@ -1,0 +1,1 @@
+test_node-nxt_1| "nxt.field-off 12 nxt.field-len 1" "0x8" |False|[{"key":1,"value":{"frame":{"data":[255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255]}}}]|
