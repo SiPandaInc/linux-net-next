@@ -1,16 +1,21 @@
 #define STR_STR(x) #x
 #define STR(x) STR_STR(x)
 
+#define MAX_ENCAP 3
+#define CNTR_ARRAY_SIZE 2
 #define KPARSER_PREFIX test_parser
 
 #ifndef MDATA
 #define MDATA  0
 #define KPARSER_NAME STR(tuple_parser)
+#define KPARSER_ID 0
 struct user_frame {
         unsigned short ip_offset;
         unsigned short l4_offset;
         unsigned int ipv4_addrs[2];
         unsigned short ports[2];
+        unsigned short counter_value;
+        unsigned short vlantcis[2];
 } __packed;
 
 struct user_metadata {
@@ -25,6 +30,8 @@ struct user_metadata {
 
 #define MSIZE MDATA - 100 
 
+#define KPARSER_ID MSIZE
+
 struct user_frame {
     __u8 data[MSIZE];
 } __packed;
@@ -35,6 +42,7 @@ struct user_metadata {
 
 #elif  MDATA  > 116  &&  MDATA < 133
 #define MSIZE MDATA - 116 
+#define KPARSER_ID MSIZE
 
 struct user_frame {
     _u16 data[MSIZE];
@@ -46,6 +54,7 @@ struct user_metadata {
 
 #elif ( MDATA  > 132 ) && ( MDATA < 165) 
 #define MSIZE MDATA - 132 
+#define KPARSER_ID MSIZE
 
 struct user_frame {
     _u16 data[MSIZE];
@@ -200,6 +209,45 @@ struct user_metadata {
         struct user_metametadata metametadata;
         struct user_frame frames[MAX_ENCAP];
 } __packed;
+
+#elif MDATA == 512
+#define MAX_ENCAP 8
+#define VLAN_COUNT_MAX 2
+#define CNTR_ARRAY_SIZE 8
+
+#define KPARSER_ID MDATA
+
+struct user_metametadata {
+        __u16 num_nodes;
+        __u16 num_encaps;
+        int ret_code;
+        __u16 cntr;
+        __u16 cntrs[CNTR_ARRAY_SIZE];
+} __packed;
+
+struct user_frame {
+        __u16 fragment_bit;
+        __u32 src_ip;
+        __u32 dst_ip;
+        __u16 src_port;
+        __u16 dst_port;
+        __u16 mss;
+        __u32 tcp_ts_value;
+        __u16 sack_left_edge;
+        __u16 sack_right_edge;
+        __u16 gre_flags;
+        __u16 gre_seqno0;
+        __u32 gre_seqno;
+        __u16 vlan_cntr;
+        __u16 vlantcis[VLAN_COUNT_MAX];
+        __u16 ipproto;
+} __packed;
+
+struct user_metadata {
+        struct user_metametadata metametadata;
+        struct user_frame frames[MAX_ENCAP];
+} __packed;
+
 
 #elif MDATA == 5
 
