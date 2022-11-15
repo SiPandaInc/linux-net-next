@@ -41,7 +41,7 @@ The *scripts* folder contains following script utilitis for building the kParser
 
 
 For running kParser node related tests utilize following command :
-*   pytest -v -s test_kparser_node.py --testfile ./data/testfunc_node.txt 
+*   pytest -v -s test_kparser_node.py --testfile ./data/testfunc_node.txt  --testscript ./script/kparser_config/gen_tlvnodes.sh
 
 For running the kParser cli tests, run following command :
 *   pytest -v -s test_kparser_cli.py --testfile ./data/test_crd_operations.txt
