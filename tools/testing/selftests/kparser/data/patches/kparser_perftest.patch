@@ -1,0 +1,734 @@
+diff --git a/net/core/filter.c b/net/core/filter.c
+index ffd290914de8..2aaaf69445bf 100644
+--- a/net/core/filter.c
++++ b/net/core/filter.c
+@@ -86,7 +86,7 @@
+ #include <net/kparser.h>
+ #include <linux/rhashtable.h>
+ #include <linux/ktime.h>
+-#define KPARSER_DEBUG 1
++#define KPARSER_DEBUG 0
+ #endif
+ static const struct bpf_func_proto *
+ bpf_sk_base_func_proto(enum bpf_func_id func_id);
+@@ -4049,14 +4049,15 @@ static int xdp_flow_dissector(struct xdp_buff *xdp, u32 flowd_sel, void *buf, u3
+
+ 	if (flowd_sel == 0) {
+ 		memset(&keys, 0, sizeof(keys));
+-		start_time = ktime_get();
++		//start_time = ktime_get();
+ 		ret = __skb_flow_dissect(NULL, NULL, &flow_keys_basic_dissector,
+ 					 &keys, data, proto, nh_off, hlen, 0);
++#if KPARSER_DEBUG
+ 		stop_time = ktime_get();
+ 		elapsed_time = ktime_sub(stop_time, start_time);
+ 		pr_err("elapsed Time : %lld\n",  ktime_to_ns(elapsed_time));
+ 		if (ret == true) {
+-#if KPARSER_DEBUG
++//#if KPARSER_DEBUG
+ 			pr_debug("\n%d %s keys.control.thoff= %d\n",
+ 				 __LINE__, __func__, keys.control.thoff);
+ 			pr_debug("%d %s keys.control.addr_type= %d\n",
+@@ -4067,8 +4068,9 @@ static int xdp_flow_dissector(struct xdp_buff *xdp, u32 flowd_sel, void *buf, u3
+ 				 __LINE__, __func__, ntohs(keys.basic.n_proto));
+ 			pr_debug("%d %s keys.basic.ip_proto= %d\n",
+ 				 __LINE__, __func__, keys.basic.ip_proto);
+-#endif
++//#endif
+ 		}
++#endif
+ 		memcpy((char *)buf, &keys, sizeof(keys));
+ 		return 0;
+ 	} else if (flowd_sel == 1) {
+@@ -4156,8 +4158,10 @@ int kparser_xdp_parse(struct xdp_buff *xdp, void *conf, size_t conf_len,
+ 	} else {
+ 		parser = kparser_funchooks.kparser_get_parser_hook(&key);
+ 		if (!parser) {
++#if KPARSER_DEBUG
+ 			pr_err("kparser_get_parser() failed, key:{%s:%u}\n",
+ 			       key.name, key.id);
++#endif
+ 			return -EINVAL;
+ 		}
+ 	}
+diff --git a/net/core/flow_dissector.c b/net/core/flow_dissector.c
+index 25cd35f5922e..122f0b6bb0c8 100644
+--- a/net/core/flow_dissector.c
++++ b/net/core/flow_dissector.c
+@@ -1013,7 +1013,7 @@ bool __skb_flow_dissect(const struct net *net,
+ 		}
+ 	}
+
+-	WARN_ON_ONCE(!net);
++	//WARN_ON_ONCE(!net);
+ 	if (net) {
+ 		enum netns_bpf_attach_type type = NETNS_BPF_FLOW_DISSECTOR;
+ 		struct bpf_prog_array *run_array;
+diff --git a/net/kparser/Makefile b/net/kparser/Makefile
+index 5a40d5cb340d..c6fabefd2d22 100644
+--- a/net/kparser/Makefile
++++ b/net/kparser/Makefile
+@@ -3,7 +3,8 @@
+ # Makefile for KPARSER module
+ #
+
+-ccflags-y := -DDEBUG -DKERNEL_MOD
++#ccflags-y := -DDEBUG -DKERNEL_MOD
++ccflags-y := -DKERNEL_MOD
+
+ obj-$(CONFIG_KPARSER) += kparser.o
+
+diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
+index 108e29d097dc..329e338bd1df 100644
+--- a/samples/bpf/Makefile
++++ b/samples/bpf/Makefile
+@@ -47,6 +47,8 @@ tprogs-y += cpustat
+ tprogs-y += xdp_adjust_tail
+ tprogs-y += xdp_fwd
+ tprogs-y += xdp_kparser
++tprogs-y += xdp_kparser_drop
++tprogs-y += xdp_kparser_load
+ tprogs-y += xdp_flow_dissector
+ tprogs-y += task_fd_query
+ tprogs-y += xdp_sample_pkts
+@@ -109,6 +111,8 @@ syscall_tp-objs := syscall_tp_user.o
+ cpustat-objs := cpustat_user.o
+ xdp_adjust_tail-objs := xdp_adjust_tail_user.o
+ xdp_kparser-objs := xdp_kparser_user.o
++xdp_kparser_load-objs := xdp_kparser_load.o
++xdp_kparser_drop-objs := xdp_kparser_drop_user.o
+ xdp_flow_dissector-objs := xdp_flow_dissector_user.o
+ xdp_fwd-objs := xdp_fwd_user.o
+ task_fd_query-objs := task_fd_query_user.o $(TRACE_HELPERS)
+@@ -173,6 +177,7 @@ always-y += cpustat_kern.o
+ always-y += xdp_adjust_tail_kern.o
+ always-y += xdp_fwd_kern.o
+ always-y += xdp_kparser_kern.o
++always-y += xdp_kparser_drop_kern.o
+ always-y += xdp_flow_dissector_kern.o
+ always-y += task_fd_query_kern.o
+ always-y += xdp_sample_pkts_kern.o
+diff --git a/samples/bpf/xdp_flow_dissector_kern.c b/samples/bpf/xdp_flow_dissector_kern.c
+index 778e65c3b039..ede07a61543d 100644
+--- a/samples/bpf/xdp_flow_dissector_kern.c
++++ b/samples/bpf/xdp_flow_dissector_kern.c
+@@ -85,7 +85,8 @@ int xdp_flowd_prog(struct xdp_md *ctx)
+ 	 */
+ 	bpf_xdp_flow_dissector(ctx, 1, arr1, 512);
+ 	count_pkts();
+-	return XDP_PASS;
++	//return XDP_PASS;
++	return XDP_DROP;
+ }
+
+ char _license[] SEC("license") = "GPL";
+diff --git a/samples/bpf/xdp_kparser_drop_kern.c b/samples/bpf/xdp_kparser_drop_kern.c
+new file mode 100644
+index 000000000000..231ef1db3f00
+--- /dev/null
++++ b/samples/bpf/xdp_kparser_drop_kern.c
+@@ -0,0 +1,72 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (c) 2022-23 Aravind Kumar Buduri <aravind.buduri@gmail.com>
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of version 2 of the GNU General Public
++ * License as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * General Public License for more details.
++ */
++#define KBUILD_MODNAME "foo"
++#include <uapi/linux/bpf.h>
++#include <linux/in.h>
++#include <linux/if_ether.h>
++#include <linux/if_packet.h>
++#include <linux/if_vlan.h>
++#include <linux/ip.h>
++#include <linux/ipv6.h>
++
++#include <bpf/bpf_helpers.h>
++
++
++#include "../../include/net/flow_dissector.h"
++
++#define DEBUG 1
++
++/*
++struct bpf_map_def SEC("maps") counter_map = {
++	.type        = BPF_MAP_TYPE_PERCPU_ARRAY,
++	.key_size    = sizeof(__u32),
++	.value_size  = sizeof(__u64),
++	.max_entries = 1,
++};
++*/
++
++struct {
++        __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
++        __type(key, u32);
++        __type(value, __u64);
++        __uint(max_entries, 1);
++} counter_map SEC(".maps");
++
++
++u64 *counter;
++u64 pkts;
++void count_pkts(void)
++{
++	u32 key = 0;
++    	counter = bpf_map_lookup_elem(&counter_map, &key);
++    	if (counter) {
++      		*counter += 1;
++		pkts = *counter;
++    	}
++}
++
++char arr1[512] = {0};
++SEC("prog")
++int xdp_parser_prog(struct xdp_md *ctx)
++{
++	/*
++	 * code for flow dissector
++	 * 2nd parameter differenciate flow dissector selection
++	 * 0 - basic key flow dissector
++	 * 1 - big key flow dissector
++	 */
++	count_pkts();
++        return XDP_DROP;
++
++}
++
++char _license[] SEC("license") = "GPL";
+diff --git a/samples/bpf/xdp_kparser_drop_user.c b/samples/bpf/xdp_kparser_drop_user.c
+new file mode 100644
+index 000000000000..9731c6a23ffa
+--- /dev/null
++++ b/samples/bpf/xdp_kparser_drop_user.c
+@@ -0,0 +1,235 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (c) 2022-23 Aravind Kumar Buduri <aravind.buduri@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of version 2 of the GNU General Public
++ * License as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * General Public License for more details.
++ */
++#include <linux/bpf.h>
++#include <linux/if_link.h>
++#include <assert.h>
++#include <errno.h>
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <libgen.h>
++#include <net/if.h>
++#include <locale.h>
++#include <math.h>
++#include <net/if.h>
++#include <poll.h>
++#include <stdbool.h>
++#include <sys/ioctl.h>
++#include <sys/mman.h>
++#include <sys/signalfd.h>
++#include <sys/sysinfo.h>
++#include <sys/timerfd.h>
++#include <sys/utsname.h>
++#include <time.h>
++#include "bpf_util.h"
++#include <bpf/bpf.h>
++#include <bpf/libbpf.h>
++
++static int ifindex;
++static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST;
++static __u32 prog_id;
++
++
++
++
++static void poll_stats(int map_fd, int interval)
++{
++        unsigned int nr_cpus = bpf_num_possible_cpus();
++        __u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
++        int i;
++	printf("poll_stats called \n");
++	while (1) {
++                __u32 key = UINT32_MAX;
++        //        __u32 key = 0;
++
++                sleep(interval);
++//		printf("wokeup \n");
++
++                //while (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
++                if (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
++                        __u64 sum = 0;
++
++                        assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
++                        for (i = 0; i < nr_cpus; i++)
++                                sum += values[i];
++#if 0
++                        if (sum > prev[key])
++                                printf("key %u: %10llu pkt/s\n",
++                                       key, (sum - prev[key]) / interval);
++#endif
++#if 1
++                        if (sum > prev[key])
++                                printf(" packet rate =%10llu pkt/s\n",
++                                        (sum - prev[key]) / interval);
++#endif
++                        prev[key] = sum;
++
++                }
++	}
++
++}
++
++
++static void int_exit(int sig)
++{
++	__u32 curr_prog_id = 0;
++
++	if (bpf_xdp_query_id(ifindex, xdp_flags, &curr_prog_id)) {
++		printf("bpf_xdp_query_id failed\n");
++		exit(1);
++	}
++	if (prog_id == curr_prog_id)
++		bpf_xdp_detach(ifindex, xdp_flags, NULL);
++	else if (!curr_prog_id)
++		printf("couldn't find a prog id on a given interface\n");
++	else
++		printf("program on interface changed, not removing\n");
++	exit(0);
++}
++
++
++#if 0
++/* simple per-protocol drop counter
++ */
++static void poll_stats(int map_fd, int interval)
++{
++	unsigned int nr_cpus = bpf_num_possible_cpus();
++	__u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
++	int i;
++
++	while (1) {
++		__u32 key = UINT32_MAX;
++
++//		sleep(interval);
++
++		while (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
++			__u64 sum = 0;
++
++			assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
++			for (i = 0; i < nr_cpus; i++)
++				sum += values[i];
++			if (sum > prev[key])
++				printf("proto %u: %10llu pkt/s\n",
++				       key, (sum - prev[key]) / interval);
++			prev[key] = sum;
++		}
++	}
++}
++#endif
++
++
++
++static void usage(const char *prog)
++{
++	fprintf(stderr,
++		"usage: %s [OPTS] IFACE\n\n"
++		"OPTS:\n"
++		"    -S    use skb-mode\n"
++		"    -N    enforce native mode\n"
++		"    -F    force loading prog\n",
++		prog);
++}
++
++int main(int argc, char **argv)
++{
++	struct bpf_prog_info info = {};
++	__u32 info_len = sizeof(info);
++	const char *optstr = "FSN";
++	int prog_fd, map_fd, opt;
++	struct bpf_program *prog;
++	struct bpf_object *obj;
++	struct bpf_map *map;
++	char filename[256];
++	int err;
++
++	while ((opt = getopt(argc, argv, optstr)) != -1) {
++		switch (opt) {
++		case 'S':
++			xdp_flags |= XDP_FLAGS_SKB_MODE;
++			break;
++		case 'N':
++			/* default, set below */
++			break;
++		case 'F':
++			xdp_flags &= ~XDP_FLAGS_UPDATE_IF_NOEXIST;
++			break;
++		default:
++			usage(basename(argv[0]));
++			return 1;
++		}
++	}
++
++	if (!(xdp_flags & XDP_FLAGS_SKB_MODE))
++		xdp_flags |= XDP_FLAGS_DRV_MODE;
++
++	if (optind == argc) {
++		usage(basename(argv[0]));
++		return 1;
++	}
++
++	ifindex = if_nametoindex(argv[optind]);
++	if (!ifindex) {
++		perror("if_nametoindex");
++		return 1;
++	}
++
++	printf(" Loading program \n");
++	snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
++	obj = bpf_object__open_file(filename, NULL);
++	if (libbpf_get_error(obj))
++		return 1;
++
++	prog = bpf_object__next_program(obj, NULL);
++	bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
++
++	err = bpf_object__load(obj);
++	if (err)
++		return 1;
++
++	prog_fd = bpf_program__fd(prog);
++
++	map = bpf_object__next_map(obj, NULL);
++	if (!map) {
++		printf("finding a map in obj file failed\n");
++		return 1;
++	}
++	map_fd = bpf_map__fd(map);
++
++	if (!prog_fd) {
++		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
++		return 1;
++	}
++
++	signal(SIGINT, int_exit);
++	signal(SIGTERM, int_exit);
++
++	if (bpf_xdp_attach(ifindex, prog_fd, xdp_flags, NULL) < 0) {
++		printf("link set xdp fd failed\n");
++		return 1;
++	}
++
++	err = bpf_obj_get_info_by_fd(prog_fd, &info, &info_len);
++	if (err) {
++		printf("can't get prog info - %s\n", strerror(errno));
++		return err;
++	}
++	prog_id = info.id;
++
++	//poll_stats(map_fd, 1);
++	poll_stats(map_fd, 1);
++
++
++	return 0;
++}
+diff --git a/samples/bpf/xdp_kparser_kern.c b/samples/bpf/xdp_kparser_kern.c
+index 82e83f7c4045..af4ae82353f4 100644
+--- a/samples/bpf/xdp_kparser_kern.c
++++ b/samples/bpf/xdp_kparser_kern.c
+@@ -88,7 +88,8 @@ int xdp_parser_prog(struct xdp_md *ctx)
+ 	/* count how many packets were processed in this interval */
+ 	count_pkts();
+
+-	return XDP_PASS;
++	//return XDP_PASS;
++	return XDP_DROP;
+ }
+
+ char _license[] SEC("license") = "GPL";
+diff --git a/samples/bpf/xdp_kparser_load.c b/samples/bpf/xdp_kparser_load.c
+new file mode 100644
+index 000000000000..a9381eae3370
+--- /dev/null
++++ b/samples/bpf/xdp_kparser_load.c
+@@ -0,0 +1,271 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (c) 2022-23 Aravind Kumar Buduri <aravind.buduri@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of version 2 of the GNU General Public
++ * License as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * General Public License for more details.
++ */
++#include <linux/bpf.h>
++#include <linux/if_link.h>
++#include <assert.h>
++#include <errno.h>
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <libgen.h>
++#include <net/if.h>
++#include <locale.h>
++#include <math.h>
++#include <net/if.h>
++#include <poll.h>
++#include <stdbool.h>
++#include <sys/ioctl.h>
++#include <sys/mman.h>
++#include <sys/signalfd.h>
++#include <sys/sysinfo.h>
++#include <sys/timerfd.h>
++#include <sys/utsname.h>
++#include <time.h>
++#include "bpf_util.h"
++#include <bpf/bpf.h>
++#include <bpf/libbpf.h>
++
++#define TOTAL_SAMPLES 300
++
++static int ifindex;
++static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST;
++static __u32 prog_id;
++
++static unsigned int long packet_rate[TOTAL_SAMPLES] = {0};
++static unsigned int long total_intervals =0;
++
++
++
++
++static void poll_stats(int map_fd, int interval)
++{
++        unsigned int nr_cpus = bpf_num_possible_cpus();
++        __u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
++        int i;
++	printf("poll_stats called \n");
++	while (1) {
++                __u32 key = UINT32_MAX;
++        //        __u32 key = 0;
++
++                sleep(interval);
++//		printf("wokeup \n");
++
++                //while (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
++                if (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
++                        __u64 sum = 0;
++
++                        assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
++                        for (i = 0; i < nr_cpus; i++)
++                                sum += values[i];
++#if 0
++                        if (sum > prev[key])
++                                printf("key %u: %10llu pkt/s\n",
++                                       key, (sum - prev[key]) / interval);
++#endif
++#if 1
++                        if (sum > prev[key]) {
++                                int indx = total_intervals % TOTAL_SAMPLES;
++                                packet_rate[indx] = sum - prev[key] ;
++                                total_intervals += interval;
++                                printf(" packet rate =%10llu pkt/s\n",
++                                        packet_rate[indx] / interval);
++                        }
++
++#endif
++                        prev[key] = sum;
++
++                }
++	}
++
++}
++
++static void write_data() {
++
++   FILE *fptr;
++
++   // use appropriate location if you are using MacOS or Linux
++   fptr = fopen("/tmp/xdp.out","w");
++
++   if(fptr == NULL)
++   {
++      printf("Error!");
++      exit(1);
++   }
++   for ( int i =0; i < TOTAL_SAMPLES; i++ )
++        fprintf(fptr,"%d\n",packet_rate[i]);
++   fclose(fptr);
++
++}
++
++static void int_exit(int sig)
++{
++	__u32 curr_prog_id = 0;
++
++	if (bpf_xdp_query_id(ifindex, xdp_flags, &curr_prog_id)) {
++		printf("bpf_xdp_query_id failed\n");
++		exit(1);
++	}
++	if (prog_id == curr_prog_id)
++		bpf_xdp_detach(ifindex, xdp_flags, NULL);
++	else if (!curr_prog_id)
++		printf("couldn't find a prog id on a given interface\n");
++	else
++		printf("program on interface changed, not removing\n");
++    write_data();
++	exit(0);
++}
++
++
++#if 0
++/* simple per-protocol drop counter
++ */
++static void poll_stats(int map_fd, int interval)
++{
++	unsigned int nr_cpus = bpf_num_possible_cpus();
++	__u64 values[nr_cpus], prev[UINT8_MAX] = { 0 };
++	int i;
++
++	while (1) {
++		__u32 key = UINT32_MAX;
++
++//		sleep(interval);
++
++		while (bpf_map_get_next_key(map_fd, &key, &key) != -1) {
++			__u64 sum = 0;
++
++			assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
++			for (i = 0; i < nr_cpus; i++)
++				sum += values[i];
++			if (sum > prev[key])
++				printf("proto %u: %10llu pkt/s\n",
++				       key, (sum - prev[key]) / interval);
++			prev[key] = sum;
++		}
++	}
++}
++#endif
++
++
++
++static void usage(const char *prog)
++{
++	fprintf(stderr,
++		"usage: %s [OPTS] IFACE\n\n"
++		"OPTS:\n"
++		"    -S    use skb-mode\n"
++		"    -N    enforce native mode\n"
++		"    -F    force loading prog\n",
++		prog);
++}
++
++int main(int argc, char **argv)
++{
++	struct bpf_prog_info info = {};
++	__u32 info_len = sizeof(info);
++	const char *optstr = "FNS:M:";
++	int prog_fd, map_fd, opt;
++	struct bpf_program *prog;
++	struct bpf_object *obj;
++	struct bpf_map *map;
++	char filename[256];
++	int err;
++    char *ifindx =NULL ;
++    char *xdp_mod =NULL ;
++
++	while ((opt = getopt(argc, argv, optstr)) != -1) {
++		switch (opt) {
++		case 'S':
++			//xdp_flags |= XDP_FLAGS_SKB_MODE;
++			// always attach in native mode
++            		ifindx = optarg;
++			break;
++		case 'M':
++			/* default, set below */
++            		xdp_mod = optarg;
++			break;
++		case 'N':
++			/* default, set below */
++			break;
++		case 'F':
++			xdp_flags &= ~XDP_FLAGS_UPDATE_IF_NOEXIST;
++			break;
++		default:
++            printf(" OPT %s " , opt );
++			usage(basename(argv[0]));
++			return 1;
++		}
++	}
++    printf(" Input params %s  %s %d  %d \n", ifindx , xdp_mod, optind , argc );
++	if (!(xdp_flags & XDP_FLAGS_SKB_MODE))
++		xdp_flags |= XDP_FLAGS_DRV_MODE;
++
++	if (optind != argc) {
++		usage(basename(argv[0]));
++		return 1;
++	}
++
++	ifindex = if_nametoindex(ifindx);
++	if (!ifindex) {
++		perror("if_nametoindex");
++		return 1;
++	}
++
++	printf(" Loading program \n");
++	//#snprintf(filename, sizeof(filename), "xdp_%s_kern.o", argv[0]);
++	snprintf(filename, sizeof(filename), "%s.o", xdp_mod);
++	obj = bpf_object__open_file(filename, NULL);
++	if (libbpf_get_error(obj))
++		return 1;
++
++	prog = bpf_object__next_program(obj, NULL);
++	bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
++
++	err = bpf_object__load(obj);
++	if (err)
++		return 1;
++
++	prog_fd = bpf_program__fd(prog);
++
++	map = bpf_object__next_map(obj, NULL);
++	if (!map) {
++		printf("finding a map in obj file failed\n");
++		return 1;
++	}
++	map_fd = bpf_map__fd(map);
++
++	if (!prog_fd) {
++		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
++		return 1;
++	}
++
++	signal(SIGINT, int_exit);
++	signal(SIGTERM, int_exit);
++
++	if (bpf_xdp_attach(ifindex, prog_fd, xdp_flags, NULL) < 0) {
++		printf("link set xdp fd failed\n");
++		return 1;
++	}
++
++	err = bpf_obj_get_info_by_fd(prog_fd, &info, &info_len);
++	if (err) {
++		printf("can't get prog info - %s\n", strerror(errno));
++		return err;
++	}
++	prog_id = info.id;
++
++	poll_stats(map_fd, 1);
++
++	return 0;
++}
