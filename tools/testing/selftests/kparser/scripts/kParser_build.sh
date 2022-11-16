@@ -152,6 +152,6 @@ function compile_kparser()
 #reboot
 compile_libbpf
 compile_iproute2
-#compile_bpftool
-#compile_kparser
-#compile_xdp
+compile_bpftool
+compile_kparser
+compile_xdp

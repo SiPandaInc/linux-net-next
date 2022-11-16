@@ -1,6 +1,7 @@
 #EDEV=enp0s8
-EDEV=nveth11
+EDEV=tap10
 ip link set dev $EDEV xdp off
+ip link ls dev $EDEV
 #ip netns exec ns2 ip link set dev veth1 xdp off
 export PKD_CONFIG_PATH=/home/testusr/wspace/linux-net-next/tools/lib/bpf
 rmmod kparser.ko
@@ -14,7 +15,9 @@ cd /home/testusr/wspace/linux-net-next/samples/bpf
 #make clean 
 #make MDATA==2
 #ip link set dev enp0s8 xdp obj xdp_kparser_kern.o verbose
-#ip link set dev $EDEV xdp obj xdp_kparser_kern.o verbose
+ip link set dev $EDEV xdp obj xdp_kparser_kern.o verbose
+ip link ls dev $EDEV
+exit 0
 #ip netns exec ns11  ip link set dev veth1 xdp obj xdp_kparser_kern.o verbose
 #ip link set dev $EDEV xdp obj xdp_kparser_flowd_kern.o verbose
 sleep 2
