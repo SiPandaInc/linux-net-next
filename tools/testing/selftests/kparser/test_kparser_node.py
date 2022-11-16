@@ -1,6 +1,5 @@
 import pytest
 import codecs
-import numpy as np
 import json
 import kparser_util
 import packet_util
@@ -101,7 +100,7 @@ class TestkParserMD():
 
     @allure.sub_suite(subsuite_name)
     def test_metadata(self,testdata,request):
-        self.testscript = request.config.option.testscript
+        self.testscript = request.config.option.kparserconfig
         #expect_mdata_json = json.dumps([{"key":1,"value":{"frames":{"ip_offset":14,"l4_offset":34,"ipv4_addrs":[self.src_ipnum,self.dst_ipnum],"ports":[self.dst_port,self.src_port]}}}])
         expect_mdata_json = json.loads(testdata[2])
         kparser_util.load_kparser_module(self.lnn_path + "/net/kparser/kparser.ko")

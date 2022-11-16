@@ -36,16 +36,16 @@ tos_num=6
 proto_num=0x0800
 ethertype=0x800
 lcp_proto_num=0x21
-src_ip4="192.168.1.20"
-dst_ip4="192.168.1.50"
-isrc_ip4="192.168.2.20"
-idst_ip4="192.168.2.50"
+src_ip4="10.10.100.20"
+dst_ip4="10.10.100.50"
+isrc_ip4="10.20.200.20"
+idst_ip4="10.20.200.50"
 src_ip6="3ffe:2501:200:3::2"
 dst_ip6="3ffe:2501:200:2::2"
-src_eth="00:00:00:00:01:e0"
-dst_eth="00:00:00:00:02:f0"
-src_eth1="00:00:00:00:03:00"
-dst_eth1="00:00:00:00:04:00"
+src_eth="00:00:00:10:01:e0"
+dst_eth="00:00:00:20:02:f0"
+src_eth1="00:00:00:30:03:00"
+dst_eth1="00:00:00:40:04:00"
 
 
 packets= [
@@ -1235,6 +1235,8 @@ def get_custom_packet(length=50):
         #cls.pkt = TestProto2(data='A'*65533)/IP(src="10.10.11.2", dst="10.10.11.3")/TCP(flags="S", sport=1234, dport=2345)
         #cls.pkt = proto.TestProto2(data='x'*65533)/IP(src=cls.src_ip, dst=cls.dst_ip)/TCP(flags="S", sport=cls.src_port, dport=cls.dst_port)
      
+def get_packet(idx):
+    return packets[idx]
 
 if __name__ == '__main__':
     #write_pkts("/tmp/allpkts.pcap")

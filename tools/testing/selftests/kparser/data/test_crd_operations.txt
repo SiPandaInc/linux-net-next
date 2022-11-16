@@ -1,6 +1,6 @@
 table_create| create table     name table1  id 0xf1  key 0xaf |False|Operation successful|
 table_read| read table     name table1  id 0xf1  key 0xaf |False|"table":{"name":"table1","id":"0xf1","key":"0xaf"}|
-table_create| delete  table/table1 key 0x801  |False|Operation successful|
+table_delete_ent| delete  table/table1 key 0x801  |False|Operation successful|
 table_read| read table     name table1  id 0xf1  key 0xaf |False|"table":{"name":"table1","id":"0xf1","key":"0xaf"}|
 table_delete| delete table     name table1  id 0xf1  key 0xaf |False|Operation successful|
 table_read| read table     name table1  id 0xf1  key 0xaf |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
@@ -10,77 +10,77 @@ counter_delete|delete counter name counter1 |False|Operation successful|
 counter_read| read counter name counter1 |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
 metadata-rule_numnodes_create| create metadata-rule name md.num_nodes type numnodes md-off 0 |False|Operation successful|
 metadata-rule_numnodes_read| read metadata-rule name md.num_nodes type numnodes md-off 0 |False|"metadata-rule":{"name":"md.num_nodes","type":"numnodes","md-off":0|
-metadata-rule_numnodes_delete| delete metadata-rule name md.num_nodes type numnodes md-off 0 |False|Operation successful|
-metadata-rule_numnodes_read| read metadata-rule name md.num_nodes type numnodes md-off 0 |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_numnodes_delete| delete metadata-rule name md.num_nodes type numnodes md-off 0 |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_numnodes_read| read metadata-rule name md.num_nodes type numnodes md-off 0 |False|"metadata-rule":{"name":"md.num_nodes","type":"numnodes","md-off":0|
 metadata-rule_numencaps_create|create metadata-rule name md.num_encaps type numencaps md-off 4|False|Operation successful|
 metadata-rule_numencaps_read| read metadata-rule name md.num_encaps  |False|"name":"md.num_encaps","type":"numencaps","md-off":4|
-metadata-rule_numencaps_delete| delete metadata-rule name md.num_encaps |False|Operation successful|
-metadata-rule_numencaps_read| read metadata-rule name md.num_encaps  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_numencaps_delete| delete metadata-rule name md.num_encaps |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_numencaps_read| read metadata-rule name md.num_encaps  |False|"name":"md.num_encaps","type":"numencaps","md-off":4|
 metadata-rule_returncode_create| create metadata-rule name md.return_code type return_code md-off 8|False|Operation successful|
 metadata-rule_returncode_read| read metadata-rule name md.return_code  |False|"metadata-rule":{"name":"md.return_code","type":"return_code","md-off":8|
-metadata-rule_returncode_delete| delete metadata-rule name md.return_code |False|Operation successful|
-metadata-rule_returncode_read| read metadata-rule name md.return_code  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_returncode_delete| delete metadata-rule name md.return_code |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_returncode_read| read metadata-rule name md.return_code  |False|"metadata-rule":{"name":"md.return_code","type":"return_code","md-off":8|
 metadata-rule_hdrdata_create| create metadata-rule name md.gre.seqno type hdrdata hdr-src-off 0  md-off 24 length 4 isframe true  isendianneeded true |False|Operation successful|
 metadata-rule_hdrdata_read| read metadata-rule name md.gre.seqno  |False|"metadata-rule":{"name":"md.gre.seqno","type":"hdrdata","isframe":"true","isendianneeded":"true","hdr-src-off":0,"md-off":24,"length":4 |
-metadata-rule_hdrdata_delete| delete metadata-rule name md.gre.seqno |False|Operation successful|
-metadata-rule_returncode_read| read metadata-rule name md.gre.seqno  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_hdrdata_delete| delete metadata-rule name md.gre.seqno |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_hdrdata_read| read metadata-rule name md.gre.seqno  |False|"metadata-rule":{"name":"md.gre.seqno","type":"hdrdata","isframe":"true","isendianneeded":"true","hdr-src-off":0,"md-off":24,"length":4 |
 metadata-rule_nibbs-hdrdata_create|  create metadata-rule name md.nibbs.seqno type nibbs_hdrdata hdr-src-off 0 md-off 24 length 4 isframe true isendianneeded true|False|Operation successful|
 metadata-rule_nibbs-hdrdata_read| read metadata-rule name md.nibbs.seqno  |False|"metadata-rule":{"name":"md.nibbs.seqno","type":"nibbs_hdrdata","isframe":"true","isendianneeded":"true","hdr-src-off":0,"md-off":24,"length":4|
-metadata-rule_nibbs-hdrdata_delete|delete metadata-rule name md.nibbs.seqno |False|Operation successful|
-metadata-rule_nibbs-hdrdata_read| read metadata-rule name md.nibbs.seqno  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_nibbs-hdrdata_delete|delete metadata-rule name md.nibbs.seqno |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_nibbs-hdrdata_read| read metadata-rule name md.nibbs.seqno  |False|"metadata-rule":{"name":"md.nibbs.seqno","type":"nibbs_hdrdata","isframe":"true","isendianneeded":"true","hdr-src-off":0,"md-off":24,"length":4|
 metadata-rule_offset_create|create metadata-rule name md.src_address_offset type offset addoff 12 md-off 2 isframe true |False|Operation successful|
 metadata-rule_offset_read| read metadata-rule name md.src_address_offset  |False|"metadata-rule":{"name":"md.src_address_offset","type":"offset","isframe":"true","md-off":2,"addoff":12|
-metadata-rule_offset_delete| delete metadata-rule name md.src_address_offset |False|Operation successful|
-metadata-rule_offset_read| read metadata-rule name md.src_address_offset  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_offset_delete| delete metadata-rule name md.src_address_offset |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_offset_read| read metadata-rule name md.src_address_offset  |False|"metadata-rule":{"name":"md.src_address_offset","type":"offset","isframe":"true","md-off":2,"addoff":12|
 metadata-rule_bit-offset_create|create metadata-rule name md.fragment_bit_offset type bit_offset addoff 16 md-off 4 isframe true |False|Operation successful|
 metadata-rule_bit-offset_read| read metadata-rule name md.fragment_bit_offset  |False|"metadata-rule":{"name":"md.fragment_bit_offset","type":"bit_offset","isframe":"true","md-off":4,"addoff":16|
-metadata-rule_bit-offset_delete| delete metadata-rule name md.fragment_bit_offset |False|Operation successful|
-metadata-rule_bit-offset_read| read metadata-rule name md.fragment_bit_offset  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_bit-offset_delete| delete metadata-rule name md.fragment_bit_offset |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_bit-offset_read| read metadata-rule name md.fragment_bit_offset  |False|"metadata-rule":{"name":"md.fragment_bit_offset","type":"bit_offset","isframe":"true","md-off":4,"addoff":16|
 metadata-rule_counter-mode-incr_create|create metadata-rule name md.cntr.inc type counter_mode counteridx counter1 counterop incr |False|Operation successful|
 metadata-rule_counter-mode-incr_read| read metadata-rule name md.cntr.inc  |False|{"metadata-rule":{"name":"md.cntr.inc","type":"counter_mode","counterop":"incr","counteridx":"counter1"|
-metadata-rule_counter-mode-incr_delete| delete metadata-rule name md.cntr.inc |False|Operation successful|
-metadata-rule_counter-mode-incr_read| read metadata-rule name md.cntr.noop  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_counter-mode-incr_delete| delete metadata-rule name md.cntr.inc |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_counter-mode-incr_read| read metadata-rule name md.cntr.inc  |False|{"metadata-rule":{"name":"md.cntr.inc","type":"counter_mode","counterop":"incr","counteridx":"counter1"|
 metadata-rule_counter-mode-noop_create|create metadata-rule name md.cntr.noop type counter_mode counteridx counter1 counterop noop |False|Operation successful|
 metadata-rule_counter-mode-noop_read| read metadata-rule name md.cntr.noop  |False|{"metadata-rule":{"name":"md.cntr.inc","type":"counter_mode","counterop":"noop","counteridx":"counter1"|
-metadata-rule_counter-mode-noop_delete| delete metadata-rule name md.cntr.noop |False|Operation successful|
-metadata-rule_counter-mode-noop_read| read metadata-rule name md.cntr.inc  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_counter-mode-noop_delete| delete metadata-rule name md.cntr.noop |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_counter-mode-noop_read| read metadata-rule name md.cntr.noop  |False|{"metadata-rule":{"name":"md.cntr.inc","type":"counter_mode","counterop":"noop","counteridx":"counter1"|
 metadata-rule_counter-mode-reset_create|create metadata-rule name md.cntr.reset type counter_mode counteridx-id 2 counterop reset |False|Operation successful|
 metadata-rule_counter-mode-reset_read| read metadata-rule name md.cntr.reset  |False|{"metadata-rule":{"name":"md.cntr.reset","type":"counter_mode","counterop":"reset","counteridx":"counter1"|
-metadata-rule_counter-mode-reset_delete| delete metadata-rule name md.cntr.reset |False|Operation successful|
-metadata-rule_counter-mode-reset_read| read metadata-rule name md.cntr.reset  |True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+metadata-rule_counter-mode-reset_delete| delete metadata-rule name md.cntr.reset |True|"opretcode":"0x10","opdesc":"delete: Metadata object is associated with a metalist, delete that metalist instead"|
+metadata-rule_counter-mode-reset_read| read metadata-rule name md.cntr.reset  |False|{"metadata-rule":{"name":"md.cntr.reset","type":"counter_mode","counterop":"reset","counteridx":"counter1"|
 metadata-ruleset_create| create metadata-ruleset name mdl.final_status|False|Operation successful|
 metadata-ruleset_read| read metadata-ruleset name mdl.final_status|False|"objidx:0":{"metadata-ruleset":{"name":"mdl.final_status"}}|
 metadata-ruleset_delete| delete metadata-ruleset name mdl.final_status|False|Operation successful|
 metadata-ruleset_read| read metadata-ruleset name mdl.final_status|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
-condexprs_equal_create| create condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_equal_create| create condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
 condexprs_equal_read| read condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond1","type":"equal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
 condexprs_equal_delete| delete condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
 condexprs_equal_read| read condexprs name ftv3.ipv4.cond1 type equal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
-condexprs_notequal_create| create condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_notequal_create| create condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
 condexprs_notequal_read| read condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond2","type":"notequal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
 condexprs_notequal_delete| delete condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
 condexprs_notequal_read| read condexprs name ftv3.ipv4.cond2 type notequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
-condexprs_lessthan_create| create condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_lessthan_create| create condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
 condexprs_lessthan_read| read condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond3","type":"lessthan","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
 condexprs_lessthan_delete| delete condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
 condexprs_lessthan_read| read condexprs name ftv3.ipv4.cond3 type lessthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
-condexprs_lessthanequal_create| create condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
-condexprs_lessthanequal_read| read condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond3","type":"lessthanequal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
-condexprs_lessthanequal_delete| delete condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
-condexprs_lessthanequal_read| read condexprs name ftv3.ipv4.cond3 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
-condexprs_greaterthan_create| create condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_lessthanequal_create| create condexprs name ftv3.ipv4.cond31 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
+condexprs_lessthanequal_read| read condexprs name ftv3.ipv4.cond31 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond31","type":"lessthanequal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
+condexprs_lessthanequal_delete| delete condexprs name ftv3.ipv4.cond31 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_lessthanequal_read| read condexprs name ftv3.ipv4.cond31 type lessthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_greaterthan_create| create condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
 condexprs_greaterthan_read| read condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond4","type":"greaterthan","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
 condexprs_greaterthan_delete| delete condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
 condexprs_greaterthan_read| read condexprs name ftv3.ipv4.cond4 type greaterthan src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
-condexprs_greaterthanequal_create| create condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
+condexprs_greaterthanequal_create| create condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
 condexprs_greaterthanequal_read| read condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|{"condexprs":{"name":"ftv3.ipv4.cond5","type":"greaterthanequal","src":{"field-off":0,"field-len":1},"mask":"0xf0","value":4}|
 condexprs_greaterthanequal_delete| delete condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
 condexprs_greaterthanequal_read| read condexprs name ftv3.ipv4.cond5 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
-condexprs_greaterthanequal_create| create condexprs name ftv3.ipv4.cond1 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|Operation successful|
-condexprslist_create|create condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|Operation successful|
-condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|{"condexprslist":{"name":"ftv3.ipv4.clist","defaultfail":"STOP_FAIL","condexprs":"ftv3.ipv4.cond1"}|
-condexprslist_delete|delete condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|False|Operation successful|
-condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  condexprs ftv3.ipv4.cond1|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
+condexprs_greaterthanequal_create| create condexprs name ftv3.ipv4.cond6 type greaterthanequal src.field-off 0 src.field-len 1 mask 0xf0 value 4|False|"opdesc":"OK"|
+condexprslist_create|create condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond6  |False|Operation successful|
+condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL condexprs ftv3.ipv4.cond1  |False|{"condexprslist":{"name":"ftv3.ipv4.clist","defaultfail":"STOP_FAIL","condexprs":"ftv3.ipv4.cond6"}|
+condexprslist_delete|delete condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL |False|Operation successful|
+condexprslist_read|read condexprslist name ftv3.ipv4.clist defaultfail STOP_FAIL|True|"opretcode":"0x2","opdesc":"read: Object key not found"|
 condexprstable_create| create condexprstable name ftv3.ipv4.ctable |False|Operation successful|
 condexprstable_read| read condexprstable name ftv3.ipv4.ctable |False|Operation successful|
 condexprstable_delete| delete condexprstable name ftv3.ipv4.ctable |False|Operation successful|
