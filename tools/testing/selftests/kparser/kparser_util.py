@@ -4,6 +4,7 @@ import time
 import subprocess
 import json
 import re
+import os
 from deepdiff import DeepDiff
 from scapy.all import *
 from pyroute2 import NetNS
@@ -11,9 +12,15 @@ from pyroute2 import IPRoute
 from pyroute2 import IPDB
 import pyroute2
 
+def compile_xdp(mdata=None):
+    md_str = ""
+    if mdata is not None:
+        md_str = 'TEST_FLAGS="-DMDATA=' + str(mdata) + '"'  
+    return run_cmd(" cd ${LINUX_NET_NEXT}/samples/bpf ; make clean; make " + md_str)
+
 
 def _kparser_cmd_(args, json=True):
-    _args = ["/home/testusr/wspace/iproute2/ip/ip"]
+    _args = [os.getenv("IPROUTE2_PATH") + "/ip/ip"]
     if json:
         _args.append("-j")
 
@@ -358,7 +365,7 @@ def test1() :
             #load_kparser_config(ipcmdfile)
 """
 
-if __name__ == '__main__':
+def test2():
     pkt0 = Ether()/IP(src="173.211.1.3", dst="172.211.1.4")/GRE(proto=0x0800)/IP(src="173.211.1.3", dst="172.211.1.4")/GRE(proto=0x0800)/IP(src="173.211.1.3", dst="172.211.1.4")/GRE(proto=0x0800)/IP(src="173.211.1.3", dst="172.211.1.4")/TCP(flags="S", sport=1234, dport=80)
     pkt1 = Ether()/IP(src="173.211.1.3", dst="172.211.1.4")
     #for x in range(3) :
@@ -374,3 +381,24 @@ if __name__ == '__main__':
     for i in range(len(y0)):
         if ( y0[i] != y1[i] ) :
             print(" Location {} yo : {} y1 {} ", i, y0[i], y1[i])
+
+if __name__ == '__main__':
+    create_tap_setup(tapname="tap102", ip="10.168.100.10",  mtu=1500)
+    lnn = os.getenv("LINUX_NET_NEXT")
+
+    time.sleep(2)
+    setup_kparser(kparser_module=lnn + "/net/kparser/kparser.ko", 
+            xdp_module= lnn + "/samples/bpf/xdp_kparser_kern.o", veth="tap102", ntsname=None)
+    
+    time.sleep(2)
+    #load_kparser_config("./scripts/kparser_config/scenarios/upstream_patch_demo.sh", del_kparser_cmd=False)
+    run_cmd("./scripts/kparser_config/scenarios/upstream_patch_demo.sh")
+    import packet_util
+    pkt = packet_util.get_packet(159)
+    pkt1 = Ether()/IP(dst="8.8.8.8")/TCP()
+    packet_util.test_tap_tx("tap102", pkt1)
+    #ctx_id = get_ctx_id()
+    #print(" CTX ", ctx_id )
+    #act_mdata_json = json.loads(get_metadata_dump(ctx_id))
+    #print(" Metadata ", act_mdata_json)
+

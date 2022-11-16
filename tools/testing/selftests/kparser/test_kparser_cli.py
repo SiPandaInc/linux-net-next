@@ -29,14 +29,13 @@ def pytest_generate_tests(metafunc):
             'testdata', test_data, ids=test_ids
         )
 
-
 @pytest.fixture()
 def testdata(request):
     return request.param
 
 
 def kparser_cmd(args, json=True):
-    _args = ["/home/testusr/wspace/iproute2/ip/ip"]
+    _args = [os.getenv("IPROUTE2_PATH") + "/ip/ip"]
     if json:
         _args.append("-j")
 
@@ -72,6 +71,11 @@ def check_output(exp_str_list, result_str, negativeTest=False):
 
 @pytest.fixture(scope="session")
 def setup(request):
+    #if (request.config.option.compile):
+    #    print("Compiling xdp ... ")
+    #    status = kparser_util.compile_xdp(mdata=None)
+    #    print(" Compile XDP status ", status )
+
     print(" Removing kparser ..")
     lnn_path = ""
     if os.getenv("LINUX_NET_NEXT") is None:
@@ -94,7 +98,7 @@ def setup(request):
 @allure.parent_suite(parent_testsuite)
 @allure.suite(suite_name)
 @allure.sub_suite(subsuite_name)
-def test_cli(testdata,setup):
+def test_cli(testdata, setup):
     print(" PARAM ", testdata)
     result = kparser_util._kparser_cmd_(" parser " + testdata[0])
     if result['returncode'] > 0:

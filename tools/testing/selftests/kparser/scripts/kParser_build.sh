@@ -4,9 +4,9 @@ screen -x kernel_compile
 USERNAME=
 TOKEN=
 rndStr=`env date --date 'now ' +'%Y-%m-%d_%H%M%S'`
-KERNDIR=/home/testusr/wspace/linux-net-next
-IPROUTE2_DIR=/home/testusr/wspace/iproute2
-LIBBPFDIR=/home/testusr/wspace/libbpf_${rndStr}
+KERNDIR=${LINUX_NET_NEXT}
+IPROUTE2_DIR=${IPROUTE2_PATH}
+LIBBPFDIR=~/tmpbpf/libbpf_${rndStr}
 REPO=https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git
 LNN_REPO=https://$USERNAME:$TOKEN@github.com/SiPandaInc/linux-net-next.git
 IPROUTE2_REPO=https://$USERNAME:$TOKEN@github.com/SiPandaInc/iproute2.git

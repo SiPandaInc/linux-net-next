@@ -10,7 +10,7 @@ parent_testsuite=os.getenv("PARENT_TESTSUITE")
 suite_name=os.getenv("TESTSUITE_NAME")
 subsuite_name=os.getenv("SUB_TESTSUITE_NAME")
 
-
+"""
 def pytest_generate_tests(metafunc):
 
     test_ids = []
@@ -29,14 +29,23 @@ def pytest_generate_tests(metafunc):
             'testdata', test_data, ids=test_ids
         )
 
+@pytest.fixture(scope="session")
+def preconfig(request):
+    if (request.config.option.compile):
+        print("\nCompiling xdp ... \n")
+        return kparser_util.compile_xdp(mdata=None)
+    else:
+        print("\nSkipping Compiling xdp ... \n")
+        return True
 
-@pytest.fixture()
-def testdata(request):
-    return request.param
+#@pytest.fixture()
+#def testdata(request):
+#    return request.param
 
+"""
 
 def kparser_cmd(args, json=True):
-    _args = ["/home/testusr/wspace/iproute2/ip/ip"]
+    _args = [os.getenv("IPROUTE2_PATH") + "/ip/ip"]
     if json:
         _args.append("-j")
 
@@ -142,7 +151,8 @@ class TestKparserXDP():
         expect_mdata_json = json.loads('[{"key":1,"value":{"frames":{"ip_offset":14,"l4_offset":34,"ipv4_addrs":[' + str(self.src_ipnum) +
                     ',' + str(self.dst_ipnum) + '],"ports":[' + str(self.dst_port) +  ','  + str(self.src_port) + ']}}}]' )
 
-        result0 = kparser_util.load_kparser_config("./scripts/kparser_config/scenarios/upstream_patch_demo.sh", del_kparser_cmd=False)
+        #result0 = kparser_util.load_kparser_config("./scripts/kparser_config/scenarios/upstream_patch_demo.sh", del_kparser_cmd=False)
+        result0 = kparser_util.run_cmd("./scripts/kparser_config/scenarios/upstream_patch_demo.sh")
         time.sleep(1)
         result1  = packet_util.test_tap_tx(self.tap,
               self.pkt)

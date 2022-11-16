@@ -77,13 +77,15 @@ int xdp_parser_prog(struct xdp_md *ctx)
 	 * hard coded value to the correct configured value, recompile this user
 	 * code and use the program.
 	 */
-	key.id = 0;
+	//key.id = 0;
+	key.id = KPARSER_ID;
+
 
 	/* set all bits to 1 in user metadata buffer to easily determine later which
 	 * fields were set/updated by kParser KMOD
 	 * NOTE: Perf ENH: commented out this memset.
 	 */
-	// memset(&user_metadata_buffer, 0xff, sizeof(user_metadata_buffer));
+	memset(&user_metadata_buffer, 0xff, sizeof(user_metadata_buffer));
 
 	bpf_xdp_kparser(ctx, &key, sizeof(key), &user_metadata_buffer,
 			sizeof(user_metadata_buffer));
@@ -91,7 +93,7 @@ int xdp_parser_prog(struct xdp_md *ctx)
 	/* now dump the metadata to be displayed by bpftool
 	 * NOTE: Perf ENH: commented out this call to xdp_update_ctx().
 	 */
-	// xdp_update_ctx(&user_metadata_buffer, sizeof(user_metadata_buffer));
+	xdp_update_ctx(&user_metadata_buffer, sizeof(user_metadata_buffer));
 
 	/* count how many packets were processed in this interval */
 	count_pkts();

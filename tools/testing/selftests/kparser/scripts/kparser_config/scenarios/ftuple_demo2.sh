@@ -1,5 +1,4 @@
 #!/bin/bash
-IPPATH=/home/testusr/wspace/iproute2
 << ////
 /* SPDX-License-Identifier: BSD-2-Clause-FreeBSD */
 /* Copyright (c) 2022, SiPanda Inc.
@@ -42,7 +41,7 @@ die()
 ipcmd() {
 # -j -p enables formatted json print in stdout
 	echo "Executing \`./ip/ip -j -p $@\`" | fold -w 80
-	$IPPATH/ip/ip -j -p "$@" || die "command \`$@\` failed."
+	${IPROUTE2_PATH}/ip/ip -j -p "$@" || die "command \`$@\` failed."
 	echo "---------------------------------------------------------------"
 }
 

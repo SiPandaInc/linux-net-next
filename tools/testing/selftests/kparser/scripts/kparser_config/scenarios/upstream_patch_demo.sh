@@ -1,5 +1,5 @@
 
-IPPATH=/home/testusr/wspace/iproute2/
+
 die()
 {
         echo "error:$1"
@@ -9,7 +9,7 @@ die()
 ipcmd() {
 # -j -p enables formatted json print in stdout
         echo "Executing \`./ip/ip -j -p $@\`" | fold -w 80
-        $IPPATH/ip/ip -j -p "$@" || die "command \`$@\` failed."
+        ${IPROUTE2_PATH}/ip/ip -j -p "$@" || die "command \`$@\` failed."
         echo "---------------------------------------------------------------"
 }
 
