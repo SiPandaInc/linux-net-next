@@ -978,9 +978,7 @@ kparser_get_parser_ctx(const struct kparser_hkey *kparser_key)
 
 	if (kparser_key->id >= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START &&
 	    kparser_key->id <= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP) {
-		rcu_read_lock();
 		ptr = kparser_fast_lookup_array[kparser_key->id];
-		rcu_read_unlock();
 	} else {
 		ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
 	}
@@ -1053,8 +1051,6 @@ int kparser_parse(struct sk_buff *skb,
 		return -EINVAL;
 	}
 
-	rcu_read_lock();
-
 	if (likely(avoid_ref == false))
 		kparser_ref_get(&k_prsr->glue.refcount);
 	parser = &k_prsr->parser;
@@ -1066,15 +1062,12 @@ int kparser_parse(struct sk_buff *skb,
 		pr_debug("{%s:%d}:parser htbl lookup failure for key:{%s:%u}\n",
 			 __func__, __LINE__,
 			 kparser_key->name, kparser_key->id);
-		rcu_read_unlock();
 		if (likely(avoid_ref == false))
 			kparser_ref_put(&k_prsr->glue.refcount);
 		return -ENOENT;
 	}
 
 	err = __kparser_parse(parser, data, pktlen, _metadata, metadata_len);
-
-	rcu_read_unlock();
 
 	if (likely(avoid_ref == false))
 		kparser_ref_put(&k_prsr->glue.refcount);
