@@ -12,13 +12,14 @@ def pytest_addoption(parser):
     parser.addoption( "--static", action="store_true", default=False, help=" docker image name, if not provided run test locally " ),
     parser.addoption( "--mode", action="store_true", default="no-threads", help=" docker image name, if not provided run test locally " ),
     parser.addoption( "--count", action="store_true", default=1, help=" docker image name, if not provided run test locally " ),
-    parser.addoption( "--compile", action="store_true", default=False, help=" docker image name, if not provided run test locally " ),
+    parser.addoption( "--compile", action="store", default=0, help=" docker image name, if not provided run test locally " ),
 
 @pytest.fixture(scope="session", autouse=True)
 def preconfig(request):
-    if (request.config.option.compile):
+    mdata = request.config.option.compile
+    if (int(mdata) > 0):
         print("\nCompiling xdp ... \n")
-        return kparser_util.compile_xdp(mdata=None)
+        return kparser_util.compile_xdp(mdata=mdata)
     else:
         print("\nSkipping Compiling xdp ... \n")
         return True

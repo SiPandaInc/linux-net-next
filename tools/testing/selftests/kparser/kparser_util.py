@@ -209,6 +209,18 @@ def setup_kparser(kparser_module=None, xdp_module=None, veth=None, ntsname=None)
     retval4 = check_xdp(veth, ntsname)
     return retval4
 
+def get_test_dict(test_str):
+    tkns = test_str.split(' ')
+    test_dict = {}
+    flag = False
+    i = 0
+    while i < len(tkns):
+        if len(tkns[i]) < 1:
+            i = i + 1
+            continue
+        test_dict[tkns[i]] = tkns[i + 1]
+        i = i + 2
+    return test_dict
 
 def gen_test_flow(kparser_obj={}, src_veth=None, dst_veth=None, packets=None, expect_mdata_json=None, src_netns=None, dst_netns=None, del_kparser_cmd=True):
     if os.getenv("LINUX_NET_NEXT") is None:

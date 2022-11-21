@@ -73,7 +73,8 @@ class TestkParserMD():
         ip_parts = cls.dst_ip.split('.')
         cls.dst_ipnum = (int(ip_parts[3]) << 24) + (int(ip_parts[2]) << 16) + (int(ip_parts[1]) << 8) + int(ip_parts[0])
         
-        cls.pkt = packet_util.get_encap_pkt(numencaps=1, type=0) 
+        #cls.pkt = packet_util.get_encap_pkt(numencaps=1, type=0) 
+        cls.pkt = packet_util.get_custom_packet(length=400)
 
     @classmethod
     def teardown_class(cls):
@@ -89,7 +90,6 @@ class TestkParserMD():
         iarr0 = [ int(x, base=16)  for x in harr0]
         print(" PacketHEX : {} \n PacketINT : {} \n".format(harr0, iarr0 ))
 
-
     @allure.sub_suite(subsuite_name)
     def test_attach_xdp(self):
         result = kparser_util.setup_kparser(self.lnn_path + "/net/kparser/kparser.ko",
@@ -103,26 +103,42 @@ class TestkParserMD():
         self.testscript = request.config.option.kparserconfig
         #expect_mdata_json = json.dumps([{"key":1,"value":{"frames":{"ip_offset":14,"l4_offset":34,"ipv4_addrs":[self.src_ipnum,self.dst_ipnum],"ports":[self.dst_port,self.src_port]}}}])
         expect_mdata_json = json.loads(testdata[2])
+        print("Loading config..")
         kparser_util.load_kparser_module(self.lnn_path + "/net/kparser/kparser.ko")
-        result_0 = kparser_util.run_cmd(
-                    "./scripts/kparser_config/gen_tlvnodes.sh " +
-                    testdata[0])
-        result_0 = kparser_util.run_cmd(" {} {} ".format(
+        #result_0 = kparser_util.run_cmd(
+        #            "./scripts/kparser_config/gen_tlvnodes.sh " +
+        #            testdata[0])
+        result_0 = kparser_util.run_cmd(" {} \"{}\" ".format(
                             self.testscript, testdata[0]))
         ret_kparser_script = True
-        print("KPARSER SCRIPT OUT :",result_0['stdout'])
-        print("KPARSER SCRIPT ERR :",result_0['stderr'])
         if (result_0['returncode'] != 0): 
             print(" kParser Config load failed ", result_0 )
+            print("KPARSER SCRIPT OUT :",result_0['stdout'])
+            print("KPARSER SCRIPT ERR :",result_0['stderr'])
             ret_kparser_script = False
 
         time.sleep(1)
+        
+        print("Sending packet..")
         ret_tx_rx_pkt  = packet_util.test_tap_tx(self.tap,
               self.pkt)
         ctx_id = kparser_util.get_ctx_id()
         md_str = kparser_util.get_metadata_dump(ctx_id)
         act_mdata_json = json.loads(md_str)
-        ret_md_cmp = kparser_util.diff_data(expect_mdata_json, act_mdata_json)
+        tdict = kparser_util.get_test_dict(testdata[0])
+        print("Test Dict", tdict)
+        exp_data = packet_util.get_data(self.pkt, int(tdict['hdr-src-off']), int(tdict['length']))
+        print("Pcket data ", exp_data)
+        #tlen = tdict['md-off'] + tdict['length'] 
+        #tlen1 = len(act_mdata_json[0]['value']['frame']['data'])  
+        #for i in range(tlen):
+        #    if i < tlen1:
+        #        act_mdata_json[0]['value']['frame']['data'][tdict[mdata] + i ] = exp_data[i]
+        #    else:
+        #        break
+
+        ret_md_cmp = kparser_util.diff_data(act_mdata_json, expect_mdata_json)
         print(ret_kparser_script, ret_tx_rx_pkt, ret_md_cmp)
         self.print_pkts()
+        print("---------------------------------------------------------------")
         assert ret_kparser_script and ret_tx_rx_pkt and ret_md_cmp

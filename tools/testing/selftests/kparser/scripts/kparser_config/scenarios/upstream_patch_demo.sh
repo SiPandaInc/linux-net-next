@@ -31,4 +31,4 @@ md-rule md.ipaddrs
 ipcmd parser create node name node.ether hdr.minlen 14 nxt.offset 12 nxt.length 2 \
 nxt.table-ent 0x8:node.ipv4
 
-ipcmd parser create parser name test_parser id 0 rootnode node.ether base-metametadata-size 16
+ipcmd parser create parser name test_parser id 1 rootnode node.ether base-metametadata-size 16

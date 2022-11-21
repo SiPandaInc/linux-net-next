@@ -110,7 +110,7 @@ class TestKparserXDP():
         cls.dst_ipnum = (int(ip_parts[3]) << 24) + (int(ip_parts[2]) << 16) + (int(ip_parts[1]) << 8) + int(ip_parts[0])
 
         #cls.pkt = Ether(src=cls.src_eth)/IP(src=cls.src_ip, dst=cls.dst_ip)/TCP(flags="S", sport=RandShort(), dport=80)
-        cls.pkt = packet_util.get_packet(159)
+        cls.pkt = packet_util.get_packet(157)
         print("PACKET ", cls.pkt)
 
     @classmethod
@@ -164,11 +164,11 @@ class TestKparserXDP():
         print(" Metadata ", act_mdata_json)
    
         result2 = kparser_util.diff_data(act_mdata_json, expect_mdata_json)
-        print(result0, result1, result2)
-        assert result0 and result1 and result2
+        print(result0['returncode'], result1, result2)
+        assert (result0['returncode'] == 0 ) and result1 and result2
 
     @allure.sub_suite(subsuite_name)
-    def xtest_rmmod_kparser(self):
+    def test_rmmod_kparser(self):
         expect_md = json.loads('[{"key":1,"value":{"frames":{"ip_offset":65535,"l4_offset":65535,"ipv4_addrs":[4294967295,4294967295],"ports":[65535,65535]}}}]')
         result0 = kparser_util.remove_kparser_module()
         result01 = kparser_util.load_kparser_config(
@@ -187,7 +187,7 @@ class TestKparserXDP():
         assert result0 and not result01 and result1 and result2 and result3
        
     @allure.sub_suite(subsuite_name)
-    def xtest_detach_xdp(self):
+    def test_detach_xdp(self):
         #result0 = kparser_util.detach_xdp_module(self.dst_veth, ntsname=self.dst_netns)
         result0 = kparser_util.detach_xdp_module(self.tap)
         result1 = kparser_util.check_xdp(self.tap)

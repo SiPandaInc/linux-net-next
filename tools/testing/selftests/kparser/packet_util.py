@@ -3,6 +3,8 @@ import sys
 from scapy.all import *
 import traceback
 import netns
+import codecs
+import proto
 from scapy.contrib.pfcp import PFCP as PFCP
 from scapy.contrib.gtp_v2 import GTPHeader as GTPHeader
 from scapy.contrib.gtp import GTP_U_Header as GTP_U_Header
@@ -1224,22 +1226,40 @@ def compare_packet(exp_pkt, act_pkt):
 
 def get_custom_packet(length=50):
         #str1 = b'0123456789abcdef'
-        str0 = ''.join(format(hex(255),"02") for i in range(128))
+        str0 = ''.join(format(hex(i),"02") for i in range(128))
         #str0 = ''.join(format(255,") for i in range(128))
         tmp_str = "f"*128
         tmp_str1 = bytes(tmp_str, encoding='utf-8')
-        str0 = codecs.decode(tmp_str1, "hex")
+        tmp_str2 = codecs.decode(tmp_str1, "hex")
         str1 = ''.join(chr(i) for i in range(128))
-        x1 = str0 + bytes(str1*510,'utf-8') + str0
-        ###cls.pkt = proto.TestProto2(data=x1)/IP(src=cls.src_ip, dst=cls.dst_ip)/TCP(flags="S", sport=cls.src_port, dport=cls.dst_port)
+        str2 = bytes(str1,'utf-8')
+        #x1 = str1 + bytes('f'*length,'utf-8') + tmp_str2
+        x1 =  str2 + tmp_str2 + str2
+        pkt = proto.TestProto2(data=x1)/IP(src=src_ip4, dst=dst_ip4)/TCP(flags="S", sport=src_port, dport=dst_port)
         #cls.pkt = TestProto2(data='A'*65533)/IP(src="10.10.11.2", dst="10.10.11.3")/TCP(flags="S", sport=1234, dport=2345)
         #cls.pkt = proto.TestProto2(data='x'*65533)/IP(src=cls.src_ip, dst=cls.dst_ip)/TCP(flags="S", sport=cls.src_port, dport=cls.dst_port)
+        return pkt
      
 def get_packet(idx):
     return packets[idx]
 
+def get_data(pkt, offset, length):
+        #print(" XYZ : ", bytes(pkt))
+        hex_data = ('0x' +  bytes(pkt).hex(",").replace("," , ",0x")).split(",")
+        int_data = [ int(x, base=16)  for x in hex_data]
+        ilen = len(int_data)
+
+        #print(" PacketHEX : {} \n PacketINT : {} \n".format(harr0, iarr0 ))
+        if offset < ilen and (offset + length) < ilen :
+            return int_data[offset:(offset + length)]
+        else:
+            return None
+
+
 if __name__ == '__main__':
     #write_pkts("/tmp/allpkts.pcap")
-    epkts = get_encap_pkt(numencaps=10,type=0)
+    #epkts = get_encap_pkt(numencaps=10,type=0)
+    epkts = get_custom_packet(length=50)
     print(" ENcap ", epkts )
+    print("Data ", get_data(epkts, 5, 10))
 
