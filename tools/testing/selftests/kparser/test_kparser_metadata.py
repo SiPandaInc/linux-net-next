@@ -75,7 +75,7 @@ class TestkParserMD():
         cls.dst_ipnum = (int(ip_parts[3]) << 24) + (int(ip_parts[2]) << 16) + (int(ip_parts[1]) << 8) + int(ip_parts[0])
         
         #cls.pkt = packet_util.get_encap_pkt(numencaps=1, type=0) 
-        cls.pkt = packet_util.get_encap_pkt(numencaps=3)
+        cls.pkt = packet_util.get_custom_packet(length=400)
 
     @classmethod
     def teardown_class(cls):
@@ -126,10 +126,10 @@ class TestkParserMD():
         ctx_id = kparser_util.get_ctx_id()
         md_str = kparser_util.get_metadata_dump(ctx_id)
         act_mdata_json = json.loads(md_str)
-        #tdict = kparser_util.get_test_dict(testdata[0])
-        #print("Test Dict", tdict)
-        #exp_data = packet_util.get_data(self.pkt, int(tdict['hdr-src-off']), int(tdict['length']))
-        #print("Pcket data ", exp_data)
+        tdict = kparser_util.get_test_dict(testdata[0])
+        print("Test Dict", tdict)
+        exp_data = packet_util.get_data(self.pkt, int(tdict['hdr-src-off']), int(tdict['length']))
+        print("Pcket data ", exp_data)
         #tlen = tdict['md-off'] + tdict['length'] 
         #tlen1 = len(act_mdata_json[0]['value']['frame']['data'])  
         #for i in range(tlen):
@@ -138,7 +138,7 @@ class TestkParserMD():
         #    else:
         #        break
 
-        #ret_md_cmp = kparser_util.diff_data(act_mdata_json, expect_mdata_json)
+        ret_md_cmp = kparser_util.diff_data(act_mdata_json, expect_mdata_json)
         print(ret_kparser_script, ret_tx_rx_pkt, ret_md_cmp)
         self.print_pkts()
         print("---------------------------------------------------------------")

@@ -1253,7 +1253,7 @@ def get_data(pkt, offset, length):
         if offset < ilen and (offset + length) < ilen :
             return int_data[offset:(offset + length)]
         else:
-            return None
+            return []
 
 
 if __name__ == '__main__':

@@ -2,8 +2,15 @@
 #
 # Makefile for KPARSER module
 #
+GCOV_PROFILE := y
 
-ccflags-y := -DDEBUG -DKERNEL_MOD
+##KBUILD_CFLAGS   := -Wall -Wundef -Wno-trigraphs \
+#                   -fno-strict-aliasing -fno-common -fshort-wchar -fno-PIE \
+#                   -Werror=implicit-function-declaration -Werror=implicit-int \
+#                   -Wno-format-security \
+#                   -fanalyzer           \
+#                   -std=gnu89
+ccflags-y := -DDEBUG -DKERNEL_MOD -fanalyzer -Wall 
 
 obj-$(CONFIG_KPARSER) += kparser.o
 

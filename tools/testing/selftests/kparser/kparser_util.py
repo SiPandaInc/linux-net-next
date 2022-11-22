@@ -220,6 +220,9 @@ def get_test_dict(test_str):
             continue
         test_dict[tkns[i]] = tkns[i + 1]
         i = i + 2
+    
+    if 'length' not in test_dict.keys():
+        tkns['length'] = 2
     return test_dict
 
 def gen_test_flow(kparser_obj={}, src_veth=None, dst_veth=None, packets=None, expect_mdata_json=None, src_netns=None, dst_netns=None, del_kparser_cmd=True):
