@@ -388,4 +388,11 @@ kparser_free_obj
 	kparser_free_proto_tbl,
 	kparser_free_parser;
 
+#define KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START	0
+#define KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP		255
+
+extern void __rcu
+	*kparser_fast_lookup_array[KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP -
+	KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START + 1];
+
 #endif /* __KPARSER_H */

@@ -21,6 +21,9 @@ static DEFINE_MUTEX(kparser_config_lock);
 static struct kparser_cntrs_conf cntrs_conf = {};
 static __u8 cntrs_conf_idx;
 
+void *kparser_fast_lookup_array[KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP -
+	KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START + 1];
+
 /* common pre-process code for create handlers */
 static inline bool
 kparser_cmd_create_pre_process(const char *op,
@@ -3245,6 +3248,9 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 			goto done;
 	}
 
+	if (kparser->glue.key.id >= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START &&
+	    kparser->glue.key.id <= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP)
+		rcu_assign_pointer(kparser_fast_lookup_array[kparser->glue.key.id], kparser);
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3525,10 +3531,15 @@ int kparser_del_parser(const struct kparser_hkey *key,
 	(*rsp)->object.conf_keys_bv = kparser->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf = kparser->glue.config.parser_conf;
 
+	if (kparser->glue.key.id >= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START &&
+	    kparser->glue.key.id <= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP)
+		rcu_assign_pointer(kparser_fast_lookup_array[kparser->glue.key.id], NULL);
+
 	kparser_free(kparser->parser.cntrs);
 	kparser_free(kparser);
 done:
 	mutex_unlock(&kparser_config_lock);
+	synchronize_rcu();
 
 	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
@@ -3557,7 +3568,7 @@ int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 
 	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
 
-	parser = kparser_get_parser(key);
+	parser = kparser_get_parser(key, false);
 	if (!parser) {
 		(*rsp)->op_ret_code = ENOENT;
 		snprintf((*rsp)->err_str_buf,
@@ -3601,7 +3612,7 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 		goto done;
 	}
 
-	if (!kparser_put_parser(&kparser->parser)) {
+	if (!kparser_put_parser(&kparser->parser, false)) {
 		(*rsp)->op_ret_code = EINVAL;
 		snprintf((*rsp)->err_str_buf,
 			 sizeof((*rsp)->err_str_buf),

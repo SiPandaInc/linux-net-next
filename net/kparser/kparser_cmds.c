@@ -723,6 +723,8 @@ int kparser_init(void)
 		memset(g_mod_namespaces[i]->bv, 0xff, g_mod_namespaces[i]->bv_len * sizeof(__u32));
 	}
 
+	memset(kparser_fast_lookup_array, 0, sizeof(kparser_fast_lookup_array));
+
 	pr_debug("OUT: %s:%s:%d:err:%d\n", __FILE__, __func__, __LINE__, err);
 
 	return 0;

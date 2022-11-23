@@ -23,12 +23,20 @@
  * _metadata: User provided metadata buffer. It must be same as configured
  *            metadata objects in CLI.
  * metadata_len: Total length of the user provided metadata buffer.
+ * avoid_ref: Set this flag in case caller wants to avoid holding the reference
+ *            of the active parser object to save performance on the data path.
+ *            But please be advised, caller should hold the reference of the
+ *            parser object while using this data path. In this case, the CLI
+ *            can be used in advance to get the reference, and caller will also
+ *            need to release the reference via CLI once it is done with the
+ *            data path.
  *
  * return: kParser error code as defined in include/uapi/linux/kparser.h
  */
 extern int kparser_parse(struct sk_buff *skb,
 			 const struct kparser_hkey *kparser_key,
-			 void *_metadata, size_t metadata_len);
+			 void *_metadata, size_t metadata_len,
+			 bool avoid_ref);
 
 /* __kparser_parse(): Function to parse a void * packet buffer using a parser instance key.
  *
@@ -52,6 +60,13 @@ extern int __kparser_parse(const void *parser, void *_hdr,
  *
  * kparser_key: key of the associated kParser parser object which must be
  * already created via CLI.
+ * avoid_ref: Set this flag in case caller wants to avoid holding the reference
+ *            of the active parser object to save performance on the data path.
+ *            But please be advised, caller should hold the reference of the
+ *            parser object while using this data path. In this case, the CLI
+ *            can be used in advance to get the reference, and caller will also
+ *            need to release the reference via CLI once it is done with the
+ *            data path.
  *
  * return: NULL if key not found, else an opaque parser instance pointer which
  * can be used in the following APIs 3 and 4.
@@ -60,7 +75,8 @@ extern int __kparser_parse(const void *parser, void *_hdr,
  * more than once, later caller will need to release the same parser exactly that
  * many times using the API kparser_put_parser().
  */
-extern const void *kparser_get_parser(const struct kparser_hkey *kparser_key);
+extern const void *kparser_get_parser(const struct kparser_hkey *kparser_key,
+				      bool avoid_ref);
 
 /* kparser_put_parser(): Function to return and undo the read only operation done previously by
  * kparser_get_parser(). The parser instance is identified by using a previously obtained opaque
@@ -70,11 +86,14 @@ extern const void *kparser_get_parser(const struct kparser_hkey *kparser_key);
  * parser: void *, Non NULL opaque pointer which was previously returned by kparser_get_parser().
  * Caller can use cached opaque pointer as long as system does not restart and kparser.ko is not
  * reloaded.
+ * avoid_ref: Set this flag only when this was used in the prio call to
+ *            kparser_get_parser(). Incorrect usage of this flag might cause
+ *            error and make the parser state unstable.
  *
  * return: boolean, true if put operation is success, else false.
  *
  * NOTE: This call makes the whole parser tree deletable for the very last call.
  */
-extern bool kparser_put_parser(const void *parser);
+extern bool kparser_put_parser(const void *parser, bool avoid_ref);
 
 #endif /* _NET_KPARSER_H */
