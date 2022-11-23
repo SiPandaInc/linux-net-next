@@ -75,7 +75,8 @@ class TestkParserMD():
         cls.dst_ipnum = (int(ip_parts[3]) << 24) + (int(ip_parts[2]) << 16) + (int(ip_parts[1]) << 8) + int(ip_parts[0])
         
         #cls.pkt = packet_util.get_encap_pkt(numencaps=1, type=0) 
-        cls.pkt = packet_util.get_custom_packet(length=400)
+        #cls.pkt = packet_util.get_custom_packet(length=400)
+        cls.pkt = packet_util.get_packet(156)
 
     @classmethod
     def teardown_class(cls):
@@ -90,6 +91,54 @@ class TestkParserMD():
         harr0 = ('0x' +  bytes(cls.pkt).hex(",").replace("," , ",0x")).split(",") 
         iarr0 = [ int(x, base=16)  for x in harr0]
         print(" PacketHEX : {} \n PacketINT : {} \n".format(harr0, iarr0 ))
+
+
+    @classmethod
+    def get_expect_metadata(cls,teststr, expect_mdata_json):
+        tdict = kparser_util.get_test_dict(teststr)
+        pkt_len = len(bytes(cls.pkt) )
+        print("Test Dict", tdict, expect_mdata_json)
+        print("Sending packet of length: {} ..".format( pkt_len))
+        tlen1 = len(expect_mdata_json[0]['value']['frame']['data'])
+        if ('isframe' in tdict.keys() and  tdict['isframe'] == 'true') or \
+            (int(tdict['length']) >= pkt_len) or (int(tdict['length']) == 0):
+            print(" All default values ")
+        elif 'type' not in tdict.keys() or tdict['type'] == 'hdrdata':
+            exp_data = packet_util.get_data(cls.pkt, int(tdict['hdr-src-off']), int(tdict['length']))
+            print("Pcket data ", exp_data)
+            #tlen = int(tdict['md-off']) + int(tdict['length'])
+            tlen = len(exp_data)
+            #tlen1 = len(act_mdata_json[0]['value']['frame']['data'])
+            print(" tlen {} tlen1 {} ".format( tlen, tlen1))
+            for i in range(tlen):
+                if 'isendianneeded' in tdict.keys() and tdict['isendianneeded'] == 'true':
+                    indx1 = tlen -i -1
+                else:
+                    indx1 = i
+                indx0 = int(tdict['md-off']) + i
+                if indx0 < tlen1:
+                    expect_mdata_json[0]['value']['frame']['data'][indx0] = exp_data[indx1]
+                else:
+                    break
+
+        elif tdict['type'] == 'constant_byte':
+            indx0 = int(tdict['md-off'])
+            cvalue = 0
+            basevalue = 0
+            if 'constantvalue' in tdict.keys():
+                if 'x' in tdict['constantvalue']:
+                    cvalue = int(tdict['constantvalue'], 16)
+                else:
+                    cvalue = int(tdict['constantvalue'], 10)
+    
+            if indx0 < tlen1:
+                expect_mdata_json[0]['value']['frame']['data'][indx0] = cvalue
+            
+        else:
+            print("Invalid Metadata Types ")
+            
+            
+        print(" Exp data ", expect_mdata_json)
 
     @allure.sub_suite(subsuite_name)
     def test_attach_xdp(self):
@@ -119,27 +168,22 @@ class TestkParserMD():
             ret_kparser_script = False
 
         time.sleep(1)
-        
-        print("Sending packet..")
+       
         ret_tx_rx_pkt  = packet_util.test_tap_tx(self.tap,
               self.pkt)
+    
+        # get actual meta-data 
         ctx_id = kparser_util.get_ctx_id()
         md_str = kparser_util.get_metadata_dump(ctx_id)
         act_mdata_json = json.loads(md_str)
-        tdict = kparser_util.get_test_dict(testdata[0])
-        print("Test Dict", tdict)
-        exp_data = packet_util.get_data(self.pkt, int(tdict['hdr-src-off']), int(tdict['length']))
-        print("Pcket data ", exp_data)
-        #tlen = tdict['md-off'] + tdict['length'] 
-        #tlen1 = len(act_mdata_json[0]['value']['frame']['data'])  
-        #for i in range(tlen):
-        #    if i < tlen1:
-        #        act_mdata_json[0]['value']['frame']['data'][tdict[mdata] + i ] = exp_data[i]
-        #    else:
-        #        break
+    
+        # prepare expected metadata 
+        self.get_expect_metadata(testdata[0], expect_mdata_json)
 
+        # compare actual vs expected meta-data
         ret_md_cmp = kparser_util.diff_data(act_mdata_json, expect_mdata_json)
         print(ret_kparser_script, ret_tx_rx_pkt, ret_md_cmp)
-        self.print_pkts()
+
+        #self.print_pkts()
         print("---------------------------------------------------------------")
         assert ret_kparser_script and ret_tx_rx_pkt and ret_md_cmp
