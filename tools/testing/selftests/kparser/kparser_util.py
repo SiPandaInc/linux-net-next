@@ -12,11 +12,14 @@ from pyroute2 import IPRoute
 from pyroute2 import IPDB
 import pyroute2
 
-def compile_xdp(mdata=None):
+def compile_xdp(mdata=None, lnn=None):
     md_str = ""
     if mdata is not None:
         md_str = 'TEST_FLAGS="-DMDATA=' + str(mdata) + '"'  
-    return run_cmd(" cd ${LINUX_NET_NEXT}/samples/bpf ; make clean; make " + md_str)
+    if lnn == None:
+    	return run_cmd(" cd ${LINUX_NET_NEXT}/samples/bpf ; make clean; make " + md_str)
+    else:
+    	return run_cmd(" cd " + lnn + "/samples/bpf ; make clean; make -j16" + md_str)
 
 
 def _kparser_cmd_(args, json=True):

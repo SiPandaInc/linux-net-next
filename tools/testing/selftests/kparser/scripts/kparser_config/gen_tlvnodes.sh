@@ -47,12 +47,12 @@ ipcmd parser create condexprs name cond.ipv4.vercheck1			\
 ipcmd parser create condexprstable name condtable.ipv4
 
 ipcmd parser create condexprslist name condlist.ipv4			\
-		type or defaultfail STOP_FAIL_CMP       
+		type or defaultfail stop-fail-compare       		\
         #table table.ipkj
 		#defaultfail STOP_FAIL_CMP
 
 ipcmd parser create condexprslist name condlist.ipv6			\
-		type or defaultfail STOP_FAIL_CMP       
+		type or defaultfail  stop-fail-compare
 
 ipcmd parser create condexprslist/condlist.ipv4				\
 		condexprs cond.ipv4.vercheck            \
@@ -162,20 +162,16 @@ ipcmd parser create metadata-rule name md.cntr.vlanci			\
         isendianneeded true                   \
 		isframe true
 
-ipcmd parser create metadata-rule name md.cntr.inc                           \
-                type counter_mode                                       \
-                counteridx cntr.vlan.1                               \
-                counterop incr              \
-                isframe true
+#                type counter                                       \
+
+ipcmd parser create metadata-rule name md.cntr.inc				\
+		type counter-mode counteridx cntr.vlan.1			\
+		counterop incr isframe true
 
 # define where to store the counter value in user metadata
-ipcmd parser create metadata-rule name md.cntr.store                         \
-                type counter_mode                                       \
-                length 2                                                \
-                md-off 32                                                 \
-                counteridx cntr.vlan.1                               \
-                counterop noop                                          \
-                isframe true
+ipcmd parser create metadata-rule name md.cntr.store				\
+		type counter-mode length 2 md-off 32 counteridx cntr.vlan.1	\
+		counterop noop isframe true
 
 ipcmd parser create metadata-ruleset name mdl.vlan				\
 		md-rule md.cntr.vlanci				\
@@ -211,7 +207,7 @@ ipcmd parser create metadata-rule name md.num_encaps                \
         isframe false                   \
         md-off 2
 ipcmd parser create metadata-rule name md.return_code           \
-        type return_code                    \
+        type return-code                    \
         md-off 4
 ipcmd parser create metadata-ruleset name mdl.final_status          \
         md-rule md.num_nodes                \

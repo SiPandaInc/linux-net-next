@@ -1,0 +1,71 @@
+{
+	"tests": [
+	{
+		"test-name" : "p4-calc-pkt-verify",
+		"description" :
+			"verify kParser parsing functionality of a p4 calculator packet",
+		"lnn-path" : "/root/repos/linux-net-next/",
+		"iproute2-path" : "/root/repos/iproute2/",
+		"log-dir" : "/tools/testing/selftests/kparser/pkt-validation-tests/logs/",
+		"kParser" : {
+			"path-inside-lnn" : "yes",
+			"cli-setup-config-file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc-cli.sh",
+			"recompile-kmod" : "no",
+			"recompile-cli" : "no"
+		},
+		"path-inside-lnn" : "yes",
+		"test-pcap-file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc.pcap",
+		"pkt-index-in-pcap" : 0,
+		"xdp-md": {
+			"md-hdr-file" : "samples/bpf/metadata_def.h",
+			"recompile-samples-prog" : "no",
+			"C-md-structure" :
+[
+" /* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */",
+"#ifndef __METADATA_DEF_H",
+"#define __METADATA_DEF_H",
+
+"#define STR_STR(x) #x",
+"#define STR(x) STR_STR(x)",
+
+"#define KPARSER_NAME STR(calc_parser)",
+"#define KPARSER_ID 1",
+
+"struct user_frame {",
+"        unsigned short calc_dstAddr;",
+"        unsigned short calc_srcAddr;",
+"        unsigned short offset2;",
+"        unsigned short offset3;",
+"        unsigned short offset4;",
+"        unsigned short offset5;",
+"        unsigned short offset6;",
+"        unsigned short offset7;",
+"        unsigned short offset8;",
+"} __packed;",
+
+"struct user_metadata {",
+"        struct user_frame frames;",
+"} __packed;",
+
+"#endif"
+]
+			},
+		"expected-md-values" : {
+			"key": 1,
+			"value": {
+				"frames": {
+					"calc_dstAddr": 112,
+					"calc_srcAddr": 160,
+					"offset2": 224,
+					"offset3": 232,
+					"offset4": 240,
+					"offset5": 248,
+					"offset6": 256,
+					"offset7": 288,
+					"offset8": 320
+				}
+			}
+		}
+	}
+	]
+}

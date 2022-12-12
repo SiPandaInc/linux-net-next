@@ -1128,6 +1128,10 @@ def get_encap_pkt(numencaps=1, type=0):
 
     return pkt
 
+def read_pcap_file(pcap_file, pkt_idx):
+    # return dpkt.pcap.Reader(open(pcap_file,'r'))
+    pkts = rdpcap(pcap_file)
+    return pkts[pkt_idx]
 
 def test_tx_rx_packet(src_veth="veth0", dst_veth=None, packets=None,
                       src_netns=None, dst_netns=None):
