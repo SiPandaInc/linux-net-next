@@ -199,14 +199,13 @@ struct kparser_conf_metadata {
 	enum kparser_metadata_counter_op_type cntr_op; // 3 bit
 	bool frame;
 	bool e_bit;
-	__u8 cntr; // 3 bit
-	__u8 cntr_data; // 3 bit
-	__u8 constant_value;
+	__u16 constant_value;
 	size_t soff;
 	size_t doff;
 	size_t len;
 	size_t add_off;
 	struct kparser_hkey counterkey;
+	struct kparser_hkey counter_data_key;
 };
 
 /* *********************** metadata list/table *********************** */
@@ -480,6 +479,7 @@ struct kparser_conf_parser {
 
 /* *********************** CLI config interface *********************** */
 
+/* TODO: remove macros and comment and use the values directly */
 /* NOTE: we can't use BITS_PER_TYPE from kernel header here and had to redefine BITS_IN_U32
  * since this is shared with user space code.
  */

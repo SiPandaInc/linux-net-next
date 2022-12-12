@@ -255,7 +255,7 @@ skip_table_create:
 	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "OK");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
-	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
+	(*rsp)->object.table_conf = *arg;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -418,7 +418,7 @@ skip_table_create:
 	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
-	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
+	(*rsp)->object.table_conf = *arg;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -783,10 +783,10 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 			    size_t *rsp_len, const char *op)
 {
 	struct kparser_glue_metadata_extract *kmde = NULL;
+	int rc, cntridx = 0, cntr_arr_idx = 0;
 	const struct kparser_conf_metadata *arg;
 	struct kparser_glue_counter *kcntr;
 	struct kparser_hkey key;
-	int rc, cntridx = 0;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -808,16 +808,32 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		goto done;
 	}
 
+	kcntr = kparser_namespace_lookup(KPARSER_NS_COUNTER, &arg->counterkey);
+	if (kcntr)
+		cntridx = kcntr->counter_cnf.index + 1;
+
 	if (arg->type == KPARSER_METADATA_COUNTER) {
-		kcntr = kparser_namespace_lookup(KPARSER_NS_COUNTER, &arg->counterkey);
-		if (!kcntr) {
-			(*rsp)->op_ret_code = ENOENT;
+		/* In this case, one of the counters must be provided. If not,
+		 * that is an error
+		 */
+		kcntr = kparser_namespace_lookup(KPARSER_NS_COUNTER,
+						 &arg->counter_data_key);
+		if (kcntr)
+			cntr_arr_idx = kcntr->counter_cnf.index + 1;
+
+		if ((cntridx == 0) && (cntr_arr_idx == 0)) {
+			(*rsp)->op_ret_code = -ENOENT;
 			snprintf((*rsp)->err_str_buf,
 				 sizeof((*rsp)->err_str_buf),
-				 "%s: Counter object key not found", op);
+				 "%s: both counteridx and counterdata object"
+				 " keys are not found", op);
 			goto done;
+		} else {
+			if (cntr_arr_idx == 0)
+				cntr_arr_idx = cntridx;
+			else if (cntridx == 0)
+				cntridx = cntr_arr_idx;
 		}
-		cntridx = kcntr->counter_cnf.index + 1;
 	}
 
 	kmde = kzalloc(sizeof(*kmde), GFP_KERNEL);
@@ -848,7 +864,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 	INIT_LIST_HEAD(&kmde->glue.owner_list);
 	INIT_LIST_HEAD(&kmde->glue.owned_list);
 
-	if (!kparser_metadata_convert(arg, &kmde->mde, cntridx)) {
+	if (!kparser_metadata_convert(arg, &kmde->mde, cntridx, cntr_arr_idx)) {
 		(*rsp)->op_ret_code = EINVAL;
 		snprintf((*rsp)->err_str_buf,
 			 sizeof((*rsp)->err_str_buf),
@@ -2339,7 +2355,7 @@ skip_table_create:
 	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
-	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
+	(*rsp)->object.table_conf = *arg;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2676,8 +2692,7 @@ skip_table_create:
 	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
-	(*rsp)->object.table_conf =
-		proto_table->glue.config.table_conf;
+	(*rsp)->object.table_conf = *arg;
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3035,7 +3050,7 @@ skip_table_create:
 	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
-	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
+	(*rsp)->object.table_conf = *arg;
 done:
 	mutex_unlock(&kparser_config_lock);
 

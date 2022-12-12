@@ -490,9 +490,13 @@ static struct kparser_mod_namespaces *g_mod_namespaces[] = {
 /* Function to allocate autogen IDs for hash keys if user did not allocate themselves
  * TODO: free ids
  */
+static int d = 0;
+
 static inline __u16 allocate_id(__u16 id, unsigned long *bv, size_t bvsize)
 {
 	int i;
+
+	return d++;
 
 	if (id != KPARSER_INVALID_ID) {
 		/* try to allocate passed id */

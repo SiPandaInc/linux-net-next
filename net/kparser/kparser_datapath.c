@@ -681,6 +681,13 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 	unsigned int flags;
 	bool currencap;
 
+	_hdr += 14;
+	parse_len -= 14;
+
+	printk("kParserdump:len:%lu\n", parse_len);
+	print_hex_dump_bytes("kParserdump:rcvd_pkt:", DUMP_PREFIX_OFFSET, _hdr,
+			     parse_len);
+
 	if (parser && parser->config.max_encaps > framescnt)
 		framescnt = parser->config.max_encaps;
 
@@ -952,8 +959,12 @@ parser_out:
 	parse_node = (ctrl.ret == KPARSER_OKAY || KPARSER_IS_OK_CODE(ctrl.ret)) ?
 		      rcu_dereference(parser->okay_node) : rcu_dereference(parser->fail_node);
 
-	if (!parse_node)
+	if (!parse_node) {
+		printk("kParserdump:metadata_len:%lu\n", metadata_len);
+		print_hex_dump_bytes("kParserdump:md:", DUMP_PREFIX_OFFSET, _metadata,
+				     metadata_len);
 		return ctrl.ret;
+	}
 
 	/* Run an exit parse node. This is either the okay node or the fail
 	 * node that is set in parser config
@@ -963,6 +974,10 @@ parser_out:
 				      _metadata, _frame, &ctrl, flags);
 	if (ret != KPARSER_OKAY)
 		ctrl.ret = (ctrl.ret == KPARSER_STOP_OKAY) ? ret : ctrl.ret;
+
+	printk("kParserdump:metadata_len:%lu\n", metadata_len);
+	print_hex_dump_bytes("kParserdump:md:", DUMP_PREFIX_OFFSET, _metadata,
+			     metadata_len);
 
 	return ctrl.ret;
 }
