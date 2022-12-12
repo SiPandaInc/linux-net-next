@@ -18,14 +18,7 @@ jobs:
           sudo apt update && sudo apt install -y gawk flex bison openssl libssl-dev libelf-dev libudev-dev libpci-dev libiberty-dev
           make CC=clang tinyconfig
           ./scripts/config --enable NET
-          ./scripts/config --enable NET_INGRESS
-          ./scripts/config --enable NET_EGRESS
-          ./scripts/config --enable INET
-          ./scripts/config --enable NET_SCHED
-          ./scripts/config --enable NET_CLS
-          ./scripts/config --enable NET_CLS_ACT
-          ./scripts/config --enable NET_TC_SKB_EXT
-          ./scripts/config --enable NET_P4_TC
+          ./scripts/config --enable KPARSER
           make CC=clang listnewconfig >> .config
           make CC=clang -j$(nproc) net/sched/
           ./scripts/clang-tools/gen_compile_commands.py
