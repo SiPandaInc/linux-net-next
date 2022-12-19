@@ -22,23 +22,61 @@ def check_and_assert(result):
 		assert result
 		exit (-1)
 
+def construct_path(path_conf, lnn_path):
+	if path_conf == None:
+		return None
+	if 'path-inside-lnn' not in path_conf:
+		return None
+	if 'file' not in path_conf:
+		return None
+	file = None
+	if path_conf['path-inside-lnn'] == "yes":
+		file = lnn_path
+	file = file + path_conf['file']
+	return file
+
 def setup_xdp(xdp_conf, lnn_path):
 	global backup_md_file
 	if xdp_conf['recompile-samples-prog'] != "yes":
-		return
-	md_hdr_file = lnn_path + xdp_conf['md-hdr-file']
-	if os.path.isfile(md_hdr_file):
+		return True
+
+	target_md_hdr_file = construct_path(xdp_conf['target-md-hdr-file-path'], lnn_path)
+	if os.path.isfile(target_md_hdr_file) == False:
+		print ("{} is missing" . format(target_md_hdr_file))
+		return False
+
+	src_md_hdr_file = construct_path(xdp_conf['src-md-hdr-file-path'], lnn_path)
+	if os.path.isfile(src_md_hdr_file) == False:
+		print ("{} is missing" . format(src_md_hdr_file))
+		return False
+
+	if os.path.isfile(target_md_hdr_file):
+
+		if os.path.isfile(src_md_hdr_file):
+			backup_md_file = target_md_hdr_file + '.' + str(time.time())
+			shutil.copyfile(target_md_hdr_file, backup_md_file)
+			shutil.copyfile(src_md_hdr_file, target_md_hdr_file)
+			print ("current md hdr file {} is backed up at {} and"
+				" replaced by {}".
+				format(target_md_hdr_file, backup_md_file,
+					src_md_hdr_file))
+			result = kparser_util.compile_xdp(lnn = lnn_path)
+			check_and_assert(result)
+			return True
+
 		if xdp_conf['C-md-structure'] != "":
-			backup_md_file = md_hdr_file + '.' + str(time.time())
-			shutil.copyfile(md_hdr_file, backup_md_file)
+			backup_md_file = target_md_hdr_file + '.' + str(time.time())
+			shutil.copyfile(target_md_hdr_file, backup_md_file)
 			print ("current md hdr file {} is backed up at {}" .
-				format(md_hdr_file, backup_md_file))
-			with open(md_hdr_file, 'w') as md_file:
+				format(target_md_hdr_file, backup_md_file))
+			with open(target_md_hdr_file, 'w') as md_file:
 				for line in xdp_conf['C-md-structure']:
 					md_file.write(line)
 					md_file.write("\n")
 			result = kparser_util.compile_xdp(lnn = lnn_path)
 			check_and_assert(result)
+
+	return True
 
 def execute_test(test):
 	global tap
@@ -64,11 +102,7 @@ def execute_test(test):
 	else:
 		iproute2_path = test['iproute2-path']
 
-	if test['path-inside-lnn'] == "yes":
-		log_dir = lnn_path + test['log-dir']
-	else:
-		log_dir = test['log-dir']
-
+	log_dir = construct_path(test['log-dir-path'], lnn_path)
 	print ("complete log dir: {}" . format(log_dir))
 
 	cmd = "mkdir -p " + log_dir
@@ -77,16 +111,17 @@ def execute_test(test):
 
 	if 'kParser' in test:
 		if test['kParser']['recompile-kmod'] == "yes":
-			cmd = "cd " + lnn_path + " && make M=net/kparser"
+			cmd = "cd " + lnn_path + " && make M=net/kparser clean && make M=net/kparser -j$(nproc)"
 			result = kparser_util.run_cmd(cmd)
 			check_and_assert(result)
 		if test['kParser']['recompile-cli'] == "yes":
-			cmd = "cd " + iproute2_path + " && make -j16"
+			cmd = "cd " + iproute2_path + " && make clean && make -j$(nproc)"
 			result = kparser_util.run_cmd(cmd)
 			check_and_assert(result)
 
 	if 'xdp-md' in test:
-		setup_xdp(test['xdp-md'], lnn_path)
+		result = setup_xdp(test['xdp-md'], lnn_path)
+		check_and_assert(result)
 
 	# tap = "tap" + str(random.randint(100,1000))
 	tap = "tap201"
@@ -112,10 +147,8 @@ def execute_test(test):
 			lnn_path + "/samples/bpf/xdp_kparser_kern.o", tap)
 	check_and_assert(result)
 
-	if test['kParser']['path-inside-lnn'] == "yes":
-		cli_config = lnn_path + test['kParser']['cli-setup-config-file']
-	else:
-		cli_config = test['kParser']['cli-setup-config-file']
+	cli_config = construct_path(test['kParser']['cli-setup-config-file-path'],
+			lnn_path)
 
 	result = kparser_util.run_cmd("dmesg -c")
 	check_and_assert(result)
@@ -128,10 +161,7 @@ def execute_test(test):
 	# time.sleep(1)
 
 	print("Sending packet..")
-	if test['path-inside-lnn'] == "yes":
-		pcap_file = lnn_path + test['test-pcap-file']
-	else:
-		pcap_file = test['test-pcap-file']
+	pcap_file = construct_path(test['test-pcap-file-path'], lnn_path)
 	pkt = packet_util.read_pcap_file(pcap_file, int(test['pkt-index-in-pcap']))
 	print ("dumping raw packet bytes: ...")
 	original_scappy_pkt = pkt
@@ -140,8 +170,8 @@ def execute_test(test):
 	print (pkt)
 	ret_tx_rx_pkt  = packet_util.test_tap_tx(tap, pkt)
 	# print (ret_tx_rx_pkt)
-	ctx_id = kparser_util.get_ctx_id()
-	md_str = kparser_util.get_metadata_dump(ctx_id)
+	ctx_id = kparser_util.get_ctx_id(lnn_path)
+	md_str = kparser_util.get_metadata_dump(ctx_id, lnn_path)
 	act_mdata_json = json.loads(md_str)
 	# print (act_mdata_json)
 	time.sleep(1)
@@ -176,8 +206,11 @@ def execute_test(test):
 	#print ((pkt[12:1]))
 	for obj in act_mdata_json:
 		if obj == test['expected-md-values']:
-			print ("bpf md matched as expected.")
-			print ("Test {} Passed!". format(test['test-name']))
+			print ("bpf md matched")
+			print ("Test Passed: {}". format(test['test-name']))
+		else:
+			print ("bpf md didn't match")
+			print ("Test Failed: {}". format(test['test-name']))
 			# print (obj)
 			# print (test['expected-md-values'])
 

@@ -131,4 +131,4 @@ ipcmd parser create table/table.ether	\
 # Creates a parser object and specifies starting node
 ipcmd parser create parser name calc_parser id 1	\
 		metametasize 18								\
-		rootnode node.ether
+		rootnode node.ether flags enable-all-debug-logs-with-loopback-hack

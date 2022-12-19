@@ -17,9 +17,9 @@ def compile_xdp(mdata=None, lnn=None):
     if mdata is not None:
         md_str = 'TEST_FLAGS="-DMDATA=' + str(mdata) + '"'  
     if lnn == None:
-    	return run_cmd(" cd ${LINUX_NET_NEXT}/samples/bpf ; make clean; make " + md_str)
+    	return run_cmd(" cd ${LINUX_NET_NEXT}/samples/bpf ; make clean; make -j$(nproc)" + md_str)
     else:
-    	return run_cmd(" cd " + lnn + "/samples/bpf ; make clean; make -j16" + md_str)
+    	return run_cmd(" cd " + lnn + "/samples/bpf ; make clean; make -j$(nproc)" + md_str)
 
 
 def _kparser_cmd_(args, json=True):
@@ -138,9 +138,13 @@ def check_xdp(veth, ntsname=None):
         return False
 
 
-def get_ctx_id():
-    cmd_str = "{}/tools/bpf/bpftool/bpftool map show | grep ctx | \
-                cut -d' ' -f1 ".format(os.getenv("LINUX_NET_NEXT"))
+def get_ctx_id(lnn_path=None):
+    if lnn_path == None:
+        cmd_str = "{}/tools/bpf/bpftool/bpftool map show | grep ctx | \
+                    cut -d' ' -f1 ".format(os.getenv("LINUX_NET_NEXT"))
+    else:
+        cmd_str = "{}/tools/bpf/bpftool/bpftool map show | grep ctx | \
+                    cut -d' ' -f1 ".format(lnn_path)
     result = run_cmd(cmd_str)
     if (result['returncode'] == 0):
         print(" Got MD ID ", result)
@@ -150,9 +154,13 @@ def get_ctx_id():
         return -1
 
 
-def get_metadata_dump(ctx_id):
-    cmd_str = "{}/tools/bpf/bpftool/bpftool map dump id {} ".format(
-                os.getenv("LINUX_NET_NEXT"), ctx_id)
+def get_metadata_dump(ctx_id, lnn_path=None):
+    if lnn_path == None:
+        cmd_str = "{}/tools/bpf/bpftool/bpftool map dump id {} ".format(
+                    os.getenv("LINUX_NET_NEXT"), ctx_id)
+    else:
+        cmd_str = "{}/tools/bpf/bpftool/bpftool map dump id {} ".format(
+                    lnn_path, ctx_id)
     result = run_cmd(cmd_str)
     if (result['returncode'] == 0):
         print(" Metadata ", result['stdout'])

@@ -5,20 +5,34 @@
 		"description" :
 			"verify kParser parsing functionality of a p4 calculator packet",
 		"lnn-path" : "/root/repos/linux-net-next/",
-		"iproute2-path" : "/root/repos/iproute2/",
-		"log-dir" : "/tools/testing/selftests/kparser/pkt-validation-tests/logs/",
-		"kParser" : {
+		"iproute2-path" : "/root/repos/iproute2-next/",
+		"log-dir-path" : {
 			"path-inside-lnn" : "yes",
-			"cli-setup-config-file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc-cli.sh",
-			"recompile-kmod" : "no",
-			"recompile-cli" : "no"
+			"file" : "/tools/testing/selftests/kparser/pkt-validation-tests/logs/"
 		},
-		"path-inside-lnn" : "yes",
-		"test-pcap-file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc.pcap",
+		"kParser" : {
+			"cli-setup-config-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc-cli.sh"
+			},
+			"recompile-kmod" : "yes",
+			"recompile-cli" : "yes"
+		},
+		"test-pcap-file-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc.pcap"
+		},
 		"pkt-index-in-pcap" : 0,
 		"xdp-md": {
-			"md-hdr-file" : "samples/bpf/metadata_def.h",
-			"recompile-samples-prog" : "no",
+			"recompile-samples-prog" : "yes",
+			"target-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "samples/bpf/metadata_def.h"
+			},
+			"src-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc-metadata_def.h"
+			},
 			"C-md-structure" :
 [
 " /* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */",
