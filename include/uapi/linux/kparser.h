@@ -442,7 +442,9 @@ struct kparser_conf_table {
 
 /* *********************** parser *********************** */
 /* Flags for parser configuration */
-#define KPARSER_F_DEBUG		(1 << 0)
+#define KPARSER_F_DEBUG_DATAPATH		(1 << 0)
+#define KPARSER_F_DEBUG_CLI			(1 << 1)
+#define KPARSER_F_DEBUG_LOOPBACK_HDR_REMOVAL_HACK	(1 << 2)
 
 #define KPARSER_MAX_NODES	10
 #define KPARSER_MAX_ENCAPS	1
@@ -450,7 +452,7 @@ struct kparser_conf_table {
 
 /* Configuration for a KPARSER parser
  *
- * flags: Flags KPARSER_F_* in parser.h
+ * flags: Flags KPARSER_F_*
  * max_nodes: Maximum number of nodes to parse
  * max_encaps: Maximum number of encapsulations to parse
  * max_frames: Maximum number of metadata frames
