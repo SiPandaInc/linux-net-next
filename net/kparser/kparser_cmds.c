@@ -490,13 +490,10 @@ static struct kparser_mod_namespaces *g_mod_namespaces[] = {
 /* Function to allocate autogen IDs for hash keys if user did not allocate themselves
  * TODO: free ids
  */
-static int d = 0;
-
 static inline __u16 allocate_id(__u16 id, unsigned long *bv, size_t bvsize)
 {
 	int i;
 
-	return d++;
 
 	if (id != KPARSER_INVALID_ID) {
 		/* try to allocate passed id */
@@ -511,7 +508,7 @@ static inline __u16 allocate_id(__u16 id, unsigned long *bv, size_t bvsize)
 	for (i = 0; i < bvsize; i++) {
 		/* avoid bit vectors which are already full */
 		if (bv[i]) {
-			id = __builtin_ffs(bv[i]);
+			id = __builtin_ffsl(bv[i]);
 			if (id) {
 				id--;
 				id += (i * BITS_PER_TYPE(unsigned long));
@@ -713,10 +710,11 @@ int kparser_init(void)
 		pr_debug("{%s:%d}:bv_len:%lu, total_bytes:%lu, range:[%d:%d]\n",
 			 __func__, __LINE__,
 			 g_mod_namespaces[i]->bv_len,
-			 sizeof(__u32) * g_mod_namespaces[i]->bv_len,
+			 sizeof(unsigned long) * g_mod_namespaces[i]->bv_len,
 			 KPARSER_KMOD_ID_MAX, KPARSER_KMOD_ID_MIN);
 
-		g_mod_namespaces[i]->bv = kcalloc(g_mod_namespaces[i]->bv_len, sizeof(__u32),
+		g_mod_namespaces[i]->bv = kcalloc(g_mod_namespaces[i]->bv_len,
+						  sizeof(unsigned long),
 						  GFP_KERNEL);
 
 		if (!g_mod_namespaces[i]->bv) {
@@ -724,7 +722,8 @@ int kparser_init(void)
 			goto handle_error;
 		}
 
-		memset(g_mod_namespaces[i]->bv, 0xff, g_mod_namespaces[i]->bv_len * sizeof(__u32));
+		memset(g_mod_namespaces[i]->bv, 0xff,
+		       g_mod_namespaces[i]->bv_len * sizeof(unsigned long));
 	}
 
 	memset(kparser_fast_lookup_array, 0, sizeof(kparser_fast_lookup_array));

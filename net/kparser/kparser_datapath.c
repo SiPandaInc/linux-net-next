@@ -626,6 +626,8 @@ static int __kparser_run_exit_node(const struct kparser_parser *parser,
 	const struct kparser_metadata_table *metadata_table;
 	int ret;
 
+	if (flags & KPARSER_F_DEBUG_DATAPATH)
+		pr_alert("{%s:%d}: exit node:%s\n", __func__, __LINE__, parse_node->name);
 	/* Run an exit parse node. This is an okay_node, fail_node, or
 	 * atencap_node
 	 */
@@ -744,7 +746,8 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 	 * unknown protocol result in table lookup for next node.
 	 */
 	do {
-		pr_debug("{%s:%d}: Parsing node:%s\n", __func__, __LINE__, parse_node->name);
+		if (flags & KPARSER_F_DEBUG_DATAPATH)
+			pr_alert("{%s:%d}: Parsing node:%s\n", __func__, __LINE__, parse_node->name);
 		currencap = false;
 		proto_node = &parse_node->proto_node;
 		hdr_len = proto_node->min_len;

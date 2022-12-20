@@ -1008,7 +1008,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	pr_alert("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -1196,6 +1196,9 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		objects[i].namespace_id = kmdl->md_configs[i].namespace_id;
 		objects[i].conf_keys_bv = kmdl->md_configs[i].conf_keys_bv;
 		objects[i].md_conf = kmdl->md_configs[i].md_conf;
+		pr_debug("Key: {ID:%u Name:%s}\n",
+			 objects[i].md_conf.key.id, objects[i].md_conf.key.name);
+
 	}
 
 	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
