@@ -4,8 +4,8 @@
 		"test-name" : "p4-calc-pkt-verify",
 		"description" :
 			"verify kParser parsing functionality of a p4 calculator packet",
-		"lnn-path" : "/root/repos/linux-net-next/",
-		"iproute2-path" : "/root/repos/iproute2-next/",
+		"lnn-path" : "/home/testusr/wspace/linux-net-next/",
+		"iproute2-path" : "/home/testusr/wspace/iproute2-next/",
 		"log-dir-path" : {
 			"path-inside-lnn" : "yes",
 			"file" : "/tools/testing/selftests/kparser/pkt-validation-tests/logs/"
@@ -15,8 +15,8 @@
 				"path-inside-lnn" : "yes",
 				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc-cli.sh"
 			},
-			"recompile-kmod" : "yes",
-			"recompile-cli" : "yes"
+			"recompile-kmod" : "no",
+			"recompile-cli" : "no"
 		},
 		"test-pcap-file-path" : {
 			"path-inside-lnn" : "yes",
@@ -24,7 +24,7 @@
 		},
 		"pkt-index-in-pcap" : 0,
 		"xdp-md": {
-			"recompile-samples-prog" : "yes",
+			"recompile-samples-prog" : "no",
 			"target-md-hdr-file-path" : {
 				"path-inside-lnn" : "yes",
 				"file" : "samples/bpf/metadata_def.h"
@@ -68,15 +68,15 @@
 			"key": 1,
 			"value": {
 				"frames": {
-					"calc_dstAddr": 112,
-					"calc_srcAddr": 160,
-					"offset2": 224,
-					"offset3": 232,
-					"offset4": 240,
-					"offset5": 248,
-					"offset6": 256,
-					"offset7": 288,
-					"offset8": 320
+					"calc_dstAddr": 0,
+					"calc_srcAddr": 48,
+					"offset2": 112,
+					"offset3": 120,
+					"offset4": 128,
+					"offset5": 136,
+					"offset6": 144,
+					"offset7": 176,
+					"offset8": 208
 				}
 			}
 		}

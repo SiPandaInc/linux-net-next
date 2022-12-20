@@ -165,9 +165,6 @@ def execute_test(test):
 	pkt = packet_util.read_pcap_file(pcap_file, int(test['pkt-index-in-pcap']))
 	print ("dumping raw packet bytes: ...")
 	original_scappy_pkt = pkt
-	print (bytes_hex((pkt)))
-	pkt = bytes(pkt)
-	print (pkt)
 	ret_tx_rx_pkt  = packet_util.test_tap_tx(tap, pkt)
 	# print (ret_tx_rx_pkt)
 	ctx_id = kparser_util.get_ctx_id(lnn_path)
@@ -194,11 +191,13 @@ def execute_test(test):
 		buf = buf.split(".")[0]
 		buf = buf.replace(" ", "")
 	raw_pkt_frm_dmsg = bytes.fromhex(buf)
-	if pkt != raw_pkt_frm_dmsg:
+	if bytes(pkt) != raw_pkt_frm_dmsg:
 		print ("i/o packets didn't match. Rerun this test.\n"
-			"input:{}\noutput:{}".
-			# format(bytes(pkt), raw_pkt_frm_dmsg))
-			format(bytes_hex(pkt), buf))
+			"input:{}\noutpt:{}".
+			 format(bytes(pkt), raw_pkt_frm_dmsg))
+		print (" Length input:{}, output{} \n".
+            format(len(pkt), len(raw_pkt_frm_dmsg)))
+			#format(bytes_hex(pkt), buf))
 	#print (type(pkt))
 	#print (type(raw_pkt_frm_dmsg))
 	#pkt_array = bytearray(pkt)
@@ -210,9 +209,9 @@ def execute_test(test):
 			print ("Test Passed: {}". format(test['test-name']))
 		else:
 			print ("bpf md didn't match")
-			print ("Test Failed: {}". format(test['test-name']))
-			# print (obj)
-			# print (test['expected-md-values'])
+			print ("Test Failed: {}".format(test['test-name']))
+			print ("Actual MD : {} \nExpected MD : {} \n".
+                    format(obj, test['expected-md-values']))
 
 parser = ArgumentParser()
 parser.add_argument("-f", "--config-file", dest="filename",
