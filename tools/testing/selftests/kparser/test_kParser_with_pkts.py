@@ -9,6 +9,8 @@ import time
 
 global backup_md_file
 global tap
+global g_lnn_path
+global g_iproute2_path
  
 def check_and_assert(result):
 	if isinstance(result, bool):
@@ -83,17 +85,25 @@ def execute_test(test):
 	print ("INFO: Starting test: {}, desc: \"{}\"" .
 		format(test['test-name'], test['description']))
 	lnn_path = ""
-	if 'lnn-path' not in test:
+	if g_lnn_path != None:
+		lnn_path = g_lnn_path
+	elif 'lnn-path' not in test:
 		if os.getenv("LINUX_NET_NEXT") is None:
 			print("LINUX_NET_NEXT not set ")
-			exit(-1)
+			return False
 		else:
 			lnn_path = os.getenv("LINUX_NET_NEXT")
 	else:
 		lnn_path = test['lnn-path']
 
+	if not os.path.isdir(lnn_path):
+		print ("lnn_path: {} is not valid" . format(lnn_path))
+		return False
+
 	iproute2_path = ""
-	if 'iproute2-path' not in test:
+	if g_iproute2_path != None:
+		iproute2_path = g_iproute2_path
+	elif 'iproute2-path' not in test:
 		if os.getenv("IPROUTE2_PATH") is None:
 			print("IPROUTE2_PATH not set ")
 			exit(-1)
@@ -101,6 +111,10 @@ def execute_test(test):
 			iproute2_path = os.getenv("IPROUTE2_PATH")
 	else:
 		iproute2_path = test['iproute2-path']
+
+	if not os.path.isdir(iproute2_path):
+		print ("iproute2_path: {} is not valid" . format(iproute2_path))
+		return False
 
 	log_dir = construct_path(test['log-dir-path'], lnn_path)
 	print ("complete log dir: {}" . format(log_dir))
@@ -175,34 +189,41 @@ def execute_test(test):
 	cmd = "dmesg > " + log_dir + "/dmesg.out"
 	result = kparser_util.run_cmd(cmd)
 	check_and_assert(result)
-	# return
 	cmd = "grep kParserdump:len: " + log_dir + "/dmesg.out"
 	result = kparser_util.run_cmd(cmd)
 	out = result['stdout']
-	pkt_len = out.split(':')
-	# print ("pkt len: {}" . format(pkt_len[2]))
-	cmd = "grep kParserdump:rcvd_pkt: " + log_dir + "/dmesg.out"
-	result = kparser_util.run_cmd(cmd)
-	out = result['stdout'].splitlines(True)
-	buf = ""
-	for line in out:
-		data = line.split(':')
-		buf = buf + data[3]
-		buf = buf.split(".")[0]
-		buf = buf.replace(" ", "")
-	raw_pkt_frm_dmsg = bytes.fromhex(buf)
-	if bytes(pkt) != raw_pkt_frm_dmsg:
-		print ("i/o packets didn't match. Rerun this test.\n"
-			"input:{}\noutpt:{}".
-			 format(bytes(pkt), raw_pkt_frm_dmsg))
-		print (" Length input:{}, output{} \n".
-            format(len(pkt), len(raw_pkt_frm_dmsg)))
-			#format(bytes_hex(pkt), buf))
-	#print (type(pkt))
-	#print (type(raw_pkt_frm_dmsg))
-	#pkt_array = bytearray(pkt)
-	#print (bytes(pkt_array[13]))
-	#print ((pkt[12:1]))
+	if out != "":
+		pkt_len_val = out.split(':')
+		pkt_len = int(pkt_len_val[2])
+		# print ("pkt len: {}" . format(pkt_len[2]))
+		cmd = "grep kParserdump:rcvd_pkt: " + log_dir + "/dmesg.out"
+		result = kparser_util.run_cmd(cmd)
+		out = result['stdout'].splitlines(True)
+		buf = ""
+		for line in out:
+			data = line.split(':')
+			tbuf = data[3].split(" ")
+			for x in range(0, min(16, pkt_len)+1):
+				buf = buf + tbuf[x]
+			pkt_len = pkt_len - x
+		raw_pkt_frm_dmsg = bytes.fromhex(buf)
+		if bytes(pkt) != raw_pkt_frm_dmsg:
+			print ("WARN: I/O packets didn't match, this test is invalid.\n"
+				"input:{}\noutpt:{}".
+				format(bytes(pkt), raw_pkt_frm_dmsg))
+			print ("Length input:{}, output{} \n".
+					format(len(pkt), len(raw_pkt_frm_dmsg)))
+			return False
+		print("I/O packets matched!")
+		#format(bytes_hex(pkt), buf))
+		#print (type(pkt))
+		#print (type(raw_pkt_frm_dmsg))
+		#pkt_array = bytearray(pkt)
+		#print (bytes(pkt_array[13]))
+		#print ((pkt[12:1]))
+	else:
+		print("kParser debug dmesg logs missing.")
+		print("packet content validtaion skipped.")
 	for obj in act_mdata_json:
 		if obj == test['expected-md-values']:
 			print ("bpf md matched")
@@ -211,19 +232,29 @@ def execute_test(test):
 			print ("bpf md didn't match")
 			print ("Test Failed: {}".format(test['test-name']))
 			print ("Actual MD : {} \nExpected MD : {} \n".
-                    format(obj, test['expected-md-values']))
+				format(obj, test['expected-md-values']))
+			return False
+	return True
 
-parser = ArgumentParser()
+parser = ArgumentParser(description='Run kParser static packet parsing validator tests')
 parser.add_argument("-f", "--config-file", dest="filename",
 	help="test config JSON FILE", metavar="FILE")
+parser.add_argument("-l", "--lnn-path", dest="lnn_path",
+	help="linux net next repo path")
+parser.add_argument("-i", "--ip-path", dest="ip_path",
+	help="iproute2 next repo path")
+
 args = parser.parse_args()
+g_lnn_path = args.lnn_path
+g_iproute2_path = args.ip_path
 
 with open(args.filename) as f:
 	conf = json.load(f)
 
 for test in conf['tests']:
 	global tap
-	execute_test(test)
+	result = execute_test(test)
+	check_and_assert(result)
 	result = kparser_util.remove_kparser_module()
 	result = kparser_util.detach_xdp_module(tap)
 	result = kparser_util.run_cmd(

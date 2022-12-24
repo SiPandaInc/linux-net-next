@@ -1,0 +1,54 @@
+{
+	"tests": [
+	{
+		"test-name" : "5-tuple-simple-demo",
+		"description" :
+			"simple 5tuple demo parser",
+		"lnn-path" : "/root/repos/linux-net-next/",
+		"iproute2-path" : "/root/repos/iproute2-next/",
+		"log-dir-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/mojatatu/5-tuple-simple-demo/logs/"
+		},
+		"kParser" : {
+			"cli-setup-config-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/mojatatu/5-tuple-simple-demo/5tuple-simple.sh"
+			},
+			"recompile-kmod" : "no",
+			"recompile-cli" : "no"
+		},
+		"test-pcap-file-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/data/pcaps/tcp_ipv4.pcap"
+		},
+		"pkt-index-in-pcap" : 0,
+		"xdp-md": {
+			"recompile-samples-prog" : "yes",
+			"target-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "samples/bpf/metadata_def.h"
+			},
+			"src-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/mojatatu/5-tuple-simple-demo/metadata_def.h"
+			},
+			"C-md-structure" : []
+			},
+		"expected-md-values" : {
+			"key": 1,
+			"value": {
+				"frames": {
+					"ipv4_ttl_offset": 176,
+					"ipv4_ipproto_offset": 184,
+					"ipv4_src_addr_offset": 208,
+					"ipv4_dst_addr_offset": 240,
+					"tcp_src_port_offset": 272,
+					"tcp_dst_port_offset": 288,
+					"is_tcp_proto_present": 1
+				}
+			}
+		}
+	}
+	]
+}

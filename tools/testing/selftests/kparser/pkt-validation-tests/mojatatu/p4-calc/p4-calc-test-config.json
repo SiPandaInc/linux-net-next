@@ -4,34 +4,34 @@
 		"test-name" : "p4-calc-pkt-verify",
 		"description" :
 			"verify kParser parsing functionality of a p4 calculator packet",
-		"lnn-path" : "/home/testusr/wspace/linux-net-next/",
-		"iproute2-path" : "/home/testusr/wspace/iproute2-next/",
+		"lnn-path" : "/root/repos/linux-net-next/",
+		"iproute2-path" : "/root/repos/iproute2-next/",
 		"log-dir-path" : {
 			"path-inside-lnn" : "yes",
-			"file" : "/tools/testing/selftests/kparser/pkt-validation-tests/logs/"
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/logs/"
 		},
 		"kParser" : {
 			"cli-setup-config-file-path" : {
 				"path-inside-lnn" : "yes",
-				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc-cli.sh"
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/mojatatu/p4-calc/p4-calc-cli.sh"
 			},
 			"recompile-kmod" : "no",
 			"recompile-cli" : "no"
 		},
 		"test-pcap-file-path" : {
 			"path-inside-lnn" : "yes",
-			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc.pcap"
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/mojatatu/p4-calc/p4-calc.pcap"
 		},
 		"pkt-index-in-pcap" : 0,
 		"xdp-md": {
-			"recompile-samples-prog" : "no",
+			"recompile-samples-prog" : "yes",
 			"target-md-hdr-file-path" : {
 				"path-inside-lnn" : "yes",
 				"file" : "samples/bpf/metadata_def.h"
 			},
 			"src-md-hdr-file-path" : {
 				"path-inside-lnn" : "yes",
-				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/p4-calc-metadata_def.h"
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/mojatatu/p4-calc/p4-calc-metadata_def.h"
 			},
 			"C-md-structure" :
 [

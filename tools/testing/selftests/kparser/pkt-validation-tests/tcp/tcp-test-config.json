@@ -1,0 +1,61 @@
+{
+	"tests": [
+	{
+		"test-name" : "tcp-options-parsing",
+		"description" :
+			"verify kParser parsing functionality of TCP options",
+		"lnn-path" : "/root/repos/linux-net-next/",
+		"iproute2-path" : "/root/repos/iproute2-next/",
+		"log-dir-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/tcp/logs/"
+		},
+		"kParser" : {
+			"cli-setup-config-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/tcp/cli-1.sh"
+			},
+			"recompile-kmod" : "no",
+			"recompile-cli" : "no"
+		},
+		"test-pcap-file-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/data/pcaps/tcp_ipv4.pcap"
+		},
+		"pkt-index-in-pcap" : 0,
+		"xdp-md": {
+			"recompile-samples-prog" : "yes",
+			"target-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "samples/bpf/metadata_def.h"
+			},
+			"src-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/tcp/tcp-metadata_def.h"
+			},
+			"C-md-structure" : []
+			},
+		"expected-md-values" : {
+			"key": 1,
+			"value": {
+				    "metametadata": {
+					"okay_numencap": 0,
+					"okay_numnodes": 3,
+					"fail_numencap": 65535,
+					"fail_numnodes": 65535
+				    },
+				    "frames": {
+					"mac_addrs": [82,84,0,18,53,2,8,0,39,62,172,49
+					],
+					"ethtype": 8,
+					"src_ip_addr": 167772687,
+					"dst_ip_addr": 3221237563,
+					"ip_protocol": 6,
+					"src_port": 44188,
+					"dst_port": 43
+				    }
+				}
+		}
+	}
+	]
+}
