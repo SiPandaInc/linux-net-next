@@ -18,7 +18,6 @@
 #define KPARSER_GENL_VERSION		0x1
 
 /* *********************** NETLINK CLI *********************** */
-#define KPARSER_ERR_STR_MAX_LEN		256
 /* *********************** Namespaces/objects *********************** */
 enum kparser_global_namespace_ids {
 	KPARSER_NS_INVALID,
@@ -481,15 +480,12 @@ struct kparser_conf_parser {
 
 /* *********************** CLI config interface *********************** */
 
-/* TODO: remove macros and comment and use the values directly */
 /* NOTE: we can't use BITS_PER_TYPE from kernel header here and had to redefine BITS_IN_U32
  * since this is shared with user space code.
  */
-#define BITS_IN_BYTE	8
-#define BITS_IN_U32	(sizeof(__u32) * BITS_IN_BYTE)
-
 #define KPARSER_CONFIG_MAX_KEYS			128
-#define KPARSER_CONFIG_MAX_KEYS_BV_LEN ((KPARSER_CONFIG_MAX_KEYS / BITS_IN_U32) + 1)
+#define KPARSER_CONFIG_MAX_KEYS_BV_LEN ((KPARSER_CONFIG_MAX_KEYS /\
+					 (sizeof(__u32) * 8)) + 1)
 struct kparser_config_set_keys_bv {
 	__u32 ns_keys_bvs[KPARSER_CONFIG_MAX_KEYS_BV_LEN];
 };
@@ -543,7 +539,6 @@ struct kparser_conf_cmd {
 
 struct kparser_cmd_rsp_hdr {
 	int op_ret_code;
-	__u8 err_str_buf[KPARSER_ERR_STR_MAX_LEN];
 	struct kparser_hkey key;
 	struct kparser_conf_cmd object;
 	size_t objects_len;

@@ -9,6 +9,7 @@
 #include <linux/slab.h>
 #include <linux/sort.h>
 #include <net/kparser.h>
+#include <linux/netlink.h>
 
 #include "kparser.h"
 
@@ -30,11 +31,13 @@ kparser_cmd_create_pre_process(const char *op,
 			       const struct kparser_conf_cmd *conf,
 			       const struct kparser_hkey *argkey, struct kparser_hkey *newkey,
 			       void **kobj, size_t kobjsize, struct kparser_cmd_rsp_hdr *rsp,
-			       size_t glueoffset)
+			       size_t glueoffset,
+			       void *extack, int *err)
 {
 	struct kparser_glue *glue;
 
-	if (kparser_conf_key_manager(conf->namespace_id, argkey, newkey, rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, argkey, newkey, rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		return false;
 	}
@@ -46,20 +49,18 @@ kparser_cmd_create_pre_process(const char *op,
 
 	if (kparser_namespace_lookup(conf->namespace_id, newkey)) {
 		rsp->op_ret_code = EEXIST;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s:Duplicate object HKey:{%s:%u}",
-			 op, newkey->name, newkey->id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Duplicate object HKey:{%s:%u}",
+				       op, newkey->name, newkey->id);
 		return false;
 	}
 
 	*kobj = kzalloc(kobjsize, GFP_KERNEL);
 	if (!(*kobj)) {
 		rsp->op_ret_code = ENOMEM;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s:Object allocation failed for size:%lu",
-			 op, kobjsize);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object allocation failed for size:%lu",
+				       op, kobjsize);
 		return false;
 	}
 
@@ -69,16 +70,15 @@ kparser_cmd_create_pre_process(const char *op,
 	rsp->op_ret_code = kparser_namespace_insert(conf->namespace_id,
 						    &glue->ht_node_id, &glue->ht_node_name);
 	if (rsp->op_ret_code) {
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s:Htbl insert err:%d", op, rsp->op_ret_code);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Htbl insert err:%d",
+				       op, rsp->op_ret_code);
 		return false;
 	}
 
 	glue->config = *conf;
 	kref_init(&glue->refcount);
 
-	snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf), "%s:Success", op);
 	rsp->key = *newkey;
 	rsp->object.conf_keys_bv = conf->conf_keys_bv;
 	rsp->object = *conf;
@@ -94,7 +94,8 @@ kparser_cmd_create_pre_process(const char *op,
 int kparser_create_cond_exprs(const struct kparser_conf_cmd *conf,
 			      size_t conf_len,
 			      struct kparser_cmd_rsp_hdr **rsp,
-			      size_t *rsp_len, const char *op)
+			      size_t *rsp_len, const char *op,
+			      void *extack, int *err)
 {
 	struct kparser_glue_condexpr_expr *kobj = NULL;
 	const struct kparser_conf_condexpr *arg;
@@ -108,12 +109,13 @@ int kparser_create_cond_exprs(const struct kparser_conf_cmd *conf,
 
 	if (!kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
 					    (void **)&kobj, sizeof(*kobj), *rsp,
-					    offsetof(struct kparser_glue_condexpr_expr, glue)))
+					    offsetof(struct
+						     kparser_glue_condexpr_expr,
+						     glue), extack, err))
 		goto done;
 
 	kobj->expr = arg->config;
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "OK");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.cond_conf = kobj->glue.config.cond_conf;
@@ -132,7 +134,9 @@ done:
 /* read handler for object conditionals */
 int kparser_read_cond_exprs(const struct kparser_hkey *key,
 			    struct kparser_cmd_rsp_hdr **rsp,
-			    size_t *rsp_len, __u8 recursive_read, const char *op)
+			    size_t *rsp_len, __u8 recursive_read,
+			    const char *op,
+			    void *extack, int *err)
 {
 	struct kparser_glue_condexpr_expr *kobj;
 
@@ -145,12 +149,12 @@ int kparser_read_cond_exprs(const struct kparser_hkey *key,
 	kobj = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS, key);
 	if (!kobj) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key not found:{%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kobj->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
@@ -165,7 +169,9 @@ done:
 /* create handler for object conditionals table entry */
 static bool kparser_create_cond_table_ent(const struct kparser_conf_table *arg,
 					  struct kparser_glue_condexpr_table **proto_table,
-					  struct kparser_cmd_rsp_hdr *rsp)
+					  struct kparser_cmd_rsp_hdr *rsp,
+					  const char *op,
+					  void *extack, int *err)
 {
 	const struct kparser_glue_condexpr_expr *kcondent;
 	void *realloced_mem;
@@ -177,19 +183,18 @@ static bool kparser_create_cond_table_ent(const struct kparser_conf_table *arg,
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLE, &arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key not found:{%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		return false;
 	}
 
 	kcondent = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS, &arg->elem_key);
 	if (!kcondent) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: Object key:{%s:%u} not found",
-			 __func__, arg->elem_key.name, arg->elem_key.id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key not found:{%s:%u}",
+				       op, arg->elem_key.name, arg->elem_key.id);
 		return false;
 	}
 
@@ -200,11 +205,10 @@ static bool kparser_create_cond_table_ent(const struct kparser_conf_table *arg,
 				 GFP_KERNEL | ___GFP_ZERO);
 	if (!realloced_mem) {
 		rsp->op_ret_code = ENOMEM;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: krealloc() err, ents:%d, size:%lu",
-			 __func__, (*proto_table)->table.num_ents,
-			 sizeof(struct kparser_condexpr_expr));
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:krealloc() err, ents:%d, size:%lu",
+				       op, (*proto_table)->table.num_ents,
+				       sizeof(struct kparser_condexpr_expr));
 		return false;
 	}
 	rcu_assign_pointer((*proto_table)->table.entries, realloced_mem);
@@ -219,7 +223,8 @@ static bool kparser_create_cond_table_ent(const struct kparser_conf_table *arg,
 int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 			      size_t conf_len,
 			      struct kparser_cmd_rsp_hdr **rsp,
-			      size_t *rsp_len, const char *op)
+			      size_t *rsp_len, const char *op,
+			      void *extack, int *err)
 {
 	struct kparser_glue_condexpr_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -233,14 +238,17 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 
 	/* create a table entry */
 	if (arg->add_entry) {
-		if (kparser_create_cond_table_ent(arg, &proto_table, *rsp) == false)
+		if (kparser_create_cond_table_ent(arg, &proto_table, *rsp, op,
+						  extack, err) == false)
 			goto done;
 		goto skip_table_create;
 	}
 
 	if (!kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
 					    (void **)&proto_table, sizeof(*proto_table), *rsp,
-					    offsetof(struct kparser_glue_condexpr_table, glue)))
+					    offsetof(struct
+						     kparser_glue_condexpr_table,
+						     glue), extack, err))
 		goto done;
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
@@ -252,7 +260,6 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 	proto_table->table.type = arg->optional_value2;
 
 skip_table_create:
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "OK");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf = *arg;
@@ -273,7 +280,9 @@ done:
 /* read handler for object conditionals table */
 int kparser_read_cond_table(const struct kparser_hkey *key,
 			    struct kparser_cmd_rsp_hdr **rsp,
-			    size_t *rsp_len, __u8 recursive_read, const char *op)
+			    size_t *rsp_len, __u8 recursive_read,
+			    const char *op,
+			    void *extack, int *err)
 {
 	const struct kparser_glue_condexpr_table *proto_table;
 	const struct kparser_glue_condexpr_expr *kcondent;
@@ -290,8 +299,9 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 	proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLE, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key not found, key:{%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -323,8 +333,6 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 					struct kparser_glue_condexpr_expr, expr);
 		objects[i].table_conf.elem_key = kcondent->glue.key;
 	}
-
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -335,7 +343,9 @@ done:
 /* create handler for object conditionals table's list entry */
 static bool kparser_create_cond_tables_ent(const struct kparser_conf_table *arg,
 					   struct kparser_glue_condexpr_tables **proto_table,
-					   struct kparser_cmd_rsp_hdr *rsp)
+					   struct kparser_cmd_rsp_hdr *rsp,
+					   const char *op,
+					   void *extack, int *err)
 {
 	const struct kparser_glue_condexpr_table *kcondent;
 	void *realloced_mem;
@@ -347,17 +357,18 @@ static bool kparser_create_cond_tables_ent(const struct kparser_conf_table *arg,
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLES, &arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key not found, key:{%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		return false;
 	}
 
 	kcondent = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLE, &arg->elem_key);
 	if (!kcondent) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-			 "%s: Object key:{%s:%u} not found",
-			 __func__, arg->elem_key.name, arg->elem_key.id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key not found, key:{%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		return false;
 	}
 
@@ -366,10 +377,10 @@ static bool kparser_create_cond_tables_ent(const struct kparser_conf_table *arg,
 				 sizeof(struct kparser_condexpr_table *), GFP_KERNEL | ___GFP_ZERO);
 	if (!realloced_mem) {
 		rsp->op_ret_code = ENOMEM;
-		snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-			 "%s: krealloc() err, ents:%d, size:%lu",
-			 __func__, (*proto_table)->table.num_ents,
-			 sizeof(struct kparser_condexpr_table *));
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: krealloc() err, ents:%d, size:%lu",
+				       op, (*proto_table)->table.num_ents,
+				       sizeof(struct kparser_condexpr_table *));
 		return false;
 	}
 	rcu_assign_pointer((*proto_table)->table.entries, realloced_mem);
@@ -384,7 +395,8 @@ static bool kparser_create_cond_tables_ent(const struct kparser_conf_table *arg,
 int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 			       size_t conf_len,
 			       struct kparser_cmd_rsp_hdr **rsp,
-			       size_t *rsp_len, const char *op)
+			       size_t *rsp_len, const char *op,
+			       void *extack, int *err)
 {
 	struct kparser_glue_condexpr_tables *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -398,14 +410,17 @@ int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 
 	/* create a table entry */
 	if (arg->add_entry) {
-		if (kparser_create_cond_tables_ent(arg, &proto_table, *rsp) == false)
+		if (kparser_create_cond_tables_ent(arg, &proto_table, *rsp, op,
+						   extack, err) == false)
 			goto done;
 		goto skip_table_create;
 	}
 
 	if (!kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
 					    (void **)&proto_table, sizeof(*proto_table), *rsp,
-					    offsetof(struct kparser_glue_condexpr_tables, glue)))
+					    offsetof(struct
+						     kparser_glue_condexpr_tables,
+						     glue), extack, err))
 		goto done;
 
 	proto_table->glue.config.namespace_id = conf->namespace_id;
@@ -415,7 +430,6 @@ int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 	kref_init(&proto_table->glue.refcount);
 
 skip_table_create:
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf = *arg;
@@ -436,7 +450,10 @@ done:
 /* read handler for object conditionals table's list */
 int kparser_read_cond_tables(const struct kparser_hkey *key,
 			     struct kparser_cmd_rsp_hdr **rsp,
-			     size_t *rsp_len, __u8 recursive_read, const char *op)
+			     size_t *rsp_len, __u8 recursive_read,
+			     const char *op,
+			     void *extack, int *err)
+
 {
 	const struct kparser_glue_condexpr_tables *proto_table;
 	const struct kparser_glue_condexpr_table *kcondent;
@@ -452,8 +469,9 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 	proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLES, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object key not found, key:{%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -484,7 +502,6 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 		objects[i].table_conf.elem_key = kcondent->glue.key;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -496,7 +513,8 @@ done:
 int kparser_create_counter(const struct kparser_conf_cmd *conf,
 			   size_t conf_len,
 			   struct kparser_cmd_rsp_hdr **rsp,
-			   size_t *rsp_len, const char *op)
+			   size_t *rsp_len, const char *op,
+			   void *extack, int *err)
 {
 	struct kparser_glue_counter *kcntr = NULL;
 	const struct kparser_conf_cntr *arg;
@@ -511,20 +529,22 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 
 	if (!arg->conf.valid_entry) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: counter entry is not valid", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: counter entry is not valid", op);
 		goto done;
 	}
 
 	if (cntrs_conf_idx >= KPARSER_CNTR_NUM_CNTRS) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: counter index %d can not be >= %d",
-			 __func__, cntrs_conf_idx, KPARSER_CNTR_NUM_CNTRS);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: counter index %d can not be >= %d",
+				       op, cntrs_conf_idx,
+				       KPARSER_CNTR_NUM_CNTRS);
 		goto done;
 	}
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("here:%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -533,16 +553,18 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object key {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
 	kcntr = kzalloc(sizeof(*kcntr), GFP_KERNEL);
 	if (!kcntr) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*kcntr));
 		goto done;
 	}
 
@@ -552,8 +574,9 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 				      &kcntr->glue.ht_node_id, &kcntr->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err:%d",
+				       op, rc);
 		goto done;
 	}
 
@@ -570,7 +593,6 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 
 	cntrs_conf_idx++;
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.cntr_conf = kcntr->glue.config.cntr_conf;
@@ -589,7 +611,9 @@ done:
 /* read handler for object counter */
 int kparser_read_counter(const struct kparser_hkey *key,
 			 struct kparser_cmd_rsp_hdr **rsp,
-			 size_t *rsp_len, __u8 recursive_read, const char *op)
+			 size_t *rsp_len, __u8 recursive_read,
+			 const char *op,
+			 void *extack, int *err)
 {
 	struct kparser_glue_counter *kcntr;
 
@@ -601,12 +625,12 @@ int kparser_read_counter(const struct kparser_hkey *key,
 	kcntr = kparser_namespace_lookup(KPARSER_NS_COUNTER, key);
 	if (!kcntr) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key not found, key:{%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kcntr->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kcntr->glue.config.conf_keys_bv;
@@ -622,7 +646,8 @@ done:
 int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 				 size_t conf_len,
 				 struct kparser_cmd_rsp_hdr **rsp,
-				 size_t *rsp_len, const char *op)
+				 size_t *rsp_len, const char *op,
+				 void *extack, int *err)
 {
 	struct kparser_glue_counter_table *table = NULL;
 	const struct kparser_conf_table *arg;
@@ -643,37 +668,43 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 		table = kparser_namespace_lookup(conf->namespace_id, &arg->key);
 		if (!table) {
 			(*rsp)->op_ret_code = ENOENT;
-			snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-				 "%s: table key not found", __func__);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s:Object key not found, key:{%s:%u}",
+					       op, arg->key.name, arg->key.id);
 			goto done;
 		}
 		if (table->elems_cnt >= KPARSER_CNTR_NUM_CNTRS) {
 			(*rsp)->op_ret_code = EINVAL;
-			snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-				 "%s: table full:%u", __func__, table->elems_cnt);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s:table full, elem cnt:%u",
+					       op, table->elems_cnt);
 			goto done;
 		}
 		kcntr = kparser_namespace_lookup(KPARSER_NS_COUNTER,
 						 &arg->elem_key);
 		if (!kcntr) {
 			(*rsp)->op_ret_code = ENOENT;
-			snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-				 "%s: Object key not found", __func__);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s:Object key not found, key:{%s:%u}",
+					       op, arg->elem_key.name,
+					       arg->elem_key.id);
 			goto done;
 		}
 		table->k_cntrs[table->elems_cnt++] = *kcntr;
 		goto skip_table_create;
 	}
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("here:%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:Object key duplicate, key:{%s:%u}",
+				       op, key.name, key.id);
 		goto done;
 	}
 
@@ -681,8 +712,9 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 	table = kzalloc(sizeof(*table), GFP_KERNEL);
 	if (!table) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*table));
 		goto done;
 	}
 
@@ -692,8 +724,9 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 				      &table->glue.ht_node_id, &table->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
@@ -704,7 +737,6 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 	kref_init(&table->glue.refcount);
 
 skip_table_create:
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf = table->glue.config.table_conf;
@@ -724,7 +756,9 @@ done:
 /* read handler for object counter table */
 int kparser_read_counter_table(const struct kparser_hkey *key,
 			       struct kparser_cmd_rsp_hdr **rsp,
-			       size_t *rsp_len, __u8 recursive_read, const char *op)
+			       size_t *rsp_len, __u8 recursive_read,
+			       const char *op,
+			       void *extack, int *err)
 {
 	const struct kparser_glue_counter_table *table;
 	struct kparser_conf_cmd *objects = NULL;
@@ -740,8 +774,9 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 	table = kparser_namespace_lookup(KPARSER_NS_COUNTER_TABLE, key);
 	if (!table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object key not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -767,8 +802,6 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 		objects[i].cntr_conf.conf = cntrs_conf.cntrs[i];
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
-
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -780,7 +813,8 @@ done:
 int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 			    size_t conf_len,
 			    struct kparser_cmd_rsp_hdr **rsp,
-			    size_t *rsp_len, const char *op)
+			    size_t *rsp_len, const char *op,
+			    void *extack, int *err)
 {
 	struct kparser_glue_metadata_extract *kmde = NULL;
 	int rc, cntridx = 0, cntr_arr_idx = 0;
@@ -794,7 +828,8 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->md_conf;
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("here:%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -803,8 +838,9 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: Duplicate object key", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object key duplicate, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
@@ -823,10 +859,10 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 
 		if ((cntridx == 0) && (cntr_arr_idx == 0)) {
 			(*rsp)->op_ret_code = -ENOENT;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s: both counteridx and counterdata object"
-				 " keys are not found", op);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s: both counteridx and"
+					       "counterdata object keys are not"
+					       " found", op);
 			goto done;
 		} else {
 			if (cntr_arr_idx == 0)
@@ -839,8 +875,8 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 	kmde = kzalloc(sizeof(*kmde), GFP_KERNEL);
 	if (!kmde) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: kzalloc() failed", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack, "%s: kzalloc() failed, size:%lu",
+				       op, sizeof(*kmde));
 		goto done;
 	}
 
@@ -850,9 +886,8 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 				      &kmde->glue.ht_node_id, &kmde->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack, "%s: kparser_namespace_insert()"
+				       " err, rc:%d", op, rc);
 		goto done;
 	}
 
@@ -866,13 +901,11 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 
 	if (!kparser_metadata_convert(arg, &kmde->mde, cntridx, cntr_arr_idx)) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_metadata_convert() err", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack, "%s: kparser_metadata_convert()"
+				       " err, rc:%d", op, rc);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
@@ -891,7 +924,9 @@ done:
 /* read handler for object metadata */
 int kparser_read_metadata(const struct kparser_hkey *key,
 			  struct kparser_cmd_rsp_hdr **rsp,
-			  size_t *rsp_len, __u8 recursive_read, const char *op)
+			  size_t *rsp_len, __u8 recursive_read,
+			  const char *op,
+			  void *extack, int *err)
 {
 	const struct kparser_glue_metadata_extract *kmde;
 
@@ -904,13 +939,12 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 	kmde = kparser_namespace_lookup(KPARSER_NS_METADATA, key);
 	if (!kmde) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack, "%s: Object key not found,"
+				       " key:{%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kmde->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
@@ -925,7 +959,9 @@ done:
 /* delete handler for object metadata */
 int kparser_del_metadata(const struct kparser_hkey *key,
 			 struct kparser_cmd_rsp_hdr **rsp,
-			 size_t *rsp_len, __u8 recursive_read, const char *op)
+			 size_t *rsp_len, __u8 recursive_read,
+			 const char *op,
+			 void *extack, int *err)
 {
 	struct kparser_glue_metadata_extract *kmde;
 	int rc;
@@ -939,18 +975,18 @@ int kparser_del_metadata(const struct kparser_hkey *key,
 	kmde = kparser_namespace_lookup(KPARSER_NS_METADATA, key);
 	if (!kmde) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack, "%s: Object key not found,"
+				       " key:{%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
 	if (kref_read(&kmde->glue.refcount) != 0) {
 		(*rsp)->op_ret_code = EBUSY;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Metadata object is associated with a metalist, delete that metalist instead",
-			 op);
+		NL_SET_ERR_MSG_FMT_MOD(extack, "%s: Metadata object is"
+				       " associated with a metalist, delete"
+				       " that metalist instead",
+				       op);
 		goto done;
 	}
 
@@ -958,12 +994,11 @@ int kparser_del_metadata(const struct kparser_hkey *key,
 				      &kmde->glue.ht_node_id, &kmde->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: namespace remove error", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack, "%s: namespace remove error, rc: %d",
+				       op, rc);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kmde->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
@@ -987,7 +1022,8 @@ void kparser_free_metadata(void *ptr, void *arg)
 int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 			    size_t conf_len,
 			    struct kparser_cmd_rsp_hdr **rsp,
-			    size_t *rsp_len, const char *op)
+			    size_t *rsp_len, const char *op,
+			    void *extack, int *err)
 {
 	struct kparser_glue_metadata_extract *kmde = NULL;
 	struct kparser_glue_metadata_table *kmdl = NULL;
@@ -1003,7 +1039,8 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->mdl_conf;
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -1012,18 +1049,18 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object key, {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
 	kmdl = kzalloc(sizeof(*kmdl), GFP_KERNEL);
 	if (!kmdl) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*kmdl));
 		goto done;
 	}
 
@@ -1042,9 +1079,9 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 	for (i = 0; i < arg->metadata_keys_count; i++) {
 		if (conf_len < sizeof(struct kparser_hkey)) {
 			(*rsp)->op_ret_code = EINVAL;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s: conf len/buffer incomplete", op);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s: conf len/buffer incomplete",
+					       op);
 			goto done;
 		}
 
@@ -1056,10 +1093,10 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		kmde = kparser_namespace_lookup(KPARSER_NS_METADATA, &arg->metadata_keys[i]);
 		if (!kmde) {
 			(*rsp)->op_ret_code = ENOENT;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s: Object key {%s:%u} not found",
-				 op, arg->metadata_keys[i].name, arg->metadata_keys[i].id);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s: Object not found, key: {%s:%u}",
+					       op, arg->metadata_keys[i].name,
+					       arg->metadata_keys[i].id);
 			goto done;
 		}
 		kmdl->metadata_table.num_ents++;
@@ -1068,10 +1105,11 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 					 GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
 			(*rsp)->op_ret_code = ENOMEM;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s: krealloc() err, ents:%d, size:%lu",
-				 op, kmdl->metadata_table.num_ents, sizeof(*kmde));
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s: krealloc() err, ents:%d, size:%lu",
+					       op,
+					       kmdl->metadata_table.num_ents,
+					       sizeof(*kmde));
 			goto done;
 		}
 		rcu_assign_pointer(kmdl->metadata_table.entries, realloced_mem);
@@ -1106,12 +1144,11 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 					 GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
 			(*rsp)->op_ret_code = ENOMEM;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s: krealloc() err,ents:%lu, size:%lu",
-				 op,
-					kmdl->md_configs_len,
-					sizeof(struct kparser_conf_cmd));
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s: krealloc() err, ents:%lu, size:%lu",
+					       op,
+					       kmdl->md_configs_len,
+					       sizeof(struct kparser_conf_cmd));
 			goto done;
 		}
 		kmdl->md_configs = realloced_mem;
@@ -1124,13 +1161,12 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 				      &kmdl->glue.ht_node_id, &kmdl->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
@@ -1153,7 +1189,9 @@ done:
 /* read handler for object metadata list */
 int kparser_read_metalist(const struct kparser_hkey *key,
 			  struct kparser_cmd_rsp_hdr **rsp,
-			  size_t *rsp_len, __u8 recursive_read, const char *op)
+			  size_t *rsp_len, __u8 recursive_read,
+			  const char *op,
+			  void *extack, int *err)
 {
 	const struct kparser_glue_metadata_table *kmdl;
 	struct kparser_conf_cmd *objects = NULL;
@@ -1169,9 +1207,9 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 	kmdl = kparser_namespace_lookup(KPARSER_NS_METALIST, key);
 	if (!kmdl) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object key not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -1201,7 +1239,6 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1212,7 +1249,9 @@ done:
 /* delete handler for object metadata list */
 int kparser_del_metalist(const struct kparser_hkey *key,
 			 struct kparser_cmd_rsp_hdr **rsp,
-			 size_t *rsp_len, __u8 recursive_read, const char *op)
+			 size_t *rsp_len, __u8 recursive_read,
+			 const char *op,
+			 void *extack, int *err)
 {
 	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
 	struct kparser_obj_link_ctx *node_tmp_list_ref = NULL;
@@ -1233,8 +1272,9 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 	kmdl = kparser_namespace_lookup(KPARSER_NS_METALIST, key);
 	if (!kmdl) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object key not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -1252,18 +1292,19 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 				continue;
 			if (kref_read(node_curr_ref->owner_obj.refcount) != 0) {
 				(*rsp)->op_ret_code = EBUSY;
-				snprintf((*rsp)->err_str_buf,
-					 sizeof((*rsp)->err_str_buf),
-					 "%s:attached parser `%s` is immutable",
-					 op,
-						((struct kparser_glue_parser *)
-						 node_curr_ref->owner_obj.obj)->glue.key.name);
+				NL_SET_ERR_MSG_FMT_MOD(extack,
+						       "%s: attached parser `%s` is immutable",
+						       op,
+						       ((struct kparser_glue_parser *)
+							node_curr_ref->owner_obj.obj)->glue.key.name);
 				goto done;
 			}
 		}
 	}
 
-	if (kparser_link_detach(kmdl, &kmdl->glue.owner_list, &kmdl->glue.owned_list, *rsp) != 0)
+	if (kparser_link_detach(kmdl, &kmdl->glue.owner_list,
+				&kmdl->glue.owned_list, *rsp,
+				extack, err) != 0)
 		goto done;
 
 	(*rsp)->key = kmdl->glue.key;
@@ -1291,9 +1332,10 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 		kmde = kparser_namespace_lookup(KPARSER_NS_METADATA, &objects[i].md_conf.key);
 		if (!kmde) {
 			(*rsp)->op_ret_code = ENOENT;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s: Object key not found", op);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s: Object not found, key: {%s:%u}",
+					       op, objects[i].md_conf.key.name,
+					       objects[i].md_conf.key.id);
 			goto done;
 		}
 
@@ -1301,9 +1343,9 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 					      &kmde->glue.ht_node_id, &kmde->glue.ht_node_name);
 		if (rc) {
 			(*rsp)->op_ret_code = rc;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s: namespace remove error", op);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s: namespace remove error, rc:%d",
+					       op, rc);
 			goto done;
 		}
 
@@ -1314,8 +1356,9 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 				      &kmdl->glue.ht_node_id, &kmdl->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: namespace remove error", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: namespace remove error, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
@@ -1327,7 +1370,6 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 
 	kparser_free(kmdl);
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1488,7 +1530,8 @@ static inline bool kparser_conf_node_convert(const struct kparser_conf_node *con
 int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 			      size_t conf_len,
 			      struct kparser_cmd_rsp_hdr **rsp,
-			      size_t *rsp_len, const char *op)
+			      size_t *rsp_len, const char *op,
+			      void *extack, int *err)
 {
 	struct kparser_glue_glue_parse_node *kparsenode = NULL;
 	struct kparser_glue_protocol_table *proto_table;
@@ -1503,7 +1546,8 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->node_conf;
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -1512,19 +1556,18 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object, key:{%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
 	kparsenode = kzalloc(sizeof(*kparsenode), GFP_KERNEL);
 	if (!kparsenode) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size:%lu",
+				       op, sizeof(*kparsenode));
 		goto done;
 	}
 
@@ -1537,10 +1580,9 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 				      &kparsenode->glue.glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc: %d",
+				       op, rc);
 		goto done;
 	}
 
@@ -1553,10 +1595,9 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 	if (!kparser_conf_node_convert(arg, &kparsenode->parse_node,
 				       sizeof(kparsenode->parse_node))) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_conf_node_convert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_conf_node_convert() err",
+				       op);
 		goto done;
 	}
 
@@ -1573,7 +1614,7 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 					KPARSER_NS_PROTO_TABLE,
 					&proto_table->glue.refcount,
 					&proto_table->glue.owned_list,
-					*rsp, op) != 0)
+					*rsp, op, extack, err) != 0)
 			goto done;
 	}
 
@@ -1590,11 +1631,10 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 					KPARSER_NS_METALIST,
 					&mdl->glue.refcount,
 					&mdl->glue.owned_list,
-					*rsp, op) != 0)
+					*rsp, op, extack, err) != 0)
 			goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.node_conf = kparsenode->glue.glue.config.node_conf;
@@ -1613,7 +1653,9 @@ done:
 /* read handler for object parse node */
 int kparser_read_parse_node(const struct kparser_hkey *key,
 			    struct kparser_cmd_rsp_hdr **rsp,
-			    size_t *rsp_len, __u8 recursive_read, const char *op)
+			    size_t *rsp_len, __u8 recursive_read,
+			    const char *op,
+			    void *extack, int *err)
 {
 	const struct kparser_glue_glue_parse_node *kparsenode;
 
@@ -1626,12 +1668,12 @@ int kparser_read_parse_node(const struct kparser_hkey *key,
 	kparsenode = kparser_namespace_lookup(KPARSER_NS_NODE_PARSE, key);
 	if (!kparsenode) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kparsenode->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
@@ -1646,7 +1688,9 @@ done:
 /* delete handler for object parse node */
 int kparser_del_parse_node(const struct kparser_hkey *key,
 			   struct kparser_cmd_rsp_hdr **rsp,
-			   size_t *rsp_len, __u8 recursive_read, const char *op)
+			   size_t *rsp_len, __u8 recursive_read,
+			   const char *op,
+			   void *extack, int *err)
 {
 	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
 	struct kparser_glue_glue_parse_node *kparsenode;
@@ -1661,9 +1705,9 @@ int kparser_del_parse_node(const struct kparser_hkey *key,
 	kparsenode = kparser_namespace_lookup(KPARSER_NS_NODE_PARSE, key);
 	if (!kparsenode) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -1675,17 +1719,18 @@ int kparser_del_parse_node(const struct kparser_hkey *key,
 			continue;
 		if (kref_read(curr_ref->owner_obj.refcount) != 0) {
 			(*rsp)->op_ret_code = EBUSY;
-			snprintf((*rsp)->err_str_buf,
-				 sizeof((*rsp)->err_str_buf),
-				 "%s:attached parser `%s` is immutable",
-				 op, ((struct kparser_glue_parser *)
-					curr_ref->owner_obj.obj)->glue.key.name);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s:attached parser `%s` is immutable",
+					       op,
+					       ((struct kparser_glue_parser *)
+						curr_ref->owner_obj.obj)->glue.key.name);
 			goto done;
 		}
 	}
 
 	if (kparser_link_detach(kparsenode, &kparsenode->glue.glue.owner_list,
-				&kparsenode->glue.glue.owned_list, *rsp) != 0)
+				&kparsenode->glue.glue.owned_list, *rsp, extack,
+				err) != 0)
 		goto done;
 
 	rc = kparser_namespace_remove(KPARSER_NS_NODE_PARSE,
@@ -1693,13 +1738,12 @@ int kparser_del_parse_node(const struct kparser_hkey *key,
 				      &kparsenode->glue.glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: namespace remove error", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: namespace remove error, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.node_conf = kparsenode->glue.glue.config.node_conf;
@@ -1721,7 +1765,9 @@ void kparser_free_node(void *ptr, void *arg)
 /* create handler for object protocol table entry */
 static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 					   struct kparser_glue_protocol_table **proto_table,
-					   struct kparser_cmd_rsp_hdr *rsp, const char *op)
+					   struct kparser_cmd_rsp_hdr *rsp,
+					   const char *op,
+					   void *extack, int *err)
 {
 	struct kparser_glue_glue_parse_node *kparsenode;
 	void *realloced_mem;
@@ -1733,19 +1779,19 @@ static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		return false;
 	}
 
 	kparsenode = kparser_namespace_lookup(KPARSER_NS_NODE_PARSE, &arg->elem_key);
 	if (!kparsenode) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: parse node key:{%s:%u} not found",
-			 op, arg->elem_key.name, arg->elem_key.id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: parse node key:{%s:%u} not found",
+				       op, arg->elem_key.name,
+				       arg->elem_key.id);
 		return false;
 	}
 
@@ -1756,12 +1802,11 @@ static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 				 GFP_KERNEL | ___GFP_ZERO);
 	if (!realloced_mem) {
 		rsp->op_ret_code = ENOMEM;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: krealloc() err, ents:%d, size:%lu",
-			 op,
-				(*proto_table)->proto_table.num_ents,
-				sizeof(struct kparser_proto_table_entry));
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: krealloc() err, ents:%d, size:%lu",
+				       op,
+				       (*proto_table)->proto_table.num_ents,
+				       sizeof(struct kparser_proto_table_entry));
 		return false;
 	}
 	rcu_assign_pointer((*proto_table)->proto_table.entries, realloced_mem);
@@ -1775,7 +1820,7 @@ static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 				KPARSER_NS_NODE_PARSE,
 				&kparsenode->glue.glue.refcount,
 				&kparsenode->glue.glue.owned_list,
-				rsp, op) != 0)
+				rsp, op, extack, err) != 0)
 		return false;
 
 	(*proto_table)->proto_table.entries[(*proto_table)->proto_table.num_ents - 1].value =
@@ -1793,7 +1838,8 @@ static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 			       size_t conf_len,
 			       struct kparser_cmd_rsp_hdr **rsp,
-			       size_t *rsp_len, const char *op)
+			       size_t *rsp_len, const char *op,
+			       void *extack, int *err)
 {
 	struct kparser_glue_protocol_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -1808,12 +1854,14 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 
 	/* create a table entry */
 	if (arg->add_entry) {
-		if (kparser_create_proto_table_ent(arg, &proto_table, *rsp, op) == false)
+		if (kparser_create_proto_table_ent(arg, &proto_table, *rsp, op,
+						   extack, err) == false)
 			goto done;
 		goto skip_table_create;
 	}
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -1822,9 +1870,9 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
@@ -1832,8 +1880,9 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	proto_table = kzalloc(sizeof(*proto_table), GFP_KERNEL);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: kzalloc() failed", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*proto_table));
 		goto done;
 	}
 
@@ -1844,9 +1893,9 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 				      &proto_table->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
@@ -1859,7 +1908,6 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	INIT_LIST_HEAD(&proto_table->glue.owned_list);
 
 skip_table_create:
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf = *arg;
 
@@ -1879,7 +1927,9 @@ done:
 /* read handler for object protocol table */
 int kparser_read_proto_table(const struct kparser_hkey *key,
 			     struct kparser_cmd_rsp_hdr **rsp,
-			     size_t *rsp_len, __u8 recursive_read, const char *op)
+			     size_t *rsp_len, __u8 recursive_read,
+			     const char *op,
+			     void *extack, int *err)
 {
 	const struct kparser_glue_protocol_table *proto_table;
 	const struct kparser_glue_glue_parse_node *parse_node;
@@ -1896,9 +1946,9 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 	proto_table = kparser_namespace_lookup(KPARSER_NS_PROTO_TABLE, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -1930,7 +1980,6 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 		objects[i].table_conf.elem_key = parse_node->glue.glue.key;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1941,7 +1990,9 @@ done:
 /* delete handler for object protocol table */
 int kparser_del_proto_table(const struct kparser_hkey *key,
 			    struct kparser_cmd_rsp_hdr **rsp,
-			    size_t *rsp_len, __u8 recursive_read, const char *op)
+			    size_t *rsp_len, __u8 recursive_read,
+			    const char *op,
+			    void *extack, int *err)
 {
 	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
 	struct kparser_obj_link_ctx *node_tmp_list_ref = NULL;
@@ -1962,9 +2013,9 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 	proto_table = kparser_namespace_lookup(KPARSER_NS_PROTO_TABLE, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -1983,12 +2034,11 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 				continue;
 			if (kref_read(node_curr_ref->owner_obj.refcount) != 0) {
 				(*rsp)->op_ret_code = EBUSY;
-				snprintf((*rsp)->err_str_buf,
-					 sizeof((*rsp)->err_str_buf),
-					 "%s:attached parser `%s` is immutable",
-					 op,
-						((struct kparser_glue_parser *)
-						 node_curr_ref->owner_obj.obj)->glue.key.name);
+				NL_SET_ERR_MSG_FMT_MOD(extack,
+						       "%s:attached parser `%s` is immutable",
+						       op,
+						       ((struct kparser_glue_parser *)
+							node_curr_ref->owner_obj.obj)->glue.key.name);
 				goto done;
 			}
 		}
@@ -2024,7 +2074,8 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 	}
 
 	if (kparser_link_detach(proto_table, &proto_table->glue.owner_list,
-				&proto_table->glue.owned_list, *rsp) != 0)
+				&proto_table->glue.owned_list, *rsp,
+				extack, err) != 0)
 		goto done;
 
 	rc = kparser_namespace_remove(KPARSER_NS_PROTO_TABLE,
@@ -2032,13 +2083,12 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 				      &proto_table->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: namespace remove error", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: namespace remove error, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	kparser_free(proto_table->proto_table.entries);
 	kparser_free(proto_table);
 done:
@@ -2109,7 +2159,8 @@ static inline bool kparser_conf_tlv_node_convert(const struct kparser_conf_node_
 int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 				  size_t conf_len,
 				  struct kparser_cmd_rsp_hdr **rsp,
-				  size_t *rsp_len, const char *op)
+				  size_t *rsp_len, const char *op,
+				  void *extack, int *err)
 {
 	struct kparser_glue_parse_tlv_node *node = NULL;
 	const struct kparser_conf_node_parse_tlv *arg;
@@ -2122,7 +2173,8 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->tlv_node_conf;
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -2131,18 +2183,18 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object key, {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
 	node = kzalloc(sizeof(*node), GFP_KERNEL);
 	if (!node) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*node));
 		goto done;
 	}
 
@@ -2153,10 +2205,9 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 				      &node->glue.glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+			 "%s: kparser_namespace_insert() err, rc:%d",
+			 op, rc);
 		goto done;
 	}
 
@@ -2168,14 +2219,12 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 
 	if (!kparser_conf_tlv_node_convert(arg, &node->tlv_parse_node)) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
+		NL_SET_ERR_MSG_FMT_MOD(extack,
 			 "%s: kparser_conf_tlv_node_convert() err",
-			 __func__);
+			 op);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.tlv_node_conf = node->glue.glue.config.tlv_node_conf;
@@ -2194,7 +2243,9 @@ done:
 /* read handler for object tlv node */
 int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 				struct kparser_cmd_rsp_hdr **rsp,
-				size_t *rsp_len, __u8 recursive_read, const char *op)
+				size_t *rsp_len, __u8 recursive_read,
+				const char *op,
+				void *extack, int *err)
 {
 	const struct kparser_glue_parse_tlv_node *node;
 
@@ -2207,14 +2258,12 @@ int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 	node = kparser_namespace_lookup(KPARSER_NS_TLV_NODE_PARSE, key);
 	if (!node) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+			 "%s: Object not found, key: {%s:%u}",
+			 op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = node->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
@@ -2229,7 +2278,9 @@ done:
 /* create handler for object tlv proto table's entry */
 static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *arg,
 					       struct kparser_glue_proto_tlvs_table **proto_table,
-					       struct kparser_cmd_rsp_hdr *rsp)
+					       struct kparser_cmd_rsp_hdr *rsp,
+					       const char *op,
+					       void *extack, int *err)
 {
 	const struct kparser_glue_parse_tlv_node *kparsenode;
 	void *realloced_mem;
@@ -2241,20 +2292,18 @@ static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_TLV_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: Object key not found",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+			 "%s: Object not found, key: {%s:%u}",
+			 op, arg->key.name, arg->key.id);
 		return false;
 	}
 
 	kparsenode = kparser_namespace_lookup(KPARSER_NS_TLV_NODE_PARSE, &arg->elem_key);
 	if (!kparsenode) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: Object key:{%s:%u} not found",
-			 __func__, arg->elem_key.name, arg->elem_key.id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+			 "%s: Object not found, key: {%s:%u}",
+			 op, arg->elem_key.name, arg->elem_key.id);
 		return false;
 	}
 
@@ -2265,12 +2314,11 @@ static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *
 				 GFP_KERNEL | ___GFP_ZERO);
 	if (!realloced_mem) {
 		rsp->op_ret_code = ENOMEM;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: krealloc() err, ents:%d, size:%lu",
-			 __func__,
-				(*proto_table)->tlvs_proto_table.num_ents,
-				sizeof(struct kparser_proto_tlvs_table_entry));
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: krealloc() err, ents:%d, size:%lu",
+				       op,
+				       (*proto_table)->tlvs_proto_table.num_ents,
+				       sizeof(struct kparser_proto_tlvs_table_entry));
 		return false;
 	}
 	rcu_assign_pointer((*proto_table)->tlvs_proto_table.entries, realloced_mem);
@@ -2288,7 +2336,8 @@ static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *
 int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 				   size_t conf_len,
 				   struct kparser_cmd_rsp_hdr **rsp,
-				   size_t *rsp_len, const char *op)
+				   size_t *rsp_len, const char *op,
+				   void *extack, int *err)
 {
 	struct kparser_glue_proto_tlvs_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -2303,12 +2352,14 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 
 	/* create a table entry */
 	if (arg->add_entry) {
-		if (kparser_create_tlv_proto_table_ent(arg, &proto_table, *rsp) == false)
+		if (kparser_create_tlv_proto_table_ent(arg, &proto_table, *rsp,
+						       op, extack, err) == false)
 			goto done;
 		goto skip_table_create;
 	}
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -2317,10 +2368,9 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
@@ -2328,9 +2378,9 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 	proto_table = kzalloc(sizeof(*proto_table), GFP_KERNEL);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*proto_table));
 		goto done;
 	}
 
@@ -2341,10 +2391,9 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 				      &proto_table->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc: %d",
+				       op, rc);
 		goto done;
 	}
 
@@ -2355,7 +2404,6 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 	kref_init(&proto_table->glue.refcount);
 
 skip_table_create:
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf = *arg;
@@ -2375,7 +2423,9 @@ done:
 /* read handler for object tlv proto table */
 int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 				 struct kparser_cmd_rsp_hdr **rsp,
-				 size_t *rsp_len, __u8 recursive_read, const char *op)
+				 size_t *rsp_len, __u8 recursive_read,
+				 const char *op,
+				 void *extack, int *err)
 {
 	const struct kparser_glue_proto_tlvs_table *proto_table;
 	const struct kparser_glue_parse_tlv_node *parse_node;
@@ -2392,10 +2442,9 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 	proto_table = kparser_namespace_lookup(KPARSER_NS_TLV_PROTO_TABLE, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -2427,7 +2476,6 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 		objects[i].table_conf.elem_key = parse_node->glue.glue.key;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2439,7 +2487,8 @@ done:
 int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 			      size_t conf_len,
 			      struct kparser_cmd_rsp_hdr **rsp,
-			      size_t *rsp_len, const char *op)
+			      size_t *rsp_len, const char *op,
+			      void *extack, int *err)
 {
 	struct kparser_glue_flag_field *kobj = NULL;
 	const struct kparser_conf_flag_field *arg;
@@ -2452,7 +2501,8 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->flag_field_conf;
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -2461,16 +2511,18 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
 	kobj = kzalloc(sizeof(*kobj), GFP_KERNEL);
 	if (!kobj) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*kobj));
 		goto done;
 	}
 
@@ -2480,8 +2532,9 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 				      &kobj->glue.ht_node_id, &kobj->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
@@ -2493,7 +2546,6 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 
 	kobj->flag_field = arg->conf;
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
@@ -2513,7 +2565,9 @@ done:
 /* read handler for object flag field */
 int kparser_read_flag_field(const struct kparser_hkey *key,
 			    struct kparser_cmd_rsp_hdr **rsp,
-			    size_t *rsp_len, __u8 recursive_read, const char *op)
+			    size_t *rsp_len, __u8 recursive_read,
+			    const char *op,
+			    void *extack, int *err)
 {
 	struct kparser_glue_flag_field *kobj;
 
@@ -2526,13 +2580,12 @@ int kparser_read_flag_field(const struct kparser_hkey *key,
 	kobj = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD, key);
 	if (!kobj) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kobj->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
@@ -2563,7 +2616,9 @@ static int compare(const void *lhs, const void *rhs)
 /* create handler for object flag field table entry */
 static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table *arg,
 						struct kparser_glue_flag_fields **proto_table,
-						struct kparser_cmd_rsp_hdr *rsp)
+						struct kparser_cmd_rsp_hdr *rsp,
+						const char *op,
+						void *extack, int *err)
 {
 	const struct kparser_glue_flag_field *kflagent;
 	void *realloced_mem;
@@ -2576,17 +2631,18 @@ static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_TABLE, &arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		return false;
 	}
 
 	kflagent = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD, &arg->elem_key);
 	if (!kflagent) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-			 "%s: Object key:{%s:%u} not found",
-			 __func__, arg->elem_key.name, arg->elem_key.id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, arg->elem_key.name, arg->elem_key.id);
 		return false;
 	}
 
@@ -2598,12 +2654,11 @@ static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table 
 				 GFP_KERNEL | ___GFP_ZERO);
 	if (!realloced_mem) {
 		rsp->op_ret_code = ENOMEM;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: krealloc() err, ents:%lu, size:%lu",
-			 __func__,
-			 (*proto_table)->flag_fields.num_idx,
-			 sizeof(struct kparser_flag_field));
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: krealloc() err, ents:%lu, size:%lu",
+				       op,
+				       (*proto_table)->flag_fields.num_idx,
+				       sizeof(struct kparser_flag_field));
 		return false;
 	}
 	rcu_assign_pointer((*proto_table)->flag_fields.fields, realloced_mem);
@@ -2627,7 +2682,8 @@ static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table 
 int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 				    size_t conf_len,
 				    struct kparser_cmd_rsp_hdr **rsp,
-				    size_t *rsp_len, const char *op)
+				    size_t *rsp_len, const char *op,
+				    void *extack, int *err)
 {
 	struct kparser_glue_flag_fields *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -2641,12 +2697,14 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 	arg = &conf->table_conf;
 
 	if (arg->add_entry) {
-		if (kparser_create_flag_field_table_ent(arg, &proto_table, *rsp) == false)
+		if (kparser_create_flag_field_table_ent(arg, &proto_table, *rsp,
+							op, extack, err) == false)
 			goto done;
 		goto skip_table_create;
 	}
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -2655,19 +2713,18 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
 	proto_table = kzalloc(sizeof(*proto_table), GFP_KERNEL);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*proto_table));
 		goto done;
 	}
 
@@ -2678,10 +2735,9 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 				      &proto_table->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc: %d",
+				       op, rc);
 		goto done;
 	}
 
@@ -2692,7 +2748,6 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 	kref_init(&proto_table->glue.refcount);
 
 skip_table_create:
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf = *arg;
@@ -2712,7 +2767,9 @@ done:
 /* read handler for object flag field */
 int kparser_read_flag_field_table(const struct kparser_hkey *key,
 				  struct kparser_cmd_rsp_hdr **rsp,
-				  size_t *rsp_len, __u8 recursive_read, const char *op)
+				  size_t *rsp_len, __u8 recursive_read,
+				  const char *op,
+				  void *extack, int *err)
 {
 	const struct kparser_glue_flag_fields *proto_table;
 	const struct kparser_glue_flag_field *kflagent;
@@ -2729,10 +2786,9 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 	proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_TABLE, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name,  key->id);
 		goto done;
 	}
 
@@ -2764,7 +2820,6 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 		objects[i].table_conf.elem_key = kflagent->glue.key;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -2801,7 +2856,8 @@ kparser_create_parse_flag_field_node_convert(const struct kparser_conf_node_pars
 int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 					 size_t conf_len,
 					 struct kparser_cmd_rsp_hdr **rsp,
-					 size_t *rsp_len, const char *op)
+					 size_t *rsp_len, const char *op,
+					 void *extack, int *err)
 {
 	const struct kparser_conf_node_parse_flag_field *arg;
 	struct kparser_glue_flag_field_node *node = NULL;
@@ -2814,7 +2870,8 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->flag_field_node_conf;
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert("%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -2823,19 +2880,18 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
 	node = kzalloc(sizeof(*node), GFP_KERNEL);
 	if (!node) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu",
+				       op, sizeof(*node));
 		goto done;
 	}
 
@@ -2845,10 +2901,9 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 				      &node->glue.glue.ht_node_id, &node->glue.glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
@@ -2860,14 +2915,12 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 
 	if (!kparser_create_parse_flag_field_node_convert(arg, &node->node_flag_field)) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_conf_tlv_node_convert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_conf_tlv_node_convert() err",
+				       op);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.flag_field_node_conf = node->glue.glue.config.flag_field_node_conf;
@@ -2886,7 +2939,9 @@ done:
 /* read handler for object flag field node */
 int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 				       struct kparser_cmd_rsp_hdr **rsp,
-				       size_t *rsp_len, __u8 recursive_read, const char *op)
+				       size_t *rsp_len, __u8 recursive_read,
+				       const char *op,
+				       void *extack, int *err)
 {
 	const struct kparser_glue_flag_field_node *node;
 
@@ -2899,14 +2954,12 @@ int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 	node = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_NODE_PARSE, key);
 	if (!node) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = node->glue.glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
@@ -2922,7 +2975,9 @@ done:
 static bool
 kparser_create_flag_field_proto_table_ent(const struct kparser_conf_table *arg,
 					  struct kparser_glue_proto_flag_fields_table **proto_table,
-					  struct kparser_cmd_rsp_hdr *rsp)
+					  struct kparser_cmd_rsp_hdr *rsp,
+					  const char *op,
+					  void *extack, int *err)
 {
 	const struct kparser_glue_flag_field_node *kparsenode;
 	void *realloced_mem;
@@ -2934,22 +2989,20 @@ kparser_create_flag_field_proto_table_ent(const struct kparser_conf_table *arg,
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: Object key not found",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		return false;
 	}
 
 	kparsenode = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_NODE_PARSE, &arg->elem_key);
 	if (!kparsenode) {
 		rsp->op_ret_code = ENOENT;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: Object key:{%s:%u} not found",
-			 __func__,
-				arg->elem_key.name,
-				arg->elem_key.id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op,
+				       arg->elem_key.name,
+				       arg->elem_key.id);
 		return false;
 	}
 
@@ -2960,12 +3013,11 @@ kparser_create_flag_field_proto_table_ent(const struct kparser_conf_table *arg,
 				 GFP_KERNEL | ___GFP_ZERO);
 	if (!realloced_mem) {
 		rsp->op_ret_code = ENOMEM;
-		snprintf(rsp->err_str_buf,
-			 sizeof(rsp->err_str_buf),
-			 "%s: krealloc() err, ents:%d, size:%lu",
-			 __func__,
-				(*proto_table)->flags_proto_table.num_ents,
-				sizeof(struct kparser_proto_flag_fields_table_entry));
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: krealloc() err, ents:%d, size:%lu",
+				       op,
+				       (*proto_table)->flags_proto_table.num_ents,
+				       sizeof(struct kparser_proto_flag_fields_table_entry));
 		return false;
 	}
 	rcu_assign_pointer((*proto_table)->flags_proto_table.entries, realloced_mem);
@@ -2983,7 +3035,8 @@ kparser_create_flag_field_proto_table_ent(const struct kparser_conf_table *arg,
 int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 					  size_t conf_len,
 					  struct kparser_cmd_rsp_hdr **rsp,
-					  size_t *rsp_len, const char *op)
+					  size_t *rsp_len, const char *op,
+					  void *extack, int *err)
 {
 	struct kparser_glue_proto_flag_fields_table *proto_table = NULL;
 	const struct kparser_conf_table *arg;
@@ -2998,12 +3051,15 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 
 	/* create a table entry */
 	if (arg->add_entry) {
-		if (kparser_create_flag_field_proto_table_ent(arg, &proto_table, *rsp) == false)
+		if (kparser_create_flag_field_proto_table_ent(arg, &proto_table,
+							      *rsp,
+							      op, extack, err) == false)
 			goto done;
 		goto skip_table_create;
 	}
 
-	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp, op) != 0) {
+	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
+				     op, extack, err) != 0) {
 		pr_alert(":%s:%d\n", __func__, __LINE__);
 		goto done;
 	}
@@ -3012,10 +3068,9 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Duplicate object key",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Duplicate object, key {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		goto done;
 	}
 
@@ -3023,9 +3078,9 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 	proto_table = kzalloc(sizeof(*proto_table), GFP_KERNEL);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size: %lu", op,
+				       sizeof(*proto_table));
 		goto done;
 	}
 
@@ -3036,10 +3091,9 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 				      &proto_table->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kparser_namespace_insert() err",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kparser_namespace_insert() err, rc: %d",
+				       op, rc);
 		goto done;
 	}
 
@@ -3050,7 +3104,6 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 	kref_init(&proto_table->glue.refcount);
 
 skip_table_create:
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.table_conf = *arg;
@@ -3070,7 +3123,9 @@ done:
 /* read handler for object flag field proto table */
 int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 					struct kparser_cmd_rsp_hdr **rsp,
-					size_t *rsp_len, __u8 recursive_read, const char *op)
+					size_t *rsp_len, __u8 recursive_read,
+					const char *op,
+					void *extack, int *err)
 {
 	const struct kparser_glue_proto_flag_fields_table *proto_table;
 	const struct kparser_glue_flag_field_node *parse_node;
@@ -3087,10 +3142,9 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 	proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_PROTO_TABLE, key);
 	if (!proto_table) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
@@ -3125,7 +3179,6 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 		objects[i].table_conf.elem_key = parse_node->glue.glue.key;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -3169,7 +3222,8 @@ static inline bool kparser_parser_convert(const struct kparser_conf_parser *conf
 int kparser_create_parser(const struct kparser_conf_cmd *conf,
 			  size_t conf_len,
 			  struct kparser_cmd_rsp_hdr **rsp,
-			  size_t *rsp_len, const char *op)
+			  size_t *rsp_len, const char *op,
+			  void *extack, int *err)
 {
 	struct kparser_glue_glue_parse_node *parse_node;
 	struct kparser_glue_parser *kparser = NULL;
@@ -3187,10 +3241,9 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 	cntrs = kzalloc(sizeof(*cntrs), GFP_KERNEL);
 	if (!cntrs) {
 		(*rsp)->op_ret_code = ENOMEM;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: kzalloc() failed, size:%lu",
-			 op, sizeof(*cntrs));
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc() failed, size:%lu",
+				       op, sizeof(*cntrs));
 		goto done;
 	}
 	rcu_assign_pointer(parser.cntrs, cntrs);
@@ -3199,15 +3252,15 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 	parser.kparser_end_signature = KPARSERENDSIGNATURE;
 	if (!kparser_parser_convert(arg, &parser)) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: parser arg convert error", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: parser arg convert error", op);
 		goto done;
 	}
 
 	if (!kparser_cmd_create_pre_process(op, conf, &arg->key, &key,
 					    (void **)&kparser, sizeof(*kparser), *rsp,
-					    offsetof(struct kparser_glue_parser, glue)))
+					    offsetof(struct kparser_glue_parser,
+						     glue), extack, err))
 		goto done;
 
 	kparser->parser = parser;
@@ -3228,7 +3281,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 					KPARSER_NS_NODE_PARSE,
 					&parse_node->glue.glue.refcount,
 					&parse_node->glue.glue.owned_list,
-					*rsp, op) != 0)
+					*rsp, op, extack, err) != 0)
 			goto done;
 	}
 
@@ -3245,7 +3298,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 					KPARSER_NS_NODE_PARSE,
 					&parse_node->glue.glue.refcount,
 					&parse_node->glue.glue.owned_list,
-					*rsp, op) != 0)
+					*rsp, op, extack, err) != 0)
 			goto done;
 	}
 
@@ -3262,7 +3315,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 					KPARSER_NS_NODE_PARSE,
 					&parse_node->glue.glue.refcount,
 					&parse_node->glue.glue.owned_list,
-					*rsp, op) != 0)
+					*rsp, op, extack, err) != 0)
 			goto done;
 	}
 
@@ -3284,11 +3337,15 @@ done:
 }
 
 static bool kparser_dump_protocol_table(const struct kparser_proto_table *obj,
-					struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len);
+					struct kparser_cmd_rsp_hdr **rsp,
+					size_t *rsp_len,
+					void *extack, int *err);
 
 /* dump metadata list to netlink msg rsp */
 static bool kparser_dump_metadata_table(const struct kparser_metadata_table *obj,
-					struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+					struct kparser_cmd_rsp_hdr **rsp,
+					size_t *rsp_len,
+					void *extack, int *err)
 {
 	const struct kparser_glue_metadata_table *glue_obj;
 	struct kparser_cmd_rsp_hdr *new_rsp = NULL;
@@ -3312,7 +3369,8 @@ static bool kparser_dump_metadata_table(const struct kparser_metadata_table *obj
 	/* NOTE: TODO: kparser_config_lock should not be released and reacquired here. Fix later. */
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_metalist(&glue_obj->glue.key,
-				   &new_rsp, &new_rsp_len, false, "read");
+				   &new_rsp, &new_rsp_len, false, "read",
+				   extack, err);
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_METALIST))
@@ -3339,7 +3397,9 @@ error:
 
 /* dump parse node to netlink msg rsp */
 static bool kparser_dump_parse_node(const struct kparser_parse_node *obj,
-				    struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+				    struct kparser_cmd_rsp_hdr **rsp,
+				    size_t *rsp_len,
+				    void *extack, int *err)
 {
 	const struct kparser_glue_glue_parse_node *glue_obj;
 	struct kparser_cmd_rsp_hdr *new_rsp = NULL;
@@ -3363,7 +3423,8 @@ static bool kparser_dump_parse_node(const struct kparser_parse_node *obj,
 	/* NOTE: TODO: kparser_config_lock should not be released and reacquired here. Fix later. */
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_parse_node(&glue_obj->glue.glue.key,
-				     &new_rsp, &new_rsp_len, false, "read");
+				     &new_rsp, &new_rsp_len, false, "read",
+				     extack, err);
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE))
@@ -3381,10 +3442,12 @@ static bool kparser_dump_parse_node(const struct kparser_parse_node *obj,
 	kparser_free(new_rsp);
 	new_rsp = NULL;
 
-	if (!kparser_dump_protocol_table(obj->proto_table, rsp, rsp_len))
+	if (!kparser_dump_protocol_table(obj->proto_table, rsp, rsp_len, extack,
+					 err))
 		goto error;
 
-	if (!kparser_dump_metadata_table(obj->metadata_table, rsp, rsp_len))
+	if (!kparser_dump_metadata_table(obj->metadata_table, rsp, rsp_len,
+					 extack, err))
 		goto error;
 
 	return true;
@@ -3396,7 +3459,9 @@ error:
 
 /* dump protocol table to netlink msg rsp */
 static bool kparser_dump_protocol_table(const struct kparser_proto_table *obj,
-					struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+					struct kparser_cmd_rsp_hdr **rsp,
+					size_t *rsp_len,
+					void *extack, int *err)
 {
 	const struct kparser_glue_protocol_table *glue_obj;
 	struct kparser_cmd_rsp_hdr *new_rsp = NULL;
@@ -3420,7 +3485,8 @@ static bool kparser_dump_protocol_table(const struct kparser_proto_table *obj,
 	/* NOTE: TODO: kparser_config_lock should not be released and reacquired here. Fix later. */
 	mutex_unlock(&kparser_config_lock);
 	rc = kparser_read_proto_table(&glue_obj->glue.key,
-				      &new_rsp, &new_rsp_len, false, "read");
+				      &new_rsp, &new_rsp_len, false, "read",
+				      extack, err);
 	mutex_lock(&kparser_config_lock);
 
 	if (rc != KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE))
@@ -3440,7 +3506,7 @@ static bool kparser_dump_protocol_table(const struct kparser_proto_table *obj,
 
 	for (i = 0; i < glue_obj->proto_table.num_ents; i++)
 		if (!kparser_dump_parse_node(glue_obj->proto_table.entries[i].node,
-					     rsp, rsp_len))
+					     rsp, rsp_len, extack, err))
 			goto error;
 
 	return true;
@@ -3452,7 +3518,9 @@ error:
 
 /* dump parser to netlink msg rsp */
 static bool kparser_dump_parser(const struct kparser_glue_parser *kparser,
-				struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+				struct kparser_cmd_rsp_hdr **rsp,
+				size_t *rsp_len,
+				void *extack, int *err)
 {
 	/* DEBUG code, if(0) avoids warning for both compiler and checkpatch */
 	if (0)
@@ -3460,7 +3528,8 @@ static bool kparser_dump_parser(const struct kparser_glue_parser *kparser,
 
 	kparser_start_new_tree_traversal();
 
-	if (!kparser_dump_parse_node(kparser->parser.root_node, rsp, rsp_len))
+	if (!kparser_dump_parse_node(kparser->parser.root_node, rsp, rsp_len,
+				     extack, err))
 		goto error;
 
 	return true;
@@ -3471,7 +3540,9 @@ error:
 /* read handler for object parser */
 int kparser_read_parser(const struct kparser_hkey *key,
 			struct kparser_cmd_rsp_hdr **rsp,
-			size_t *rsp_len, __u8 recursive_read, const char *op)
+			size_t *rsp_len, __u8 recursive_read,
+			const char *op,
+			void *extack, int *err)
 {
 	const struct kparser_glue_parser *kparser;
 
@@ -3484,19 +3555,19 @@ int kparser_read_parser(const struct kparser_hkey *key,
 	kparser = kparser_namespace_lookup(KPARSER_NS_PARSER, key);
 	if (!kparser) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf), "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kparser->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparser->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf = kparser->glue.config.parser_conf;
 
 	if (recursive_read &&
-	    kparser_dump_parser(kparser, rsp, rsp_len) == false)
+	    kparser_dump_parser(kparser, rsp, rsp_len, extack, err) == false)
 		pr_debug("kparser_dump_parser failed");
 
 done:
@@ -3509,7 +3580,9 @@ done:
 /* delete handler for object parser */
 int kparser_del_parser(const struct kparser_hkey *key,
 		       struct kparser_cmd_rsp_hdr **rsp,
-		       size_t *rsp_len, __u8 recursive_read, const char *op)
+		       size_t *rsp_len, __u8 recursive_read,
+		       const char *op,
+		       void *extack, int *err)
 {
 	struct kparser_glue_parser *kparser;
 	int rc;
@@ -3523,27 +3596,27 @@ int kparser_del_parser(const struct kparser_hkey *key,
 	kparser = kparser_namespace_lookup(KPARSER_NS_PARSER, key);
 	if (!kparser) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
 	if (kparser_link_detach(kparser, &kparser->glue.owner_list,
-				&kparser->glue.owned_list, *rsp) != 0)
+				&kparser->glue.owned_list, *rsp,
+				extack, err) != 0)
 		goto done;
 
 	rc = kparser_namespace_remove(KPARSER_NS_PARSER,
 				      &kparser->glue.ht_node_id, &kparser->glue.ht_node_name);
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: namespace remove error", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: namespace remove error, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = kparser->glue.key;
 	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparser->glue.config.conf_keys_bv;
@@ -3573,7 +3646,8 @@ void kparser_free_parser(void *ptr, void *arg)
 int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 			size_t conf_len,
 			struct kparser_cmd_rsp_hdr **rsp,
-			size_t *rsp_len, const char *op)
+			size_t *rsp_len, const char *op,
+			void *extack, int *err)
 {
 	const struct kparser_parser *parser;
 	const struct kparser_hkey *key;
@@ -3589,13 +3663,12 @@ int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 	parser = kparser_get_parser(key, false);
 	if (!parser) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = *key;
 	(*rsp)->object.conf_keys_bv = conf->conf_keys_bv;
 	(*rsp)->object.obj_key = *key;
@@ -3611,7 +3684,9 @@ done:
 /* handler for object parser unlock */
 int kparser_parser_unlock(const struct kparser_hkey *key,
 			  struct kparser_cmd_rsp_hdr **rsp,
-			  size_t *rsp_len, __u8 recursive_read, const char *op)
+			  size_t *rsp_len, __u8 recursive_read,
+			  const char *op,
+			  void *extack, int *err)
 {
 	const struct kparser_glue_parser *kparser;
 
@@ -3624,22 +3699,20 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 	kparser = kparser_namespace_lookup(KPARSER_NS_PARSER, key);
 	if (!kparser) {
 		(*rsp)->op_ret_code = ENOENT;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Object key not found", __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
 	if (!kparser_put_parser(&kparser->parser, false)) {
 		(*rsp)->op_ret_code = EINVAL;
-		snprintf((*rsp)->err_str_buf,
-			 sizeof((*rsp)->err_str_buf),
-			 "%s: Parser unlock failed",
-			 __func__);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: Parser unlock failed",
+				       op);
 		goto done;
 	}
 
-	snprintf((*rsp)->err_str_buf, sizeof((*rsp)->err_str_buf), "Operation successful");
 	(*rsp)->key = *key;
 	(*rsp)->object.obj_key = *key;
 done:

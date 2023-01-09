@@ -10,6 +10,7 @@
 #include <linux/rhashtable.h>
 #include <linux/slab.h>
 #include <linux/sort.h>
+#include <linux/netlink.h>
 
 #include "kparser.h"
 
@@ -75,16 +76,17 @@ int kparser_link_attach(const void *owner_obj,
 			struct kref *owned_obj_refcount,
 			struct list_head *owned_list,
 			struct kparser_cmd_rsp_hdr *rsp,
-			const char *op)
+			const char *op,
+			void *extack, int *err)
 {
 	struct kparser_obj_link_ctx *reflist = NULL;
 
 	reflist = kzalloc(sizeof(*reflist), GFP_KERNEL);
 	if (!reflist) {
 		rsp->op_ret_code = ENOMEM;
-		(void)snprintf(rsp->err_str_buf,
-				sizeof(rsp->err_str_buf),
-				"%s: kzalloc failed", op);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s: kzalloc failed, size: %lu",
+				       op, sizeof(*reflist));
 		return -ENOMEM;
 	}
 
@@ -123,14 +125,14 @@ int kparser_link_attach(const void *owner_obj,
  */
 static inline int kparser_link_break(const void *owner, const void *owned,
 				     struct kparser_obj_link_ctx *ref,
-				     struct kparser_cmd_rsp_hdr *rsp)
+				     struct kparser_cmd_rsp_hdr *rsp,
+				     void *extack, int *err)
 {
 	if (!ref) {
 		if (rsp) {
 			rsp->op_ret_code = EFAULT;
-			(void)snprintf(rsp->err_str_buf,
-					sizeof(rsp->err_str_buf),
-					"link is NULL!");
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "link is NULL!");
 		}
 		return -EFAULT;
 	}
@@ -138,9 +140,8 @@ static inline int kparser_link_break(const void *owner, const void *owned,
 	if (ref->sig != KPARSER_LINK_OBJ_SIGNATURE) {
 		if (rsp) {
 			rsp->op_ret_code = EFAULT;
-			(void)snprintf(rsp->err_str_buf,
-					sizeof(rsp->err_str_buf),
-					"link is corrupt!");
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "link is corrupt!");
 		}
 		return -EFAULT;
 	}
@@ -148,9 +149,8 @@ static inline int kparser_link_break(const void *owner, const void *owned,
 	if (owner && ref->owner_obj.obj != owner) {
 		if (rsp) {
 			rsp->op_ret_code = EFAULT;
-			(void)snprintf(rsp->err_str_buf,
-					sizeof(rsp->err_str_buf),
-					"link owner corrupt!");
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "link owner corrupt!");
 		}
 		return -EFAULT;
 	}
@@ -158,9 +158,8 @@ static inline int kparser_link_break(const void *owner, const void *owned,
 	if (owned && ref->owned_obj.obj != owned) {
 		if (rsp) {
 			rsp->op_ret_code = EFAULT;
-			(void)snprintf(rsp->err_str_buf,
-					sizeof(rsp->err_str_buf),
-					"link owned corrupt!");
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "link owned corrupt!");
 		}
 		return -EFAULT;
 	}
@@ -184,12 +183,13 @@ static inline int kparser_link_break(const void *owner, const void *owned,
  */
 static inline int kparser_link_detach_owner(const void *obj,
 					    struct list_head *list,
-					    struct kparser_cmd_rsp_hdr *rsp)
+					    struct kparser_cmd_rsp_hdr *rsp,
+					    void *extack, int *err)
 {
 	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
 
 	list_for_each_entry_safe(curr_ref, tmp_list_ref, list, owner_obj.list_node) {
-		if (kparser_link_break(obj, NULL, curr_ref, rsp) != 0)
+		if (kparser_link_break(obj, NULL, curr_ref, rsp, extack, err) != 0)
 			return -EFAULT;
 		kparser_free(curr_ref);
 	}
@@ -202,7 +202,8 @@ static inline int kparser_link_detach_owner(const void *obj,
  */
 static inline int kparser_link_detach_owned(const void *obj,
 					    struct list_head *list,
-					    struct kparser_cmd_rsp_hdr *rsp)
+					    struct kparser_cmd_rsp_hdr *rsp,
+					    void *extack, int *err)
 {
 	struct kparser_obj_link_ctx *tmp_list_ref = NULL, *curr_ref = NULL;
 	const struct kparser_glue_glue_parse_node *kparsenode;
@@ -231,7 +232,7 @@ static inline int kparser_link_detach_owned(const void *obj,
 			}
 		}
 
-		if (kparser_link_break(NULL, obj, curr_ref, rsp) != 0)
+		if (kparser_link_break(NULL, obj, curr_ref, rsp, extack, err) != 0)
 			return -EFAULT;
 		kparser_free(curr_ref);
 	}
@@ -243,12 +244,13 @@ static inline int kparser_link_detach_owned(const void *obj,
 int kparser_link_detach(const void *obj,
 			struct list_head *owner_list,
 			struct list_head *owned_list,
-			struct kparser_cmd_rsp_hdr *rsp)
+			struct kparser_cmd_rsp_hdr *rsp,
+			void *extack, int *err)
 {
-	if (kparser_link_detach_owner(obj, owner_list, rsp) != 0)
+	if (kparser_link_detach_owner(obj, owner_list, rsp, extack, err) != 0)
 		return -EFAULT;
 
-	if (kparser_link_detach_owned(obj, owned_list, rsp) != 0)
+	if (kparser_link_detach_owned(obj, owned_list, rsp, extack, err) != 0)
 		return -EFAULT;
 
 	return 0;
@@ -559,12 +561,13 @@ int kparser_conf_key_manager(enum kparser_global_namespace_ids ns_id,
 			     const struct kparser_hkey *key,
 			     struct kparser_hkey *new_key,
 			     struct kparser_cmd_rsp_hdr *rsp,
-			     const char *op)
+			     const char *op,
+			     void *extack, int *err)
 {
 	if (kparser_hkey_empty(key)) {
 		rsp->op_ret_code = -EINVAL;
-		(void)snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-				"%s:HKey missing", op);
+			NL_SET_ERR_MSG_FMT_MOD(extack,
+					       "%s:HKey missing", op);
 		return -EINVAL;
 	}
 
@@ -573,9 +576,9 @@ int kparser_conf_key_manager(enum kparser_global_namespace_ids ns_id,
 
 	if (kparser_hkey_user_id_invalid(key)) {
 		rsp->op_ret_code = -EINVAL;
-		(void)snprintf(rsp->err_str_buf, sizeof(rsp->err_str_buf),
-				"%s:HKey id invalid:%u",
-				op, key->id);
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "%s:HKey id invalid:%u",
+				       op, key->id);
 		return -EINVAL;
 	}
 
@@ -832,7 +835,9 @@ while (0)
 
 /* netlink msg processors for create */
 int kparser_config_handler_add(const void *cmdarg, size_t cmdarglen,
-			       struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+			       struct kparser_cmd_rsp_hdr **rsp,
+			       size_t *rsp_len,
+			       void *extack, int *err)
 {
 	const struct kparser_conf_cmd *conf;
 
@@ -845,12 +850,16 @@ int kparser_config_handler_add(const void *cmdarg, size_t cmdarglen,
 		return KPARSER_ATTR_UNSPEC;
 
 	return g_mod_namespaces[conf->namespace_id]->create_handler(conf, cmdarglen,
-								    rsp, rsp_len, "create");
+								    rsp,
+								    rsp_len,
+								    "create",
+								    extack, err);
 }
 
 /* netlink msg processors for update */
 int kparser_config_handler_update(const void *cmdarg, size_t cmdarglen,
-				  struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+				  struct kparser_cmd_rsp_hdr **rsp,
+				  size_t *rsp_len, void *extack, int *err)
 {
 	const struct kparser_conf_cmd *conf;
 
@@ -863,12 +872,16 @@ int kparser_config_handler_update(const void *cmdarg, size_t cmdarglen,
 		return KPARSER_ATTR_UNSPEC;
 
 	return g_mod_namespaces[conf->namespace_id]->update_handler(conf, cmdarglen,
-								    rsp, rsp_len, "update");
+								    rsp,
+								    rsp_len,
+								    "update",
+								    extack, err);
 }
 
 /* netlink msg processors for read */
 int kparser_config_handler_read(const void *cmdarg, size_t cmdarglen,
-				struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+				struct kparser_cmd_rsp_hdr **rsp,
+				size_t *rsp_len, void *extack, int *err)
 {
 	const struct kparser_conf_cmd *conf;
 
@@ -881,12 +894,13 @@ int kparser_config_handler_read(const void *cmdarg, size_t cmdarglen,
 		return KPARSER_ATTR_UNSPEC;
 
 	return g_mod_namespaces[conf->namespace_id]->read_handler(&conf->obj_key, rsp, rsp_len,
-			conf->recursive_read_delete, "read");
+			conf->recursive_read_delete, "read", extack, err);
 }
 
 /* netlink msg processors for delete */
 int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
-				  struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len)
+				  struct kparser_cmd_rsp_hdr **rsp,
+				  size_t *rsp_len, void *extack, int *err)
 {
 	const struct kparser_conf_cmd *conf;
 
@@ -899,5 +913,5 @@ int kparser_config_handler_delete(const void *cmdarg, size_t cmdarglen,
 		return KPARSER_ATTR_UNSPEC;
 
 	return g_mod_namespaces[conf->namespace_id]->del_handler(&conf->obj_key, rsp, rsp_len,
-			conf->recursive_read_delete, "delete");
+			conf->recursive_read_delete, "delete", extack, err);
 }

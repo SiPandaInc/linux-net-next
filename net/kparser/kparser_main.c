@@ -115,7 +115,6 @@ static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX] = {
 static const struct genl_ops kparser_nl_ops[] = {
 	{
 	  .cmd = KPARSER_CMD_CONFIGURE,
-	  .validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 	  .doit = kparser_cli_cmd_handler,
 	  .flags = GENL_ADMIN_PERM,
 	},
@@ -137,7 +136,7 @@ struct genl_family kparser_nl_family __ro_after_init = {
 /* send response to netlink msg requests */
 static int kparser_send_cmd_rsp(int cmd, int attrtype,
 				const struct kparser_cmd_rsp_hdr *rsp,
-				size_t rsp_len, struct genl_info *info)
+				size_t rsp_len, struct genl_info *info, int err)
 {
 	struct sk_buff *msg;
 	size_t msgsz = NLMSG_DEFAULT_SIZE;
@@ -158,6 +157,21 @@ static int kparser_send_cmd_rsp(int cmd, int attrtype,
 		return -ENOBUFS;
 	}
 
+	// ret = -1234;
+	// NL_SET_ERR_MSG_FMT_MOD(info->extack, "Hii:%d", err);
+	if (rsp->op_ret_code != 0) {
+		struct nlmsghdr *nlh = hdr - GENL_HDRLEN - NLMSG_HDRLEN;
+		struct nlmsgerr *e;
+		nlh->nlmsg_type = NLMSG_ERROR;
+		nlh->nlmsg_len += nlmsg_msg_size(sizeof(*e));
+		nlh->nlmsg_flags |= NLM_F_ACK_TLVS;
+		e = (struct nlmsgerr *)NLMSG_DATA(nlh);
+		memset(&e->msg, 0, sizeof(e->msg));
+		e->error = rsp->op_ret_code;
+		nlmsg_free(msg);
+		return e->error;
+	}
+
 	if (nla_put(msg, attrtype, (int)rsp_len, rsp)) {
 		genlmsg_cancel(msg, hdr);
 		nlmsg_free(msg);
@@ -171,7 +185,8 @@ static int kparser_send_cmd_rsp(int cmd, int attrtype,
 	return ret;
 }
 
-typedef int kparser_ops(const void *, size_t, struct kparser_cmd_rsp_hdr **, size_t *);
+typedef int kparser_ops(const void *, size_t, struct kparser_cmd_rsp_hdr **,
+			size_t *, void *extack, int *err);
 
 /* define netlink msg processors */
 #define KPARSER_NS_DEFINE_OP_HANDLERS(NS_ID)				\
@@ -209,7 +224,7 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 	size_t rsp_len = 0;
 	int ret_attr_id;
 	int attr_idx;
-	int rc;
+	int rc, err;
 
 	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
 
@@ -217,9 +232,11 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 		if (!info->attrs[attr_idx] || !kparser_ns_op_handler[attr_idx])
 			continue;
 
+
 		ret_attr_id = kparser_ns_op_handler[attr_idx](nla_data(info->attrs[attr_idx]),
-							      nla_len(info->attrs[attr_idx]), &rsp,
-							      &rsp_len);
+							      nla_len(info->attrs[attr_idx]),
+							      &rsp, &rsp_len,
+							      info->extack, &err);
 
 		if (ret_attr_id <= KPARSER_ATTR_UNSPEC || ret_attr_id >= KPARSER_ATTR_MAX) {
 			pr_debug("%s: attr %d handler failed\n", __func__, attr_idx);
@@ -227,10 +244,11 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 			goto out;
 		}
 
-		rc = kparser_send_cmd_rsp(KPARSER_CMD_CONFIGURE, ret_attr_id, rsp, rsp_len, info);
+		rc = kparser_send_cmd_rsp(KPARSER_CMD_CONFIGURE, ret_attr_id,
+					  rsp, rsp_len, info, err);
 		if (rc) {
 			pr_debug("kparser_send_cmd_rsp() failed,attr:%d, rc:%d\n", attr_idx, rc);
-			rc = EIO;
+			// rc = EIO;
 			goto out;
 		}
 
