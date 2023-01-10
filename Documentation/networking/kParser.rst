@@ -186,6 +186,13 @@ There are four kernel datatpath API functions:
 	 *	      configured metadata objects in CLI.
 	 * metadata_len: Total length of the user provided metadata
 	 *		 buffer.
+	 * avoid_ref: Set this flag in case caller wants to avoid holding the reference
+	 *            of the active parser object to save performance on the data path.
+	 *            But please be advised, caller should hold the reference of the
+	 *            parser object while using this data path. In this case, the CLI
+	 *            can be used in advance to get the reference, and caller will also
+	 *            need to release the reference via CLI once it is done with the
+	 *            data path.
 	 *
 	 * return: kParser error code as defined in
 	 *	   include/uapi/linux/kparser.h
@@ -193,7 +200,8 @@ There are four kernel datatpath API functions:
 
 		int kparser_parse(struct sk_buff *skb,
 				  const struct kparser_hkey*kparser_key,
-				  void *_metadata, size_t metadata_len);
+				  void *_metadata, size_t metadata_len,
+				  bool avoid_ref);
 
 	/* __kparser_parse(): Function to parse a void * packet buffer
 	 *		      using a parser instance key.
@@ -227,6 +235,14 @@ There are four kernel datatpath API functions:
 	 *
 	 * kparser_key: key of the associated kParser parser object
 	 *		which must be already created via CLI.
+	 * avoid_ref: Set this flag in case caller wants to avoid holding the reference
+	 *            of the active parser object to save performance on the data path.
+	 *            But please be advised, caller should hold the reference of the
+	 *            parser object while using this data path. In this case, the CLI
+	 *            can be used in advance to get the reference, and caller will also
+	 *            need to release the reference via CLI once it is done with the
+	 *            data path.
+	 *
 	 *
 	 * return: NULL if key not found, else an opaque parser instance
 	 *	   pointer which can be used in the following APIs 3 and
@@ -238,7 +254,8 @@ There are four kernel datatpath API functions:
 	 *	 using the API kparser_put_parser().
 	 */
 		const void *kparser_get_parser(const struct kparser_hkey
-					       *kparser_key);
+					       *kparser_key,
+					       bool avoid_ref);
 
 	/* kparser_put_parser(): Function to return and undo the read
 	 *			 only operation done previously by
@@ -254,6 +271,14 @@ There are four kernel datatpath API functions:
 	 *	   returned by kparser_get_parser(). Caller can use
 	 *	   cached opaque pointer as long as system does not
 	 *	   restart and kparser.ko is not reloaded.
+	 * avoid_ref: Set this flag in case caller wants to avoid holding the reference
+	 *            of the active parser object to save performance on the data path.
+	 *            But please be advised, caller should hold the reference of the
+	 *            parser object while using this data path. In this case, the CLI
+	 *            can be used in advance to get the reference, and caller will also
+	 *            need to release the reference via CLI once it is done with the
+	 *            data path.
+	 *
 	 *
 	 * return: boolean, true if put operation is success, else
 	 *	   false.
@@ -262,7 +287,7 @@ There are four kernel datatpath API functions:
 	 *	 very last call.
 	 */
 
-		bool kparser_put_parser(const void *parser);
+		bool kparser_put_parser(const void *parser, bool avoid_ref);
 
 Example: Five tuple parser with header offsets
 ==============================================

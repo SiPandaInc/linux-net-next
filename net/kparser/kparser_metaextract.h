@@ -12,21 +12,17 @@
 
 #include "kparser_types.h"
 
-#include "linux/byteorder/little_endian.h"
-#define __BYTE_ORDER __LITTLE_ENDIAN
+#include <asm/byteorder.h>
 
-#define __BIG_ENDIAN 0
-
-#if __BYTE_ORDER == __BIG_ENDIAN
-#define kparser_htonll(x) (x)
-#define kparser_ntohll(x) (x)
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#ifdef __LITTLE_ENDIAN
 #define kparser_htonll(x)						\
 	(((__u64)htonl((x) & 0xffffffff) << 32) | htonl((x) >> 32))
 #define kparser_ntohll(x)						\
 	(((__u64)ntohl((x) & 0xffffffff) << 32) | ntohl((x) >> 32))
 #else
 #error "Cannot determine endianness"
+#define kparser_htonll(x) (x)
+#define kparser_ntohll(x) (x)
 #endif
 
 /* Metadata extraction pseudo instructions
@@ -803,7 +799,8 @@ static inline int kparser_metadata_extract(const struct kparser_parser *parser,
 }
 
 static inline bool kparser_metadata_convert(const struct kparser_conf_metadata *conf,
-					    struct kparser_metadata_extract *mde, int cntridx)
+					    struct kparser_metadata_extract *mde,
+					    int cntridx, int cntr_arr_idx)
 {
 	__u32 encoding_type;
 
@@ -853,7 +850,7 @@ static inline bool kparser_metadata_convert(const struct kparser_conf_metadata *
 
 	case KPARSER_METADATA_COUNTER:
 		*mde = __kparser_metadata_set_control_counter(conf->frame, conf->doff,
-							      cntridx, cntridx,
+							      cntridx, cntr_arr_idx,
 							      conf->cntr_op);
 		return true;
 
@@ -886,7 +883,7 @@ static inline bool kparser_metadata_convert(const struct kparser_conf_metadata *
 	}
 
 	*mde = __kparser_metadata_set_control(conf->frame, encoding_type, conf->doff,
-					      conf->cntr, conf->cntr_op);
+					      cntridx, conf->cntr_op);
 
 	return true;
 }

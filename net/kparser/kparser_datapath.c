@@ -236,7 +236,7 @@ parse_again:
 
 	proto_tlv_node = &parse_tlv_node->proto_tlv_node;
 
-	if (flags & KPARSER_F_DEBUG)
+	if (flags & KPARSER_F_DEBUG_DATAPATH)
 		pr_debug("kParser parsing TLV %s\n", parse_tlv_node->name);
 
 	pr_debug("{%s:%d}: tlv_len:%lu min_len:%lu\n", __func__, __LINE__,
@@ -592,7 +592,7 @@ static ssize_t kparser_parse_flag_fields(const struct kparser_parser *parser,
 			if (field_offset > parse_len)
 				return KPARSER_STOP_LENGTH;
 
-			if (pflags & KPARSER_F_DEBUG)
+			if (pflags & KPARSER_F_DEBUG_DATAPATH)
 				pr_debug("kParser parsing flag-field %s\n",
 					 parse_flag_field_node->name);
 
@@ -626,6 +626,8 @@ static int __kparser_run_exit_node(const struct kparser_parser *parser,
 	const struct kparser_metadata_table *metadata_table;
 	int ret;
 
+	if (flags & KPARSER_F_DEBUG_DATAPATH)
+		pr_alert("{%s:%d}: exit node:%s\n", __func__, __LINE__, parse_node->name);
 	/* Run an exit parse node. This is an okay_node, fail_node, or
 	 * atencap_node
 	 */
@@ -681,6 +683,7 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 	unsigned int flags;
 	bool currencap;
 
+
 	if (parser && parser->config.max_encaps > framescnt)
 		framescnt = parser->config.max_encaps;
 
@@ -707,6 +710,19 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 	_frame = _metadata + parser->config.metameta_size;
 	flags = parser->config.flags;
 
+	if (flags & KPARSER_F_DEBUG_LOOPBACK_HDR_REMOVAL_HACK) {
+		/* hack to remove occasional loopback hdr */
+		_hdr += 14;
+		parse_len -= 14;
+	}
+
+
+	if (flags & KPARSER_F_DEBUG_DATAPATH) {
+		printk("kParserdump:len:%lu\n", parse_len);
+		print_hex_dump_bytes("kParserdump:rcvd_pkt:", DUMP_PREFIX_OFFSET, _hdr,
+				     parse_len);
+	}
+
 	ctrl.hdr_base = _hdr;
 	ctrl.node_cnt = 0;
 	ctrl.encap_levels = 0;
@@ -730,7 +746,8 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 	 * unknown protocol result in table lookup for next node.
 	 */
 	do {
-		pr_debug("{%s:%d}: Parsing node:%s\n", __func__, __LINE__, parse_node->name);
+		if (flags & KPARSER_F_DEBUG_DATAPATH)
+			pr_alert("{%s:%d}: Parsing node:%s\n", __func__, __LINE__, parse_node->name);
 		currencap = false;
 		proto_node = &parse_node->proto_node;
 		hdr_len = proto_node->min_len;
@@ -740,7 +757,7 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 			goto parser_out;
 		}
 		/* Protocol node length checks */
-		if (flags & KPARSER_F_DEBUG)
+		if (flags & KPARSER_F_DEBUG_DATAPATH)
 			pr_debug("kParser parsing %s\n", parse_node->name);
 
 		/* when SKB is passed, if parse_len < hdr_len, then
@@ -952,8 +969,14 @@ parser_out:
 	parse_node = (ctrl.ret == KPARSER_OKAY || KPARSER_IS_OK_CODE(ctrl.ret)) ?
 		      rcu_dereference(parser->okay_node) : rcu_dereference(parser->fail_node);
 
-	if (!parse_node)
+	if (!parse_node) {
+		if (flags & KPARSER_F_DEBUG_DATAPATH) {
+			printk("kParserdump:metadata_len:%lu\n", metadata_len);
+			print_hex_dump_bytes("kParserdump:md:", DUMP_PREFIX_OFFSET, _metadata,
+					     metadata_len);
+		}
 		return ctrl.ret;
+	}
 
 	/* Run an exit parse node. This is either the okay node or the fail
 	 * node that is set in parser config
@@ -963,6 +986,12 @@ parser_out:
 				      _metadata, _frame, &ctrl, flags);
 	if (ret != KPARSER_OKAY)
 		ctrl.ret = (ctrl.ret == KPARSER_STOP_OKAY) ? ret : ctrl.ret;
+
+	if (flags & KPARSER_F_DEBUG_DATAPATH) {
+		printk("kParserdump:metadata_len:%lu\n", metadata_len);
+		print_hex_dump_bytes("kParserdump:md:", DUMP_PREFIX_OFFSET, _metadata,
+				     metadata_len);
+	}
 
 	return ctrl.ret;
 }
