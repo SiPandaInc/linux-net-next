@@ -161,6 +161,7 @@ static int kparser_send_cmd_rsp(int cmd, int attrtype,
 	if (rsp->op_ret_code != 0) {
 		struct nlmsghdr *nlh = hdr - GENL_HDRLEN - NLMSG_HDRLEN;
 		struct nlmsgerr *e;
+
 		nlh->nlmsg_type = NLMSG_ERROR;
 		nlh->nlmsg_len += nlmsg_msg_size(sizeof(*e));
 		nlh->nlmsg_flags |= NLM_F_ACK_TLVS;
@@ -232,7 +233,6 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 		if (!info->attrs[attr_idx] || !kparser_ns_op_handler[attr_idx])
 			continue;
 
-
 		ret_attr_id = kparser_ns_op_handler[attr_idx](nla_data(info->attrs[attr_idx]),
 							      nla_len(info->attrs[attr_idx]),
 							      &rsp, &rsp_len,
@@ -248,8 +248,7 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 		rc = kparser_send_cmd_rsp(KPARSER_CMD_CONFIGURE, ret_attr_id,
 					  rsp, rsp_len, info, err);
 		if (rc) {
-			KPARSER_KMOD_DEBUG_PRINT(
-						 KPARSER_F_DEBUG_CLI,
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
 						 "kparser_send_cmd_rsp() failed,attr:%d, rc:%d\n",
 						 attr_idx, rc);
 			// rc = EIO;

@@ -497,7 +497,6 @@ static inline __u16 allocate_id(__u16 id, unsigned long *bv, size_t bvsize)
 {
 	int i;
 
-
 	if (id != KPARSER_INVALID_ID) {
 		/* try to allocate passed id */
 		/* already allocated, conflict */
@@ -795,8 +794,8 @@ static inline const struct kparser_conf_cmd
 	    (*rsp_len != 0) || conf->namespace_id <= KPARSER_NS_INVALID ||
 	    conf->namespace_id >= KPARSER_NS_MAX) {
 		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "[%p %lu %p %p %p %lu %d]\n",
-			 conf, cmdarglen, rsp, *rsp, rsp_len,
-			 *rsp_len, conf->namespace_id);
+					 conf, cmdarglen, rsp, *rsp, rsp_len,
+					 *rsp_len, conf->namespace_id);
 		goto err_return;
 	}
 

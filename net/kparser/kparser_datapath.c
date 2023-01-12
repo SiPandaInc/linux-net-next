@@ -34,7 +34,7 @@ static const struct kparser_parse_node *lookup_node(__u32 dflags,
 
 	KPARSER_KMOD_DEBUG_PRINT(dflags,
 				 "type:0x%04x ents:%d, types:[%x, %x]\n",
-				 type,table->num_ents,ntohs(type),ntohl(type));
+				 type, table->num_ents, ntohs(type), ntohl(type));
 
 	for (i = 0; i < table->num_ents; i++) {
 		entries = rcu_dereference(table->entries);
@@ -52,15 +52,14 @@ static const struct kparser_parse_node *lookup_node(__u32 dflags,
 			// for 4 bytes
 			*isencap = entries[i].encap;
 			return entries[i].node;
-		} else {
-			// for 3 bytes
-			tmp = ntohl(type);
-			tmp = tmp >> 8;
-			KPARSER_KMOD_DEBUG_PRINT(dflags, "tmp:%x", tmp);
-			if (tmp == entries[i].value) {
-				*isencap = entries[i].encap;
-				return entries[i].node;
-			}
+		}
+		// for 3 bytes
+		tmp = ntohl(type);
+		tmp = tmp >> 8;
+		KPARSER_KMOD_DEBUG_PRINT(dflags, "tmp:%x", tmp);
+		if (tmp == entries[i].value) {
+			*isencap = entries[i].encap;
+			return entries[i].node;
 		}
 	}
 
@@ -78,7 +77,7 @@ static const struct kparser_parse_tlv_node
 
 	for (i = 0; i < table->num_ents; i++) {
 		KPARSER_KMOD_DEBUG_PRINT(dflags, "table_type:%d\n",
-			 table->entries[i].type);
+					 table->entries[i].type);
 		if (type == table->entries[i].type)
 			return table->entries[i].node;
 	}
@@ -303,7 +302,7 @@ parse_again:
 
 	proto_ops = &proto_tlv_node->ops;
 
-	KPARSER_KMOD_DEBUG_PRINT(dflags,"cond_exprs_parameterized:%d\n",
+	KPARSER_KMOD_DEBUG_PRINT(dflags, "cond_exprs_parameterized:%d\n",
 				 proto_ops->cond_exprs_parameterized);
 
 	if (proto_ops->cond_exprs_parameterized) {
@@ -418,7 +417,7 @@ static int kparser_parse_tlvs(__u32 dflags,
 	else
 		off = eval_parameterized_len(&proto_tlvs_node->ops.pfstart_offset, cp);
 
-	KPARSER_KMOD_DEBUG_PRINT(dflags,"off:%ld\n", off);
+	KPARSER_KMOD_DEBUG_PRINT(dflags, "off:%ld\n", off);
 
 	if (off < 0)
 		return KPARSER_STOP_LENGTH;
@@ -429,7 +428,7 @@ static int kparser_parse_tlvs(__u32 dflags,
 	cp += off;
 	tlv_offset = hdr_offset + off;
 
-	KPARSER_KMOD_DEBUG_PRINT(dflags,"len:%ld tlv_offset:%ld\n",
+	KPARSER_KMOD_DEBUG_PRINT(dflags, "len:%ld tlv_offset:%ld\n",
 				 len, tlv_offset);
 
 	/* This is the main TLV processing loop */
@@ -750,7 +749,6 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 	__u32 dflags = 0;
 	bool currencap;
 
-
 	if (parser && parser->config.max_encaps > framescnt)
 		framescnt = parser->config.max_encaps;
 
@@ -782,7 +780,7 @@ int __kparser_parse(const void *obj, void *_hdr, size_t parse_len,
 
 	if (dflags & KPARSER_F_DEBUG_DATAPATH) {
 		/* This code is required for regression tests also */
-		printk("kParserdump:len:%lu\n", parse_len);
+		pr_alert("kParserdump:len:%lu\n", parse_len);
 		print_hex_dump_bytes("kParserdump:rcvd_pkt:",
 				     DUMP_PREFIX_OFFSET, _hdr, parse_len);
 	}
@@ -935,7 +933,7 @@ after_post_processing:
 		wildcard_node = rcu_dereference(parse_node->wildcard_node);
 		if (!proto_table && !wildcard_node) {
 			/* Leaf parse node */
-			KPARSER_KMOD_DEBUG_PRINT(dflags,"Leaf node");
+			KPARSER_KMOD_DEBUG_PRINT(dflags, "Leaf node");
 			goto parser_out;
 		}
 
@@ -1053,7 +1051,7 @@ parser_out:
 	if (!parse_node) {
 		if (dflags & KPARSER_F_DEBUG_DATAPATH) {
 			/* This code is required for regression tests also */
-			printk("kParserdump:metadata_len:%lu\n", metadata_len);
+			pr_alert("kParserdump:metadata_len:%lu\n", metadata_len);
 			print_hex_dump_bytes("kParserdump:md:",
 					     DUMP_PREFIX_OFFSET,
 					     _metadata, metadata_len);
@@ -1072,7 +1070,7 @@ parser_out:
 
 	if (dflags & KPARSER_F_DEBUG_DATAPATH) {
 		/* This code is required for regression tests also */
-		printk("kParserdump:metadata_len:%lu\n", metadata_len);
+		pr_alert("kParserdump:metadata_len:%lu\n", metadata_len);
 		print_hex_dump_bytes("kParserdump:md:", DUMP_PREFIX_OFFSET,
 				     _metadata, metadata_len);
 	}
@@ -1145,26 +1143,23 @@ int kparser_parse(struct sk_buff *skb,
 		return err;
 	WARN_ON(skb->data_len);
 
-	/*
-	   // TODO: do this pullup inside the loop of ___kparser_parse(), when
-	   // parse_len < hdr_len
-
-		if (pktlen > KPARSER_MAX_SKB_PACKET_LEN) {
-			skb_pull(skb, KPARSER_MAX_SKB_PACKET_LEN);
-			data = skb_mac_header(skb);
-			pktlen = skb_mac_header_len(skb) + skb->len;
-		}
-
-		err = skb_linearize(skb);
-		if (err < 0)
-			return err;
-		WARN_ON(skb->data_len);
-		___kparser_parse(parser, skb, _metadata, metadata_len);
-	*/
+	/* TODO: do this pullup inside the loop of ___kparser_parse(), when
+	 * parse_len < hdr_len
+	 * if (pktlen > KPARSER_MAX_SKB_PACKET_LEN) {
+	 *	skb_pull(skb, KPARSER_MAX_SKB_PACKET_LEN);
+	 *	data = skb_mac_header(skb);
+	 *	pktlen = skb_mac_header_len(skb) + skb->len;
+	 * }
+	 * err = skb_linearize(skb);
+	 * if (err < 0)
+	 *	return err;
+	 * WARN_ON(skb->data_len);
+	 * ___kparser_parse(parser, skb, _metadata, metadata_len);
+	 */
 	k_prsr = kparser_get_parser_ctx(kparser_key);
 	if (!k_prsr) {
 		if (kparser_key)
-			KPARSER_KMOD_DEBUG_PRINT(dflags,"parser {%s:%u} is not found\n",
+			KPARSER_KMOD_DEBUG_PRINT(dflags, "parser {%s:%u} is not found\n",
 						 kparser_key->name, kparser_key->id);
 		return -EINVAL;
 	}

@@ -43,8 +43,8 @@ kparser_cmd_create_pre_process(const char *op,
 	}
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OP:%s Key{%s:%d}:{%s:%d}\n",
-		 op, argkey->name, argkey->id,
-		 newkey->name, newkey->id);
+				 op, argkey->name, argkey->id,
+				 newkey->name, newkey->id);
 
 	if (kparser_namespace_lookup(conf->namespace_id, newkey)) {
 		rsp->op_ret_code = EEXIST;
@@ -155,7 +155,8 @@ int kparser_read_cond_exprs(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kobj->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.cond_conf = kobj->glue.config.cond_conf;
 done:
@@ -177,7 +178,8 @@ static bool kparser_create_cond_table_ent(const struct kparser_conf_table *arg,
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -353,7 +355,8 @@ static bool kparser_create_cond_tables_ent(const struct kparser_conf_table *arg,
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLES, &arg->key);
 	if (!(*proto_table)) {
@@ -477,7 +480,8 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -551,7 +555,8 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 		goto done;
 	}
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -634,7 +639,8 @@ int kparser_read_counter(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kcntr->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kcntr->glue.config.conf_keys_bv;
 	(*rsp)->object.cntr_conf = kcntr->glue.config.cntr_conf;
 done:
@@ -663,7 +669,8 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 
 	arg = &conf->table_conf;
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	/* create a table entry */
 	if (arg->add_entry) {
@@ -783,7 +790,8 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = table->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = table->glue.config.table_conf;
 
@@ -838,7 +846,8 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		goto done;
 	}
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -861,11 +870,11 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 		if (kcntr)
 			cntr_arr_idx = kcntr->counter_cnf.index + 1;
 
-		if ((cntridx == 0) && (cntr_arr_idx == 0)) {
+		if (cntridx == 0 && cntr_arr_idx == 0) {
 			(*rsp)->op_ret_code = -ENOENT;
 			NL_SET_ERR_MSG_FMT_MOD(extack,
 					       "%s: both counteridx and"
-					       "counterdata object keys are not"
+					       " counterdata object keys are not"
 					       " found", op);
 			goto done;
 		} else {
@@ -950,7 +959,8 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kmde->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
 done:
@@ -1004,7 +1014,8 @@ int kparser_del_metadata(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kmde->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
 
@@ -1049,7 +1060,8 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		goto done;
 	}
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -1092,7 +1104,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		conf_len -= sizeof(struct kparser_hkey);
 
 		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n",
-			 arg->metadata_keys[i].id, arg->metadata_keys[i].name);
+					 arg->metadata_keys[i].id, arg->metadata_keys[i].name);
 
 		kmde = kparser_namespace_lookup(KPARSER_NS_METADATA, &arg->metadata_keys[i]);
 		if (!kmde) {
@@ -1220,7 +1232,8 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kmdl->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmdl->glue.config.conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 
@@ -1229,8 +1242,9 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "%s:krealloc failed for rsp, len:%lu\n",
-				 op, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "%s:krealloc failed for rsp, len:%lu\n",
+						 op, *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -1241,10 +1255,8 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		objects[i].conf_keys_bv = kmdl->md_configs[i].conf_keys_bv;
 		objects[i].md_conf = kmdl->md_configs[i].md_conf;
 		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n",
-			 objects[i].md_conf.key.id, objects[i].md_conf.key.name);
-
+					 objects[i].md_conf.key.id, objects[i].md_conf.key.name);
 	}
-
 done:
 	mutex_unlock(&kparser_config_lock);
 
@@ -1314,7 +1326,8 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 		goto done;
 
 	(*rsp)->key = kmdl->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmdl->glue.config.conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 
@@ -1683,7 +1696,8 @@ int kparser_read_parse_node(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kparsenode->glue.glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.node_conf = kparsenode->glue.glue.config.node_conf;
 done:
@@ -1752,7 +1766,8 @@ int kparser_del_parse_node(const struct kparser_hkey *key,
 		goto done;
 	}
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.node_conf = kparsenode->glue.glue.config.node_conf;
 
@@ -1782,7 +1797,8 @@ static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -1962,7 +1978,8 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -2056,7 +2073,8 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -2219,8 +2237,8 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 	if (rc) {
 		(*rsp)->op_ret_code = rc;
 		NL_SET_ERR_MSG_FMT_MOD(extack,
-			 "%s: kparser_namespace_insert() err, rc:%d",
-			 op, rc);
+				       "%s: kparser_namespace_insert() err, rc:%d",
+				       op, rc);
 		goto done;
 	}
 
@@ -2233,8 +2251,8 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 	if (!kparser_conf_tlv_node_convert(arg, &node->tlv_parse_node)) {
 		(*rsp)->op_ret_code = EINVAL;
 		NL_SET_ERR_MSG_FMT_MOD(extack,
-			 "%s: kparser_conf_tlv_node_convert() err",
-			 op);
+				       "%s: kparser_conf_tlv_node_convert() err",
+				       op);
 		goto done;
 	}
 
@@ -2272,13 +2290,14 @@ int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 	if (!node) {
 		(*rsp)->op_ret_code = ENOENT;
 		NL_SET_ERR_MSG_FMT_MOD(extack,
-			 "%s: Object not found, key: {%s:%u}",
-			 op, key->name, key->id);
+				       "%s: Object not found, key: {%s:%u}",
+				       op, key->name, key->id);
 		goto done;
 	}
 
 	(*rsp)->key = node->glue.glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.tlv_node_conf = node->glue.glue.config.tlv_node_conf;
 done:
@@ -2300,14 +2319,15 @@ static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_TLV_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
 		rsp->op_ret_code = ENOENT;
 		NL_SET_ERR_MSG_FMT_MOD(extack,
-			 "%s: Object not found, key: {%s:%u}",
-			 op, arg->key.name, arg->key.id);
+				       "%s: Object not found, key: {%s:%u}",
+				       op, arg->key.name, arg->key.id);
 		return false;
 	}
 
@@ -2315,8 +2335,8 @@ static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *
 	if (!kparsenode) {
 		rsp->op_ret_code = ENOENT;
 		NL_SET_ERR_MSG_FMT_MOD(extack,
-			 "%s: Object not found, key: {%s:%u}",
-			 op, arg->elem_key.name, arg->elem_key.id);
+				       "%s: Object not found, key: {%s:%u}",
+				       op, arg->elem_key.name, arg->elem_key.id);
 		return false;
 	}
 
@@ -2463,7 +2483,8 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -2604,7 +2625,8 @@ int kparser_read_flag_field(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kobj->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
 done:
@@ -2620,7 +2642,8 @@ static int compare(const void *lhs, const void *rhs)
 	const struct kparser_flag_field *lhs_flag = lhs;
 	const struct kparser_flag_field *rhs_flag = rhs;
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "lflag:%x rflag:%x\n", lhs_flag->flag, rhs_flag->flag);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "lflag:%x rflag:%x\n", lhs_flag->flag, rhs_flag->flag);
 
 	if (lhs_flag->flag < rhs_flag->flag)
 		return -1;
@@ -2643,7 +2666,8 @@ static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table 
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -2689,7 +2713,7 @@ static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table 
 
 	for (i = 0; i < (*proto_table)->flag_fields.num_idx; i++)
 		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "List[%d]:%x\n",
-			 i, (*proto_table)->flag_fields.fields[i].flag);
+					 i, (*proto_table)->flag_fields.fields[i].flag);
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return true;
@@ -2983,7 +3007,8 @@ int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = node->glue.glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_node_conf = node->glue.glue.config.flag_field_node_conf;
 done:
@@ -3006,7 +3031,8 @@ kparser_create_flag_field_proto_table_ent(const struct kparser_conf_table *arg,
 
 	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -3172,7 +3198,8 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -3588,7 +3615,8 @@ int kparser_read_parser(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kparser->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparser->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf = kparser->glue.config.parser_conf;
 
@@ -3644,7 +3672,8 @@ int kparser_del_parser(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kparser->glue.key;
-	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparser->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf = kparser->glue.config.parser_conf;
 
