@@ -131,6 +131,7 @@ struct genl_family kparser_nl_family __ro_after_init = {
 	.module		= THIS_MODULE,
 	.ops		= kparser_nl_ops,
 	.n_ops		= ARRAY_SIZE(kparser_nl_ops),
+	.resv_start_op	= KPARSER_CMD_CONFIGURE + 1,
 };
 
 /* send response to netlink msg requests */
@@ -157,8 +158,6 @@ static int kparser_send_cmd_rsp(int cmd, int attrtype,
 		return -ENOBUFS;
 	}
 
-	// ret = -1234;
-	// NL_SET_ERR_MSG_FMT_MOD(info->extack, "Hii:%d", err);
 	if (rsp->op_ret_code != 0) {
 		struct nlmsghdr *nlh = hdr - GENL_HDRLEN - NLMSG_HDRLEN;
 		struct nlmsgerr *e;
@@ -181,7 +180,8 @@ static int kparser_send_cmd_rsp(int cmd, int attrtype,
 	genlmsg_end(msg, hdr);
 	ret = genlmsg_reply(msg, info);
 
-	// pr_debug("genlmsg_reply() ret:%d\n", ret);
+	/* pr_debug("genlmsg_reply() ret:%d\n", ret); */
+
 	return ret;
 }
 
@@ -226,7 +226,7 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 	int attr_idx;
 	int rc, err;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	for (attr_idx = KPARSER_ATTR_UNSPEC + 1; attr_idx < KPARSER_ATTR_MAX; attr_idx++) {
 		if (!info->attrs[attr_idx] || !kparser_ns_op_handler[attr_idx])
@@ -239,7 +239,8 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 							      info->extack, &err);
 
 		if (ret_attr_id <= KPARSER_ATTR_UNSPEC || ret_attr_id >= KPARSER_ATTR_MAX) {
-			pr_debug("%s: attr %d handler failed\n", __func__, attr_idx);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "attr %d handler failed", attr_idx);
 			rc = EIO;
 			goto out;
 		}
@@ -247,7 +248,10 @@ static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info)
 		rc = kparser_send_cmd_rsp(KPARSER_CMD_CONFIGURE, ret_attr_id,
 					  rsp, rsp_len, info, err);
 		if (rc) {
-			pr_debug("kparser_send_cmd_rsp() failed,attr:%d, rc:%d\n", attr_idx, rc);
+			KPARSER_KMOD_DEBUG_PRINT(
+						 KPARSER_F_DEBUG_CLI,
+						 "kparser_send_cmd_rsp() failed,attr:%d, rc:%d\n",
+						 attr_idx, rc);
 			// rc = EIO;
 			goto out;
 		}
@@ -261,7 +265,7 @@ out:
 	if (rsp)
 		kfree(rsp);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 
 	return rc;
 }
@@ -286,31 +290,31 @@ static int __init init_kparser(void)
 {
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	rc = genl_register_family(&kparser_nl_family);
 	if (rc) {
-		pr_debug("genl_register_family failed\n");
-		pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "genl_register_family failed\n");
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 		return rc;
 	}
 
 	rc = kparser_init();
 	if (rc) {
-		pr_debug("kparser_init() err:%d\n", rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "kparser_init() err:%d\n", rc);
 		goto out;
 	}
 	init_kparser_hooks();
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 
 	return rc;
 
 out:
 	rc = genl_unregister_family(&kparser_nl_family);
 	if (rc != 0)
-		pr_debug("kparser_deinit() err:%d\n", rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "kparser_deinit() err:%d\n", rc);
 
-	pr_debug("ERR OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "ERR OUT: ");
 
 	deinit_kparser_hooks();
 	return rc;
@@ -321,17 +325,18 @@ static void __exit exit_kparser(void)
 {
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	rc = genl_unregister_family(&kparser_nl_family);
 	if (rc != 0)
-		pr_debug("genl_unregister_family() err:%d\n", rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "genl_unregister_family() err:%d\n",
+					 rc);
 
 	rc = kparser_deinit();
 	if (rc != 0)
-		pr_debug("kparser_deinit() err:%d\n", rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "kparser_deinit() err:%d\n", rc);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	deinit_kparser_hooks();
 }
 

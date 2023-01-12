@@ -38,12 +38,11 @@ kparser_cmd_create_pre_process(const char *op,
 
 	if (kparser_conf_key_manager(conf->namespace_id, argkey, newkey, rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		return false;
 	}
 
-	pr_debug("{%s:%d} OP:%s Key{%s:%d}:{%s:%d}\n",
-		 __func__, __LINE__,
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OP:%s Key{%s:%d}:{%s:%d}\n",
 		 op, argkey->name, argkey->id,
 		 newkey->name, newkey->id);
 
@@ -101,7 +100,7 @@ int kparser_create_cond_exprs(const struct kparser_conf_cmd *conf,
 	const struct kparser_conf_condexpr *arg;
 	struct kparser_hkey key;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -127,7 +126,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_CONDEXPRS);
 }
 
@@ -140,9 +139,9 @@ int kparser_read_cond_exprs(const struct kparser_hkey *key,
 {
 	struct kparser_glue_condexpr_expr *kobj;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -156,13 +155,13 @@ int kparser_read_cond_exprs(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kobj->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.cond_conf = kobj->glue.config.cond_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_CONDEXPRS);
 }
 
@@ -176,9 +175,9 @@ static bool kparser_create_cond_table_ent(const struct kparser_conf_table *arg,
 	const struct kparser_glue_condexpr_expr *kcondent;
 	void *realloced_mem;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -215,7 +214,7 @@ static bool kparser_create_cond_table_ent(const struct kparser_conf_table *arg,
 
 	(*proto_table)->table.entries[(*proto_table)->table.num_ents - 1] = &kcondent->expr;
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return true;
 }
 
@@ -230,7 +229,7 @@ int kparser_create_cond_table(const struct kparser_conf_cmd *conf,
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -273,7 +272,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_CONDEXPRS_TABLE);
 }
 
@@ -290,9 +289,9 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -306,7 +305,8 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n",
+				 (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 	(*rsp)->object.table_conf.optional_value1 = proto_table->table.default_fail;
@@ -317,8 +317,9 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n",
-				 __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -336,7 +337,7 @@ int kparser_read_cond_table(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_CONDEXPRS_TABLE);
 }
 
@@ -350,9 +351,9 @@ static bool kparser_create_cond_tables_ent(const struct kparser_conf_table *arg,
 	const struct kparser_glue_condexpr_table *kcondent;
 	void *realloced_mem;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_CONDEXPRS_TABLES, &arg->key);
 	if (!(*proto_table)) {
@@ -387,7 +388,7 @@ static bool kparser_create_cond_tables_ent(const struct kparser_conf_table *arg,
 
 	(*proto_table)->table.entries[(*proto_table)->table.num_ents - 1] = &kcondent->table;
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return true;
 }
 
@@ -402,7 +403,7 @@ int kparser_create_cond_tables(const struct kparser_conf_cmd *conf,
 	const struct kparser_conf_table *arg;
 	struct kparser_hkey key;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -443,7 +444,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_CONDEXPRS_TABLES);
 }
 
@@ -461,8 +462,8 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -476,7 +477,7 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -485,8 +486,9 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n",
-				 __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 ":krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -505,7 +507,7 @@ int kparser_read_cond_tables(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_CONDEXPRS_TABLES);
 }
 
@@ -521,7 +523,7 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -545,11 +547,11 @@ int kparser_create_counter(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("here:%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -604,7 +606,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_COUNTER);
 }
 
@@ -617,8 +619,8 @@ int kparser_read_counter(const struct kparser_hkey *key,
 {
 	struct kparser_glue_counter *kcntr;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -632,13 +634,13 @@ int kparser_read_counter(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kcntr->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kcntr->glue.config.conf_keys_bv;
 	(*rsp)->object.cntr_conf = kcntr->glue.config.cntr_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_COUNTER);
 }
 
@@ -655,13 +657,13 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
 	arg = &conf->table_conf;
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	/* create a table entry */
 	if (arg->add_entry) {
@@ -696,7 +698,7 @@ int kparser_create_counter_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("here:%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
@@ -749,7 +751,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_COUNTER_TABLE);
 }
 
@@ -765,9 +767,9 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -781,7 +783,7 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = table->glue.config.table_conf;
 
@@ -790,7 +792,9 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n", __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -805,7 +809,7 @@ int kparser_read_counter_table(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_COUNTER_TABLE);
 }
 
@@ -822,7 +826,7 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 	struct kparser_glue_counter *kcntr;
 	struct kparser_hkey key;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -830,11 +834,11 @@ int kparser_create_metadata(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("here:%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -917,7 +921,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_METADATA);
 }
 
@@ -930,9 +934,9 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 {
 	const struct kparser_glue_metadata_extract *kmde;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -946,13 +950,13 @@ int kparser_read_metadata(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kmde->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_METADATA);
 }
 
@@ -966,9 +970,9 @@ int kparser_del_metadata(const struct kparser_hkey *key,
 	struct kparser_glue_metadata_extract *kmde;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1000,7 +1004,7 @@ int kparser_del_metadata(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kmde->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmde->glue.config.conf_keys_bv;
 	(*rsp)->object.md_conf = kmde->glue.config.md_conf;
 
@@ -1008,7 +1012,7 @@ int kparser_del_metadata(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_METADATA);
 }
 
@@ -1033,7 +1037,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 	void *realloced_mem;
 	int rc, i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1041,11 +1045,11 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_alert("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -1087,7 +1091,7 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 
 		conf_len -= sizeof(struct kparser_hkey);
 
-		pr_debug("Key: {ID:%u Name:%s}\n",
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n",
 			 arg->metadata_keys[i].id, arg->metadata_keys[i].name);
 
 		kmde = kparser_namespace_lookup(KPARSER_NS_METADATA, &arg->metadata_keys[i]);
@@ -1121,7 +1125,9 @@ int kparser_create_metalist(const struct kparser_conf_cmd *conf,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n", __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			if (kmdl) {
@@ -1182,7 +1188,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_METALIST);
 }
 
@@ -1198,9 +1204,9 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1214,7 +1220,7 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kmdl->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmdl->glue.config.conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 
@@ -1223,7 +1229,7 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n",
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "%s:krealloc failed for rsp, len:%lu\n",
 				 op, *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
@@ -1234,7 +1240,7 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 		objects[i].namespace_id = kmdl->md_configs[i].namespace_id;
 		objects[i].conf_keys_bv = kmdl->md_configs[i].conf_keys_bv;
 		objects[i].md_conf = kmdl->md_configs[i].md_conf;
-		pr_debug("Key: {ID:%u Name:%s}\n",
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n",
 			 objects[i].md_conf.key.id, objects[i].md_conf.key.name);
 
 	}
@@ -1242,7 +1248,7 @@ int kparser_read_metalist(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_METALIST);
 }
 
@@ -1263,9 +1269,9 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i, rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1308,7 +1314,7 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 		goto done;
 
 	(*rsp)->key = kmdl->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kmdl->glue.config.conf_keys_bv;
 	(*rsp)->object.mdl_conf = kmdl->glue.config.mdl_conf;
 
@@ -1317,8 +1323,9 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n",
-				 __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -1373,7 +1380,7 @@ int kparser_del_metalist(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_METALIST);
 }
 
@@ -1540,7 +1547,7 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1548,11 +1555,12 @@ int kparser_create_parse_node(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -1646,7 +1654,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE);
 }
 
@@ -1659,9 +1667,9 @@ int kparser_read_parse_node(const struct kparser_hkey *key,
 {
 	const struct kparser_glue_glue_parse_node *kparsenode;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1675,13 +1683,13 @@ int kparser_read_parse_node(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kparsenode->glue.glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.node_conf = kparsenode->glue.glue.config.node_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE);
 }
 
@@ -1696,9 +1704,9 @@ int kparser_del_parse_node(const struct kparser_hkey *key,
 	struct kparser_glue_glue_parse_node *kparsenode;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1744,7 +1752,7 @@ int kparser_del_parse_node(const struct kparser_hkey *key,
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparsenode->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.node_conf = kparsenode->glue.glue.config.node_conf;
 
@@ -1752,7 +1760,7 @@ int kparser_del_parse_node(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_NODE_PARSE);
 }
 
@@ -1772,9 +1780,9 @@ static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 	struct kparser_glue_glue_parse_node *kparsenode;
 	void *realloced_mem;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -1830,7 +1838,7 @@ static bool kparser_create_proto_table_ent(const struct kparser_conf_table *arg,
 	(*proto_table)->proto_table.entries[(*proto_table)->proto_table.num_ents - 1].node =
 			&kparsenode->parse_node.node;
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return true;
 }
 
@@ -1846,7 +1854,7 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1862,11 +1870,12 @@ int kparser_create_proto_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -1920,7 +1929,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE);
 }
 
@@ -1937,9 +1946,9 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -1953,7 +1962,7 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -1962,7 +1971,9 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n", __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -1983,7 +1994,7 @@ int kparser_read_proto_table(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE);
 }
 
@@ -2004,9 +2015,9 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i, rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2045,7 +2056,7 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -2054,8 +2065,9 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n",
-				 __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -2094,7 +2106,7 @@ int kparser_del_proto_table(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_PROTO_TABLE);
 }
 
@@ -2167,7 +2179,7 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2175,11 +2187,12 @@ int kparser_create_parse_tlv_node(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -2236,7 +2249,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_TLV_NODE_PARSE);
 }
 
@@ -2249,9 +2262,9 @@ int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 {
 	const struct kparser_glue_parse_tlv_node *node;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2265,13 +2278,13 @@ int kparser_read_parse_tlv_node(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = node->glue.glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.tlv_node_conf = node->glue.glue.config.tlv_node_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_TLV_NODE_PARSE);
 }
 
@@ -2285,9 +2298,9 @@ static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *
 	const struct kparser_glue_parse_tlv_node *kparsenode;
 	void *realloced_mem;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_TLV_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -2328,7 +2341,7 @@ static bool kparser_create_tlv_proto_table_ent(const struct kparser_conf_table *
 	(*proto_table)->tlvs_proto_table.entries[(*proto_table)->tlvs_proto_table.num_ents -
 		1].node = &kparsenode->tlv_parse_node;
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return true;
 }
 
@@ -2344,7 +2357,7 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2360,11 +2373,12 @@ int kparser_create_tlv_proto_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -2416,7 +2430,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_TLV_PROTO_TABLE);
 }
 
@@ -2433,9 +2447,9 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2449,7 +2463,7 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -2458,7 +2472,9 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n", __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -2479,7 +2495,7 @@ int kparser_read_tlv_proto_table(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_TLV_PROTO_TABLE);
 }
 
@@ -2495,7 +2511,7 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2503,11 +2519,12 @@ int kparser_create_flag_field(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -2558,7 +2575,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD);
 }
 
@@ -2571,9 +2588,9 @@ int kparser_read_flag_field(const struct kparser_hkey *key,
 {
 	struct kparser_glue_flag_field *kobj;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2587,13 +2604,13 @@ int kparser_read_flag_field(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kobj->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kobj->glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_conf = kobj->glue.config.flag_field_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD);
 }
 
@@ -2603,7 +2620,7 @@ static int compare(const void *lhs, const void *rhs)
 	const struct kparser_flag_field *lhs_flag = lhs;
 	const struct kparser_flag_field *rhs_flag = rhs;
 
-	pr_debug("lflag:%x rflag:%x\n", lhs_flag->flag, rhs_flag->flag);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "lflag:%x rflag:%x\n", lhs_flag->flag, rhs_flag->flag);
 
 	if (lhs_flag->flag < rhs_flag->flag)
 		return -1;
@@ -2624,9 +2641,9 @@ static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table 
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -2671,10 +2688,10 @@ static bool kparser_create_flag_field_table_ent(const struct kparser_conf_table 
 	     sizeof(struct kparser_flag_field), &compare, NULL);
 
 	for (i = 0; i < (*proto_table)->flag_fields.num_idx; i++)
-		pr_debug("List[%d]:%x\n",
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "List[%d]:%x\n",
 			 i, (*proto_table)->flag_fields.fields[i].flag);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return true;
 }
 
@@ -2690,7 +2707,7 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2705,11 +2722,12 @@ int kparser_create_flag_field_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -2760,7 +2778,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD_TABLE);
 }
 
@@ -2777,9 +2795,9 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2793,7 +2811,8 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n",
+				 (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -2802,7 +2821,9 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n", __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -2823,7 +2844,7 @@ int kparser_read_flag_field_table(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD_TABLE);
 }
 
@@ -2864,7 +2885,7 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2872,11 +2893,12 @@ int kparser_create_parse_flag_field_node(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert("%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -2932,7 +2954,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD_NODE_PARSE);
 }
 
@@ -2945,9 +2967,9 @@ int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 {
 	const struct kparser_glue_flag_field_node *node;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -2961,13 +2983,13 @@ int kparser_read_parse_flag_field_node(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = node->glue.glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = node->glue.glue.config.conf_keys_bv;
 	(*rsp)->object.flag_field_node_conf = node->glue.glue.config.flag_field_node_conf;
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD_NODE_PARSE);
 }
 
@@ -2982,9 +3004,9 @@ kparser_create_flag_field_proto_table_ent(const struct kparser_conf_table *arg,
 	const struct kparser_glue_flag_field_node *kparsenode;
 	void *realloced_mem;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	*proto_table = kparser_namespace_lookup(KPARSER_NS_FLAG_FIELD_PROTO_TABLE, &arg->key);
 	if (!(*proto_table)) {
@@ -3027,7 +3049,7 @@ kparser_create_flag_field_proto_table_ent(const struct kparser_conf_table *arg,
 	(*proto_table)->flags_proto_table.entries[(*proto_table)->flags_proto_table.num_ents -
 		1].node = &kparsenode->node_flag_field;
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return true;
 }
 
@@ -3043,7 +3065,7 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 	struct kparser_hkey key;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3060,11 +3082,12 @@ int kparser_create_flag_field_proto_table(const struct kparser_conf_cmd *conf,
 
 	if (kparser_conf_key_manager(conf->namespace_id, &arg->key, &key, *rsp,
 				     op, extack, err) != 0) {
-		pr_alert(":%s:%d\n", __func__, __LINE__);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "error");
 		goto done;
 	}
 
-	pr_debug("Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+				 "Key: {ID:%u Name:%s}\n", arg->key.id, arg->key.name);
 
 	if (kparser_namespace_lookup(conf->namespace_id, &key)) {
 		(*rsp)->op_ret_code = EEXIST;
@@ -3116,7 +3139,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD_PROTO_TABLE);
 }
 
@@ -3133,9 +3156,9 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 	void *realloced_mem;
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3149,7 +3172,7 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = proto_table->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = proto_table->glue.config.conf_keys_bv;
 	(*rsp)->object.table_conf = proto_table->glue.config.table_conf;
 
@@ -3158,8 +3181,9 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 		*rsp_len = *rsp_len + sizeof(struct kparser_conf_cmd);
 		realloced_mem = krealloc(*rsp, *rsp_len, GFP_KERNEL | ___GFP_ZERO);
 		if (!realloced_mem) {
-			pr_alert("%s:krealloc failed for rsp, len:%lu\n",
-				 __func__, *rsp_len);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+						 "krealloc failed for rsp, len:%lu\n",
+						 *rsp_len);
 			*rsp_len = 0;
 			mutex_unlock(&kparser_config_lock);
 			return KPARSER_ATTR_UNSPEC;
@@ -3182,7 +3206,7 @@ int kparser_read_flag_field_proto_table(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_FLAG_FIELD_PROTO_TABLE);
 }
 
@@ -3232,7 +3256,7 @@ int kparser_create_parser(const struct kparser_conf_cmd *conf,
 	struct kparser_parser parser = {};
 	struct kparser_hkey key;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3332,7 +3356,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
 }
 
@@ -3359,8 +3383,9 @@ static bool kparser_dump_metadata_table(const struct kparser_metadata_table *obj
 
 	rc = alloc_first_rsp(&new_rsp, &new_rsp_len, KPARSER_NS_METALIST);
 	if (rc) {
-		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n",
-			 __func__, rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+					 "alloc_first_rsp() failed, rc:%d\n",
+					 rc);
 		return false;
 	}
 
@@ -3413,8 +3438,8 @@ static bool kparser_dump_parse_node(const struct kparser_parse_node *obj,
 
 	rc = alloc_first_rsp(&new_rsp, &new_rsp_len, KPARSER_NS_NODE_PARSE);
 	if (rc) {
-		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n",
-			 __func__, rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+					 "alloc_first_rsp() failed, rc:%d\n", rc);
 		return false;
 	}
 
@@ -3475,7 +3500,8 @@ static bool kparser_dump_protocol_table(const struct kparser_proto_table *obj,
 
 	rc = alloc_first_rsp(&new_rsp, &new_rsp_len, KPARSER_NS_PROTO_TABLE);
 	if (rc) {
-		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n", __func__, rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+					 "alloc_first_rsp() failed, rc:%d\n", rc);
 		return false;
 	}
 
@@ -3546,9 +3572,9 @@ int kparser_read_parser(const struct kparser_hkey *key,
 {
 	const struct kparser_glue_parser *kparser;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3562,18 +3588,18 @@ int kparser_read_parser(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kparser->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparser->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf = kparser->glue.config.parser_conf;
 
 	if (recursive_read &&
 	    kparser_dump_parser(kparser, rsp, rsp_len, extack, err) == false)
-		pr_debug("kparser_dump_parser failed");
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "kparser_dump_parser failed");
 
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
 }
 
@@ -3587,9 +3613,9 @@ int kparser_del_parser(const struct kparser_hkey *key,
 	struct kparser_glue_parser *kparser;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3618,7 +3644,7 @@ int kparser_del_parser(const struct kparser_hkey *key,
 	}
 
 	(*rsp)->key = kparser->glue.key;
-	pr_debug("Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", (*rsp)->key.id, (*rsp)->key.name);
 	(*rsp)->object.conf_keys_bv = kparser->glue.config.conf_keys_bv;
 	(*rsp)->object.parser_conf = kparser->glue.config.parser_conf;
 
@@ -3632,7 +3658,7 @@ done:
 	mutex_unlock(&kparser_config_lock);
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_PARSER);
 }
 
@@ -3652,13 +3678,13 @@ int kparser_parser_lock(const struct kparser_conf_cmd *conf,
 	const struct kparser_parser *parser;
 	const struct kparser_hkey *key;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	mutex_lock(&kparser_config_lock);
 
 	key = &conf->obj_key;
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	parser = kparser_get_parser(key, false);
 	if (!parser) {
@@ -3677,7 +3703,7 @@ done:
 
 	synchronize_rcu();
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_OP_PARSER_LOCK_UNLOCK);
 }
 
@@ -3690,9 +3716,9 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 {
 	const struct kparser_glue_parser *kparser;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
-	pr_debug("Key: {ID:%u Name:%s}\n", key->id, key->name);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "Key: {ID:%u Name:%s}\n", key->id, key->name);
 
 	mutex_lock(&kparser_config_lock);
 
@@ -3718,6 +3744,6 @@ int kparser_parser_unlock(const struct kparser_hkey *key,
 done:
 	mutex_unlock(&kparser_config_lock);
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return KPARSER_ATTR_RSP(KPARSER_NS_OP_PARSER_LOCK_UNLOCK);
 }

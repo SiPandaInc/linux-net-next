@@ -44,7 +44,7 @@ static void kparser_release_ref(struct kref *kref)
 /* Consumer of this is datapath */
 void kparser_ref_get(struct kref *refcount)
 {
-	pr_debug("{%s:%d}:refcnt:%u\n", __func__, __LINE__, kref_read(refcount));
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "refcnt:%u\n", kref_read(refcount));
 
 	kref_get(refcount);
 }
@@ -55,12 +55,13 @@ void kparser_ref_put(struct kref *refcount)
 	unsigned int refcnt;
 
 	refcnt = kref_read(refcount);
-	pr_debug("{%s:%d}:refcnt:%u\n", __func__, __LINE__, refcnt);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "refcnt:%u\n", refcnt);
 
 	if (refcnt > KREF_INIT_VALUE)
 		kref_put(refcount, kparser_release_ref);
 	else
-		pr_warn("refcount violation detected, val:%u", refcnt);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+					 "refcount violation detected, val:%u", refcnt);
 }
 
 /* These are to track/bookkeep owner/owned relationships(both ways) when refcount is involved among
@@ -111,8 +112,8 @@ int kparser_link_attach(const void *owner_obj,
 	if (reflist->owned_obj.refcount)
 		kref_get(reflist->owned_obj.refcount);
 
-	pr_debug("{%s:%d}:owner:%p owned:%p ref:%p\n",
-		 __func__, __LINE__, owner_obj, owned_obj, reflist);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "owner:%p owned:%p ref:%p\n",
+				 owner_obj, owned_obj, reflist);
 
 	synchronize_rcu();
 
@@ -517,12 +518,13 @@ static inline __u16 allocate_id(__u16 id, unsigned long *bv, size_t bvsize)
 				__clear_bit(id, bv);
 				return (id + KPARSER_KMOD_ID_MIN);
 			}
-			pr_alert("{%s:%d} ID alloc failed: {%d:%d}\n", __func__, __LINE__, id, i);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "ID alloc failed: {%d:%d}\n",
+						 id, i);
 			return KPARSER_INVALID_ID;
 		}
 	}
 
-	pr_alert("{%s:%d} ID alloc failed: {%d:%d}\n", __func__, __LINE__, id, i);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "ID alloc failed: {%d:%d}\n", id, i);
 	return KPARSER_INVALID_ID;
 }
 
@@ -674,7 +676,8 @@ int alloc_first_rsp(struct kparser_cmd_rsp_hdr **rsp, size_t *rsp_len, int nsid)
 
 	*rsp = kzalloc(sizeof(**rsp), GFP_KERNEL);
 	if (!(*rsp)) {
-		pr_alert("%s:kzalloc failed for rsp, size:%lu\n", __func__, sizeof(**rsp));
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, ":kzalloc failed for rsp, size:%lu\n",
+					 sizeof(**rsp));
 		return -ENOMEM;
 	}
 
@@ -689,7 +692,7 @@ int kparser_init(void)
 {
 	int err, i, j;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	for (i = 0; i < (sizeof(g_mod_namespaces) /
 				sizeof(g_mod_namespaces[0])); i++) {
@@ -710,18 +713,18 @@ int kparser_init(void)
 			((KPARSER_KMOD_ID_MAX - KPARSER_KMOD_ID_MIN) /
 			 BITS_PER_TYPE(unsigned long)) + 1;
 
-		pr_debug("{%s:%d}:bv_len:%lu, total_bytes:%lu, range:[%d:%d]\n",
-			 __func__, __LINE__,
-			 g_mod_namespaces[i]->bv_len,
-			 sizeof(unsigned long) * g_mod_namespaces[i]->bv_len,
-			 KPARSER_KMOD_ID_MAX, KPARSER_KMOD_ID_MIN);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+					 "bv_len:%lu, total_bytes:%lu, range:[%d:%d]\n",
+					 g_mod_namespaces[i]->bv_len,
+					 sizeof(unsigned long) * g_mod_namespaces[i]->bv_len,
+					 KPARSER_KMOD_ID_MAX, KPARSER_KMOD_ID_MIN);
 
 		g_mod_namespaces[i]->bv = kcalloc(g_mod_namespaces[i]->bv_len,
 						  sizeof(unsigned long),
 						  GFP_KERNEL);
 
 		if (!g_mod_namespaces[i]->bv) {
-			pr_alert("%s: kzalloc() failed\n", __func__);
+			KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "kzalloc() failed");
 			goto handle_error;
 		}
 
@@ -731,7 +734,7 @@ int kparser_init(void)
 
 	memset(kparser_fast_lookup_array, 0, sizeof(kparser_fast_lookup_array));
 
-	pr_debug("OUT: %s:%s:%d:err:%d\n", __FILE__, __func__, __LINE__, err);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 
 	return 0;
 
@@ -747,7 +750,7 @@ handle_error:
 		g_mod_namespaces[j]->bv_len = 0;
 	}
 
-	pr_debug("OUT: %s() failed, err: %d\n", __func__, err);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 
 	return err;
 }
@@ -757,7 +760,7 @@ int kparser_deinit(void)
 {
 	int i;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 	for (i = 0; i < ARRAY_SIZE(g_mod_namespaces); i++) {
 		if (!g_mod_namespaces[i])
 			continue;
@@ -771,7 +774,7 @@ int kparser_deinit(void)
 		g_mod_namespaces[i]->bv_len = 0;
 	}
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return 0;
 }
 
@@ -785,14 +788,13 @@ static inline const struct kparser_conf_cmd
 	const struct kparser_conf_cmd *conf;
 	int rc;
 
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");
 
 	conf = cmdarg;
 	if (!conf || cmdarglen < sizeof(*conf) || !rsp || *rsp || !rsp_len ||
 	    (*rsp_len != 0) || conf->namespace_id <= KPARSER_NS_INVALID ||
 	    conf->namespace_id >= KPARSER_NS_MAX) {
-		pr_debug("{%s:%d}:[%p %lu %p %p %p %lu %d]\n",
-			 __func__, __LINE__,
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "[%p %lu %p %p %p %lu %d]\n",
 			 conf, cmdarglen, rsp, *rsp, rsp_len,
 			 *rsp_len, conf->namespace_id);
 		goto err_return;
@@ -808,28 +810,27 @@ static inline const struct kparser_conf_cmd
 
 	rc = alloc_first_rsp(rsp, rsp_len, conf->namespace_id);
 	if (rc) {
-		pr_debug("%s:alloc_first_rsp() failed, rc:%d\n",
-			 __func__, rc);
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI,
+					 "alloc_first_rsp() failed, rc:%d\n", rc);
 		goto err_return;
 	}
 
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return cmdarg;
 
 err_return:
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");
 	return NULL;
 }
 
 #define KPARSER_CONFIG_HANDLER_PRE()					\
 do {									\
-	pr_debug("IN: %s:%s:%d\n", __FILE__, __func__, __LINE__);	\
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "IN: ");		\
 	conf = kparser_config_handler_preprocess(cmdarg, cmdarglen,	\
 			rsp, rsp_len);					\
 	if (!conf)							\
-		pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__,		\
-				__LINE__);				\
-	pr_debug("OUT: %s:%s:%d\n", __FILE__, __func__, __LINE__);	\
+		KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");	\
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_CLI, "OUT: ");		\
 }									\
 while (0)
 

@@ -241,7 +241,7 @@ struct kparser_parameterized_len {
 
 struct kparser_parameterized_next_proto {
 	__u16 src_off;
-	__u16 mask;
+	__u32 mask;
 	__u8 size;
 	__u8 right_shift;
 };
@@ -443,7 +443,6 @@ struct kparser_conf_table {
 /* Flags for parser configuration */
 #define KPARSER_F_DEBUG_DATAPATH		(1 << 0)
 #define KPARSER_F_DEBUG_CLI			(1 << 1)
-#define KPARSER_F_DEBUG_LOOPBACK_HDR_REMOVAL_HACK	(1 << 2)
 
 #define KPARSER_MAX_NODES	10
 #define KPARSER_MAX_ENCAPS	1
