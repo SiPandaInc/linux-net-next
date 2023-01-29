@@ -26,35 +26,35 @@
 static int kparser_cli_cmd_handler(struct sk_buff *skb, struct genl_info *info);
 
 /* define netlink msg policies */
-#define NS_DEFINE_POLICY_ATTR_ENTRY(id, struc_name, rsp_struc_name)	\
-	[KPARSER_ATTR_CREATE_##id] = {					\
+#define NS_DEFINE_POLICY_ATTR_ENTRY(ID, STRUC_NAME, RSP_STRUC_NAME)	\
+	[KPARSER_ATTR_CREATE_##ID] = {					\
 		.type = NLA_BINARY,					\
 		.validation_type = NLA_VALIDATE_MIN,			\
-		.min = sizeof(struct struc_name)			\
+		.min = sizeof(struct STRUC_NAME)			\
 	},								\
-	[KPARSER_ATTR_UPDATE_##id] = {					\
+	[KPARSER_ATTR_UPDATE_##ID] = {					\
 		.type = NLA_BINARY,					\
-		.len = sizeof(struct struc_name),			\
+		.len = sizeof(struct STRUC_NAME),			\
 		.validation_type = NLA_VALIDATE_MIN,			\
-		.min = sizeof(struct struc_name)			\
+		.min = sizeof(struct STRUC_NAME)			\
 	},								\
-	[KPARSER_ATTR_READ_##id] = {					\
+	[KPARSER_ATTR_READ_##ID] = {					\
 		.type = NLA_BINARY,					\
-		.len = sizeof(struct struc_name),			\
+		.len = sizeof(struct STRUC_NAME),			\
 		.validation_type = NLA_VALIDATE_MIN,			\
-		.min = sizeof(struct struc_name)			\
+		.min = sizeof(struct STRUC_NAME)			\
 	},								\
-	[KPARSER_ATTR_DELETE_##id] = {					\
+	[KPARSER_ATTR_DELETE_##ID] = {					\
 		.type = NLA_BINARY,					\
-		.len = sizeof(struct struc_name),			\
+		.len = sizeof(struct STRUC_NAME),			\
 		.validation_type = NLA_VALIDATE_MIN,			\
-		.min = sizeof(struct struc_name)			\
+		.min = sizeof(struct STRUC_NAME)			\
 	},								\
-	[KPARSER_ATTR_RSP_##id] = {					\
+	[KPARSER_ATTR_RSP_##ID] = {					\
 		.type = NLA_BINARY,					\
-		.len = sizeof(struct rsp_struc_name),			\
+		.len = sizeof(struct RSP_STRUC_NAME),			\
 		.validation_type = NLA_VALIDATE_MIN,			\
-		.min = sizeof(struct rsp_struc_name)			\
+		.min = sizeof(struct RSP_STRUC_NAME)			\
 	}
 
 static const struct nla_policy kparser_nl_policy[KPARSER_ATTR_MAX] = {

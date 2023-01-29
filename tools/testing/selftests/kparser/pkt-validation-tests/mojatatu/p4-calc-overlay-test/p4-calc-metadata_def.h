@@ -17,7 +17,7 @@ struct user_frame {
         unsigned short calc_op_a;
         unsigned short calc_op_b;
         unsigned short calc_res;
-        unsigned char calc_isValid;
+        unsigned short calc_isValid;
 } __packed;
 struct user_metadata {
         struct user_frame frames;

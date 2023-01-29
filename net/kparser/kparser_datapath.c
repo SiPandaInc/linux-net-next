@@ -1166,7 +1166,7 @@ int kparser_parse(struct sk_buff *skb,
 
 	rcu_read_lock();
 
-	if (likely(avoid_ref == false))
+	if (likely(!avoid_ref))
 		kparser_ref_get(&k_prsr->glue.refcount);
 	parser = &k_prsr->parser;
 
@@ -1178,7 +1178,7 @@ int kparser_parse(struct sk_buff *skb,
 					 "parser htbl lookup failure for key:{%s:%u}\n",
 					 kparser_key->name, kparser_key->id);
 		rcu_read_unlock();
-		if (likely(avoid_ref == false))
+		if (likely(!avoid_ref))
 			kparser_ref_put(&k_prsr->glue.refcount);
 		return -ENOENT;
 	}
@@ -1187,7 +1187,7 @@ int kparser_parse(struct sk_buff *skb,
 
 	rcu_read_unlock();
 
-	if (likely(avoid_ref == false))
+	if (likely(!avoid_ref))
 		kparser_ref_put(&k_prsr->glue.refcount);
 
 	return err;
@@ -1225,7 +1225,7 @@ const void *kparser_get_parser(const struct kparser_hkey *kparser_key,
 	if (!k_prsr)
 		return NULL;
 
-	if (likely(avoid_ref == false))
+	if (likely(!avoid_ref))
 		kparser_ref_get(&k_prsr->glue.refcount);
 
 	return &k_prsr->parser;
@@ -1256,7 +1256,7 @@ bool kparser_put_parser(const void *obj, bool avoid_ref)
 	if (!parser)
 		return false;
 
-	if (likely(avoid_ref == false)) {
+	if (likely(!avoid_ref)) {
 		k_parser = container_of(parser, struct kparser_glue_parser, parser);
 		kparser_ref_put(&k_parser->glue.refcount);
 	}

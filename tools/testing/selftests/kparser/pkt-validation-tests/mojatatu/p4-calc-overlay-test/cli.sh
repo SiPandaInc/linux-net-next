@@ -17,9 +17,16 @@ IP="$1/ip/ip"
 ipcmd() {
 # -j -p enables formatted json print in stdout
 	echo "Executing \`$IP -j -p $@\`" | fold -w 80
-	$IP -j -p "$@" || die "command \`$@\` failed."
+	# $IP -j -p "$@" || die "command \`$@\` failed."
+	$IP "$@" || die "command \`$@\` failed."
 	echo "---------------------------------------------------------------"
 }
+
+#Lookup table creation for checking next nodes
+ipcmd parser create table name table.ether
+ipcmd parser create table name P
+ipcmd parser create table name four
+ipcmd parser create table name ver
 
 #Extraction definition per header. Values (addoff local offsets)
 ipcmd parser create metadata-rule name md.calc.dstAddr	\
@@ -67,18 +74,23 @@ ipcmd parser create metadata-rule name md.calc.operand_b    \
 		md-off 16						                    \
 		addoff 64
 
-ipcmd parser create metadata-rule name md.calc.res		\
-	type bit-offset						\
-	md-off 18						\
-	addoff 96
+ipcmd parser create metadata-rule name md.calc.res  \
+		type bit-offset						        \
+		md-off 18						            \
+		addoff 96
 
-ipcmd parser create metadata-rule name md.calc.isValid		\
-	type constant-halfword					\
-	md-off 20						\
-	constantvalue 1
+ipcmd parser create metadata-rule name md.calc.isValid  \
+		type constant-halfword        \
+		md-off 20					            \
+		constantvalue 1
 
-ipcmd parser create node name node.calc \
-		min-hdr-length 16 	\
+# Creates a metalist object to be associated with a parse node. 
+ipcmd parser create metalist name mdl.calceth	\
+		md.rule md.calc.dstAddr					\
+		md.rule md.calc.srcAddr					\
+		md.rule md.calc.etherType
+
+ipcmd parser create metalist name mdl.calc  \
 		md.rule md.calc.p                   \
 		md.rule md.calc.four                \
 		md.rule md.calc.ver                 \
@@ -88,38 +100,36 @@ ipcmd parser create node name node.calc \
 		md.rule md.calc.res  \
 		md.rule md.calc.isValid
 
-ipcmd parser create node name node.calc.check.ver \
-		min-hdr-length 16 \
-		nxt.field-off 2	\
-		nxt.field-len 1 \
-		overlay true	\
-		nxt.table-ent 0x01:node.calc
+ipcmd parser create node name node.calc 	\
+		min-hdr-length 16 					\
+		metalist mdl.calc
 
-ipcmd parser create node name node.calc.check.four \
-		min-hdr-length 16 \
-		nxt.field-off 1	\
-		nxt.field-len 1 \
-		overlay true	\
-		nxt.table-ent 0x34:node.calc.check.ver
+ipcmd parser create table/P	\
+		key 0x503401	\
+		node node.calc
 
-ipcmd parser create node name node.calc.check.P \
+# it verifies the value of P field, and if ok, moves to next four field
+ipcmd parser create node name node.P \
 		min-hdr-length 16 \
 		nxt.field-off 0	\
-		nxt.field-len 1 \
+		nxt.field-len 3 \
 		overlay true	\
-		nxt.table-ent 0x50:node.calc.check.four
+		nxt.table P
 
 # Creates a parse nodes. Contains header size and how to calculate next header
 ipcmd parser create node name node.ether	\
 		min-hdr-length 14					\
 		nxt.field-off 12					\
 		nxt.field-len 2						\
-		md.rule md.calc.dstAddr					\
-		md.rule md.calc.srcAddr					\
-		md.rule md.calc.etherType				\
-		nxt.table-ent 0x1234:node.calc.check.P
+		metalist mdl.calceth				\
+		nxt.table table.ether
+
+# Populate lookup tables.
+ipcmd parser create table/table.ether	\
+		key 0x1234						\
+		node node.P
 
 # Creates a parser object and specifies starting node
-ipcmd parser create parser name calc_parser id 1			\
-		metametasize 21						\
-		rootnode node.ether flags enable-all-debug-logs
+ipcmd parser create parser name calc_parser id 1	\
+		metametasize 22								\
+		rootnode node.ether

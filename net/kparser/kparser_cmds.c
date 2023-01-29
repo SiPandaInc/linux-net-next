@@ -273,19 +273,19 @@ struct kparser_mod_namespaces {
 };
 
 /* Statically define kParser KMOD's namespaces with all the parameters */
-#define KPARSER_DEFINE_MOD_NAMESPACE(g_ns_obj, nsid, obj_name, field, create,	\
-				     read, update, delete, free)		\
+#define KPARSER_DEFINE_MOD_NAMESPACE(g_ns_obj, NSID, OBJ_NAME, FIELD, CREATE,	\
+				     READ, UPDATE, DELETE, FREE)		\
 static struct kparser_mod_namespaces g_ns_obj = {				\
-	.namespace_id = nsid,							\
-	.name = #nsid,								\
+	.namespace_id = NSID,							\
+	.name = #NSID,								\
 	.htbl_name =	{							\
 		.tbl_params = {							\
 			.head_offset = offsetof(				\
-					struct obj_name,			\
-					field.ht_node_name),			\
+					struct OBJ_NAME,			\
+					FIELD.ht_node_name),			\
 			.key_offset = offsetof(					\
-					struct obj_name,			\
-					field.key.name),			\
+					struct OBJ_NAME,			\
+					FIELD.key.name),			\
 			.key_len = sizeof(((struct kparser_hkey *)0)->name),	\
 			.automatic_shrinking = true,				\
 			.hashfn = kparser_generic_hash_fn_name,			\
@@ -296,11 +296,11 @@ static struct kparser_mod_namespaces g_ns_obj = {				\
 	.htbl_id =	{							\
 		.tbl_params = {							\
 			.head_offset = offsetof(				\
-					struct obj_name,			\
-					field.ht_node_id),			\
+					struct OBJ_NAME,			\
+					FIELD.ht_node_id),			\
 			.key_offset = offsetof(					\
-					struct obj_name,			\
-					field.key.id),				\
+					struct OBJ_NAME,			\
+					FIELD.key.id),				\
 			.key_len = sizeof(((struct kparser_hkey *)0)->id),	\
 			.automatic_shrinking = true,				\
 			.hashfn = kparser_generic_hash_fn_id,			\
@@ -309,11 +309,11 @@ static struct kparser_mod_namespaces g_ns_obj = {				\
 		}								\
 	},									\
 										\
-	.create_handler = create,						\
-	.read_handler = read,							\
-	.update_handler = update,						\
-	.del_handler = delete,							\
-	.free_handler = free,							\
+	.create_handler = CREATE,						\
+	.read_handler = READ,							\
+	.update_handler = UPDATE,						\
+	.del_handler = DELETE,							\
+	.free_handler = FREE,							\
 }
 
 KPARSER_DEFINE_MOD_NAMESPACE(kparser_mod_namespace_condexprs,

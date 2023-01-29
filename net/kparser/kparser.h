@@ -403,14 +403,15 @@ extern void __rcu
 	*kparser_fast_lookup_array[KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP -
 	KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START + 1];
 
-#define KPARSER_KMOD_DEBUG_PRINT(parser_flag, fmt, args...)			\
+#define KPARSER_KMOD_DEBUG_PRINT(PARSER_FLAG, FMT, ARGS...)			\
 do {										\
-	if (parser_flag & KPARSER_F_DEBUG_DATAPATH)				\
-		pr_alert("kParser:DATA:[%s:%d]" fmt, __func__, __LINE__, ## args);\
-	else if (parser_flag & KPARSER_F_DEBUG_CLI)				\
-		pr_alert("kParser:CLI:[%s:%d]" fmt, __func__, __LINE__, ## args);\
+	unsigned int parser_flag = PARSER_FLAG;					\
+	if ((parser_flag) & KPARSER_F_DEBUG_DATAPATH)				\
+		pr_alert("kParser:DATA:[%s:%d]" FMT, __func__, __LINE__, ## ARGS);\
+	else if ((parser_flag) & KPARSER_F_DEBUG_CLI)				\
+		pr_alert("kParser:CLI:[%s:%d]" FMT, __func__, __LINE__, ## ARGS);\
 	else									\
-		pr_debug("kParser:[%s:%d]" fmt, __func__, __LINE__, ## args);	\
+		pr_debug("kParser:[%s:%d]" FMT, __func__, __LINE__, ## ARGS);	\
 }										\
 while (0)
 

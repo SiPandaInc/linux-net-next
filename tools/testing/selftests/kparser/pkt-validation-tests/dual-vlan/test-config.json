@@ -1,0 +1,49 @@
+{
+	"tests": [
+	{
+		"test-name" : "dual-vlan-parsing",
+		"description" :
+			"verify kParser dual vlan parsing",
+		"lnn-path" : "/root/repos/linux-net-next/",
+		"iproute2-path" : "/root/repos/iproute2-next/",
+		"log-dir-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/dual-vlan/logs/"
+		},
+		"kParser" : {
+			"cli-setup-config-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/dual-vlan/cli.sh"
+			},
+			"recompile-kmod" : "no",
+			"recompile-cli" : "no"
+		},
+		"test-pcap-file-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/data/pcaps/vlan_icmp.pcap"
+		},
+		"pkt-index-in-pcap" : 0,
+		"xdp-md": {
+			"recompile-samples-prog" : "yes",
+			"target-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "samples/bpf/metadata_def.h"
+			},
+			"src-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/dual-vlan/metadata_def.h"
+			},
+			"C-md-structure" : []
+			},
+		"expected-md-values" : {
+				"key": 1,
+				"value": {
+				    "frames": {
+					"vlan_cnt": 2,
+					"vlan_type_offsets": [16,20]
+				    }
+				}
+		}
+	}
+	]
+}

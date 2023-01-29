@@ -15,14 +15,13 @@
 #include <asm/byteorder.h>
 
 #ifdef __LITTLE_ENDIAN
-#define kparser_htonll(x)						\
-	(((__u64)htonl((x) & 0xffffffff) << 32) | htonl((x) >> 32))
-#define kparser_ntohll(x)						\
-	(((__u64)ntohl((x) & 0xffffffff) << 32) | ntohl((x) >> 32))
+#define kparser_htonll(X)						\
+	(((__u64)htonl((X) & 0xffffffff) << 32) | htonl((X) >> 32))
+#define kparser_ntohll(X)						\
+	(((__u64)ntohl((X) & 0xffffffff) << 32) | ntohl((X) >> 32))
 #else
-#error "Cannot determine endianness"
-#define kparser_htonll(x) (x)
-#define kparser_ntohll(x) (x)
+#define kparser_htonll(X) (X)
+#define kparser_ntohll(X) (X)
 #endif
 
 /* Metadata extraction pseudo instructions
@@ -229,7 +228,7 @@ struct kparser_metadata_extract {
 	.bytes.frame = FRAME,									\
 	.bytes.src_off = SRC_OFF,								\
 	.bytes.dst_off = DST_OFF,								\
-	.bytes.length = LEN - 1, /* Minimum one byte */						\
+	.bytes.length = (LEN) - 1, /* Minimum one byte */					\
 	.bytes.e_bit = E_BIT,									\
 	.bytes.cntr = CNTR,									\
 }
@@ -254,7 +253,7 @@ __kparser_metadata_make_bytes_extract(bool frame, size_t src_off,
 	.nibbs.frame = FRAME,									\
 	.nibbs.src_off = NIBB_SRC_OFF,								\
 	.nibbs.dst_off = DST_OFF,								\
-	.nibbs.length = NIBB_LEN - 1, /* Minimum one nibble */					\
+	.nibbs.length = (NIBB_LEN) - 1, /* Minimum one nibble */				\
 	.nibbs.e_bit = E_BIT,									\
 	.nibbs.cntr = CNTR,									\
 }
