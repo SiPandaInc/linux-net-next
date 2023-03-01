@@ -41,10 +41,11 @@ IP="$1/ip/ip"
 ipcmd() {
 # -j -p enables formatted json print in stdout
 	echo "Executing \`./ip/ip -j -p $@\`" | fold -w 80
-	$IP -j -p "$@" || die "command \`$@\` failed."
+	$IP netns exec testkparser $IP -j -p "$@" || die "command \`$@\` failed."
 	echo "---------------------------------------------------------------"
 }
 
+$IP netns add testkparser
 
 ipcmd parser create metadata-rule name okay_node.metadata.numencaps type numencaps md-off 0
 ipcmd parser create metadata-rule name okay_node.metadata.numnodes type numnodes md-off 2 
