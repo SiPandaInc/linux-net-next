@@ -1,0 +1,67 @@
+{
+	"tests": [
+	{
+		"test-name" : "autogen-simple-parser",
+		"description" :
+			"verify kParser parsing functionality of autogen simple parser",
+		"lnn-path" : "/root/repos/linux-net-next/",
+		"iproute2-path" : "/root/repos/iproute2-next/",
+		"log-dir-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/simple-parser-autogen/logs/"
+		},
+		"kParser" : {
+			"cli-setup-config-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/simple-parser-autogen/simpleparser-kparser-cli.sh"
+			},
+			"recompile-kmod" : "no",
+			"recompile-cli" : "no"
+		},
+		"test-pcap-file-path" : {
+			"path-inside-lnn" : "yes",
+			"file" : "tools/testing/selftests/kparser/pkt-validation-tests/data/pcaps/tcp_ipv4.pcap"
+		},
+		"pkt-index-in-pcap" : 0,
+		"xdp-md": {
+			"recompile-samples-prog" : "yes",
+			"target-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "samples/bpf/metadata_def.h"
+			},
+			"src-md-hdr-file-path" : {
+				"path-inside-lnn" : "yes",
+				"file" : "tools/testing/selftests/kparser/pkt-validation-tests/simple-parser-autogen/metadata_def.h"
+			},
+			"C-md-structure" : []
+			},
+		"expected-md-values" : {
+			"key": 1,
+			"value": {
+			    "metametadata": {
+				"ipmetadata": {
+				    "ipv4_metadata": {
+					"addr_type": 1,
+					"ip_protocol": 6,
+					"pad1": 255,
+					"pad2": 255,
+					"ports": 721460396,
+					"addrs": 3098648807172145344
+				    },
+				    "ipv6_metadata": {
+					"addr_type": 1,
+					"ip_protocol": 6,
+					"pad1": 255,
+					"pad2": 255,
+					"ports": 721460396,
+					"addrs": 3098648807172145344
+				    }
+				}
+			    },
+			"frames" : {}
+			}
+
+		}
+	}
+	]
+}

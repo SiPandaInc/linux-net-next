@@ -1088,11 +1088,17 @@ kparser_get_parser_ctx(const struct kparser_hkey *kparser_key)
 	if (!kparser_key)
 		return NULL;
 
+	KPARSER_KMOD_DEBUG_PRINT(KPARSER_F_DEBUG_DATAPATH,
+				 "Incoming parser lookup for key: {%s:%u}\n",
+				 kparser_key->name, kparser_key->id);
+
 	if (kparser_key->id >= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_START &&
 	    kparser_key->id <= KPARSER_PARSER_FAST_LOOKUP_RSVD_ID_STOP) {
 		rcu_read_lock();
 		ptr = kparser_fast_lookup_array[kparser_key->id];
 		rcu_read_unlock();
+		if (unlikely(!ptr))
+			ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
 	} else {
 		ptr = kparser_namespace_lookup(KPARSER_NS_PARSER, kparser_key);
 	}

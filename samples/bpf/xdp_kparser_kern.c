@@ -71,15 +71,13 @@ SEC("prog")
 int xdp_parser_prog(struct xdp_md *ctx)
 {
 	/* prepare a parser key which is already created and configured via the ip cli
-	 * NOTE: Using hard coded parser id 0 since as of now there is no way to
-	 * pass parser id to this function from the caller. Hence user either
-	 * must configure the parser with id 0 using the ip cli, or change this
-	 * hard coded value to the correct configured value, recompile this user
-	 * code and use the program.
+	 * NOTE: Using hard coded parser id KPARSER_ID and name KPARSER_NAME
+	 * from associated metadata_def.h, since as of now there is no way to
+	 * pass parser hkey to this function from the caller except from compile
+	 * time.
 	 */
-	//key.id = 0;
 	key.id = KPARSER_ID;
-
+	memcpy(key.name, KPARSER_NAME, strlen(KPARSER_NAME) + 1);
 
 	/* set all bits to 1 in user metadata buffer to easily determine later which
 	 * fields were set/updated by kParser KMOD
